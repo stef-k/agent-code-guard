@@ -360,7 +360,8 @@ def _javascript_lexical_name(node, source: bytes) -> str | None:
 
 
 def _callback_name(node, region: ExecutableRegion) -> str:
-    point = region.original_point(node.start_point.row, node.start_point.column)
+    row, column = node.start_point
+    point = region.original_point(row, column)
     return f"<callback@{point.line}:{point.byte_column}>"
 
 

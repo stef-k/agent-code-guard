@@ -329,3 +329,11 @@ Candidates that pass that primary gate must also address threshold/configuration
 Every candidate issue ends with one explicit decision: `ACCEPT`, `ACCEPT — CONFIGURABLE ONLY`, `NEEDS MORE EVIDENCE`, or `REJECT / OUT OF SCOPE`. The repository's candidate-guard issue template and `docs/guard-admission.md` define the reusable evidence record.
 
 Once admitted, a guard should normally ship as one complete vertical production slice from deterministic provider/facts through configuration, runner/result/policy integration, tests, CI, and documentation. Internals remain modular, but the project should not accumulate half-integrated production engines that cannot be reached through the normal `code-guard` workflow.
+
+## D28 — Real-project complexity evidence remains Outcome C
+
+Issue #14 sampled 1,132 production files and 11,870 callables across C#, JavaScript, TypeScript/Vue, Python, Go, Rust, and Kotlin at six pinned repository commits. Complexity calculated only from shared production `DecisionFact` values is deterministic and usually review-useful when conditions, loops, catches, ternaries, and executable selection arms dominate.
+
+The real-project evidence changes the earlier provisional concern into two concrete blockers. Counting every short-circuit operator systematically inflates fallback/default and compact predicate code, while opaque lambdas in Kotlin, C#, Python, Go, and Java can hide decisions entirely. These effects make current cross-language values incomparable and do not justify universal or per-language default threshold tables.
+
+Complexity therefore remains **Outcome C** and is not admitted to production yet. No guard, REVIEW default, FAIL state, or runner activation is added. Before renewed admission, a narrow follow-up must test one contribution per maximal boolean expression and close or explicitly bound mainstream lambda ownership. If those semantics become stable, complexity should be an opt-in PASS/REVIEW guard requiring one project-supplied positive `reviewAt`, consuming the runner's single `AnalysisFacts`, and explaining non-zero normalized category counts. Agents may not relax that configuration without authorization.
