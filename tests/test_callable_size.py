@@ -46,6 +46,20 @@ class CallableSizeConfigTests(unittest.TestCase):
 
 
 class CallableSizeEvaluationTests(unittest.TestCase):
+    def test_javascript_assignment_and_anonymous_callback_are_independent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "owners.ts"
+            source.write_text(
+                "const assigned = (x: number) => x;\n"
+                "function owner() { return [1].map((x) => x + 1); }\n",
+                encoding="utf-8",
+            )
+            result = callable_size.run(root, callable_size.Config(True, 1), analyze_files([source]))
+            identities = {finding.callable for finding in result.findings}
+            self.assertIn("owners.assigned", identities)
+            self.assertTrue(any("<callback@" in identity for identity in identities))
+
     def test_boundary_multiple_callables_and_no_fail(self) -> None:
         fixtures = Path(__file__).parent / "fixtures" / "analyzers"
         facts = analyze_files([fixtures / "php" / "Mixed.php"])
@@ -66,7 +80,7 @@ class CallableSizeEvaluationTests(unittest.TestCase):
         fixtures = Path(__file__).parent / "fixtures" / "analyzers"
         facts = analyze_files([fixtures / "vue" / "Setup.vue"])
         finding = callable_size.run(fixtures, callable_size.Config(True, 1), facts).findings[0]
-        self.assertEqual((finding.path, finding.start_line, finding.embedded_language), ("vue/Setup.vue", 2, "typescript"))
+        self.assertEqual((finding.path, finding.start_line, finding.embedded_language), ("vue/Setup.vue", 8, "typescript"))
 
 
 class CallableSizeOrchestrationTests(unittest.TestCase):
@@ -116,6 +130,16 @@ class CallableSizeRunnerTests(CodeGuardTestCase):
             config = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={"callableSize": {"enabled": False}})
             result = self.run_guard(root, str(source), "--config", str(config), "--json")
             self.assertEqual((result.returncode, self.read_json(result)["requiredPolicies"]), (0, []))
+
+    def test_enabled_pass_has_no_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "sample.py"
+            source.write_text("def sample():\n    return 1\n", encoding="utf-8")
+            config = write_config(root, {"enabled": False}, guards={"callableSize": {"enabled": True, "reviewAt": 2}})
+            result = self.run_guard(root, str(source), "--config", str(config), "--json")
+            data = self.read_json(result)
+            self.assertEqual((result.returncode, data["requiredPolicies"], data["guards"]["callableSize"]["state"]), (0, [], "pass"))
 
     def test_enabled_malformed_source_is_exit_three(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 import argparse
+from importlib import import_module
 import json
 import sys
 from pathlib import Path
 
 from .file_selection import resolve_scope
-from .guards import loc
+from .guards import callable_size, loc
 from .result_model import GuardResult, aggregate_state, required_policies
 
 
@@ -39,6 +40,19 @@ def payload(results: list[GuardResult]) -> dict[str, object]:
     }
 
 
+def run_guards(scope, args: argparse.Namespace) -> list[GuardResult]:
+    """Load guard configuration, then construct shared syntax facts at most once."""
+    loc_config = loc.load_config(args)
+    callable_size_config = callable_size.load_config(args)
+    results = [loc.run(scope.root, loc_config, scope.files)]
+    needs_analysis = callable_size_config.enabled
+    if needs_analysis:
+        analysis = import_module("agent_code_guard.analysis.pipeline")
+        facts = analysis.analyze_files(scope.files)
+        results.append(callable_size.run(scope.root, callable_size_config, facts))
+    return results
+
+
 def print_text(data: dict[str, object]) -> None:
     print(str(data["overall"]).upper())
     loc_result = data["guards"]["loc"]
@@ -51,6 +65,16 @@ def print_text(data: dict[str, object]) -> None:
             print(f"  Threshold override: {finding['overrideIndex']}")
         if finding["reason"]:
             print(f"  Reason: {finding['reason']}")
+    callable_result = data["guards"].get("callableSize")
+    if callable_result:
+        for finding in callable_result["findings"]:
+            if finding["state"] != "review":
+                continue
+            print(
+                f"REVIEW: {finding['path']}:{finding['range']['startLine']}-{finding['range']['endLine']} "
+                f"— {finding['callable']} is {finding['measured']} LOC "
+                f"(review {finding['thresholds']['reviewAt']})"
+            )
     policies = data["requiredPolicies"]
     if policies:
         print(f"Required policies: {', '.join(policies)}")
@@ -69,8 +93,7 @@ def main() -> int:
     args = parser().parse_args()
     try:
         scope = resolve_scope(args, Path.cwd())
-        result = loc.run(scope.root, loc.load_config(args), scope.files)
-        data = payload([result])
+        data = payload(run_guards(scope, args))
         if args.json:
             print(json.dumps(data, indent=2))
         else:

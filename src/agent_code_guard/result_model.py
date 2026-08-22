@@ -56,8 +56,9 @@ class CallableFinding:
             "measured": self.measured,
             "state": self.state,
             "thresholds": self.thresholds,
-            "details": self.details,
         }
+        if self.details is not None:
+            value["details"] = self.details
         if self.embedded_language is not None:
             value["embeddedLanguage"] = self.embedded_language
         return value
