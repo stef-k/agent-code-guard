@@ -280,6 +280,31 @@ No production REVIEW or FAIL threshold is introduced.
 - Syntax trees containing errors are rejected rather than partially measured.
 - The corpus proves deterministic normalization, not universal threshold value.
 
+## Production second-wave validation (#8)
+
+The shipped pipeline was subsequently validated without a second parser or fact
+model across C++, Rust, PHP, Swift, and Dart using Tree-sitter 0.26.0 and
+tree-sitter-language-pack 1.14.3. Each fixture asserts lexical identity,
+original range, inclusive physical LOC, structural nesting, and complexity
+derived only from immutable `AnalysisFacts`.
+
+| Language | Callable and closure policy | Control/decision mapping | Provider result and limitations |
+| --- | --- | --- | --- |
+| C++ | Free functions, methods, constructors, destructors, operators, templates, and nested-class methods are named. Assigned lambdas use the declaration target; callbacks use source coordinates. | Conditions, loops, switch, try/catch, ternary, and short-circuit operators map directly. Preprocessor directives add no runtime decisions. | `.cpp/.cc/.cxx/.hpp/.hh/.hxx` parse deterministically. `.h` remains excluded. `#define`, `#ifdef`, and `#if` structure is lexical potential code: no macro expansion, configuration selection, or claim that a reported callable is compiled. Error nodes reject the whole file; a future specialized backend is not justified by this evidence. |
+| Rust | Free, trait-default, and impl functions are named. Bound closures use the binding; callbacks use coordinates. | `if let` is a condition and `while let` a loop; patterns add zero. Non-wildcard `match` arms count, explicit guards add `pattern_guard`, and expression-oriented controls use the same facts. | The grammar exposes stable ranges and distinct pattern/guard nodes. No Rust toolchain is required. |
+| PHP | Functions, methods, constructors, bound arrows/closures, and anonymous callbacks are independent callables. | `if/elseif`, loops, switch/match arms, catches, ternary, and short-circuit booleans count. `??` remains a non-decision fallback. | One whole-file PHP region preserves original `.php` bytes/path across multiple PHP islands; HTML `text` nodes emit no executable facts. This avoids breaking valid PHP spanning tags and requires one executable parse. |
+| Swift | Functions, methods, initializers, extension/protocol executable defaults, bound closures, and callbacks are represented. | `guard` is a condition: only its failure body nests. Loops/switch/do-catch map normally; non-default patterns and `where` guards count. Optional syntax alone does not. | Stable lexical ranges are available. Protocol bodies require a small adapter join for the grammar's adjacent declaration/body shape; the common facts remain unchanged. |
+| Dart | Top-level, async, method, constructor, local functions, bound closures, and callbacks are represented. | Conditions, loops, switch cases, catches, ternary, and short-circuit booleans count. Null-aware access and `??` do not. | Stable ranges are available. A small adapter joins the grammar's adjacent signature/body nodes and preserves one parse/fact pass; Flutter semantics are out of scope. |
+
+The architecture **survived with small, evidence-driven adapter extensions**.
+No `AnalysisFacts` field changed. Callable LOC strengthens Outcome B while
+qualifying declaration ownership for templates and closures. Structural nesting
+strengthens Outcome B because patterns, markup, preprocessing, and callable
+boundaries remain distinct from executable control depth. Complexity strengthens
+but further qualifies Outcome C: the common core remains useful, while guarded
+patterns and fallback/optional constructs need explicit language mapping. No
+universal threshold or production syntax guard was introduced.
+
 ## Recommended production slices
 
 1. Productionize source/container regions, byte mapping, language adapter/fact

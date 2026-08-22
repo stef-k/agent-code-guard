@@ -146,8 +146,11 @@ resolve_scope() -> ResolvedScope.files
 
 Ordinary files are identity-mapped regions. Vue template/style content is ignored;
 each inline `script` region is mapped back to exact original `.vue` byte coordinates.
-The first wave supports Python, Go, Kotlin, C#, Java, JavaScript, TypeScript,
-JSX, TSX, and Vue JavaScript/TypeScript scripts. Unsupported ordinary artifacts
+The production adapters support Python, Go, Kotlin, C#, Java, JavaScript,
+TypeScript, JSX, TSX, Vue JavaScript/TypeScript scripts, C++, Rust, PHP, Swift,
+and Dart. C++ dispatch includes `.cpp`, `.cc`, `.cxx`, `.hpp`, `.hh`, and `.hxx`;
+ambiguous generic `.h` files remain syntax-inapplicable until language context is
+available. Unsupported ordinary artifacts
 are not syntax errors. Supported malformed syntax, unsupported explicit Vue
 script languages, external Vue scripts, or a missing required grammar fail
 deterministically instead of returning partial facts.
@@ -166,6 +169,11 @@ downgraded to regex analysis. The language pack wheel is about 2–2.4 MB before
 installation. Parser instances are cached by embedded language inside one
 provider, and each executable region is parsed/extracted once for reuse by all
 future syntax guards.
+
+PHP files use one identity-mapped whole-file executable region. The pinned PHP
+grammar exposes PHP declarations alongside inert HTML `text` nodes, so mixed
+files retain exact original bytes and paths without copying or splitting PHP
+that can legally span close/reopen tags. HTML does not emit executable facts.
 
 The public runner deliberately does not construct this pipeline while only LOC
 is enabled. Installing these dependencies is therefore optional for ordinary

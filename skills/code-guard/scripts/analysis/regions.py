@@ -14,6 +14,9 @@ LANGUAGE_BY_SUFFIX = {
     ".py": "python", ".go": "go", ".kt": "kotlin", ".cs": "csharp",
     ".java": "java", ".js": "javascript", ".jsx": "javascript",
     ".ts": "typescript", ".tsx": "tsx",
+    ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp",
+    ".hpp": "cpp", ".hh": "cpp", ".hxx": "cpp",
+    ".rs": "rust", ".php": "php", ".swift": "swift", ".dart": "dart",
 }
 APPLICABLE_SUFFIXES = frozenset((*LANGUAGE_BY_SUFFIX, ".vue"))
 
