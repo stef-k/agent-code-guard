@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -53,6 +54,16 @@ class NestingConfigTests(unittest.TestCase):
                 config = nesting.load_config(args(path))
                 self.assertEqual((config.enabled, config.review_at), expected)
 
+    def test_no_discovered_config_uses_builtin_default(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            previous = Path.cwd()
+            try:
+                os.chdir(temp)
+                config = nesting.load_config(args())
+            finally:
+                os.chdir(previous)
+            self.assertEqual((config.enabled, config.review_at), (True, nesting.DEFAULT_REVIEW_AT))
+
     def test_present_enabled_must_be_boolean(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -85,6 +96,19 @@ class NestingEvaluationTests(unittest.TestCase):
         result, by_name = self.findings("javascript/decisions.js", 3)
         self.assertEqual((by_name["decisions.deeplyNested"].state, result.state), ("review", "review"))
         self.assertNotIn("fail", {finding.state for finding in result.findings})
+
+    def test_builtin_threshold_4_passes_and_5_reviews(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            exact = root / "exact.py"
+            exact.write_text("def exact():\n    if True:\n        while True:\n            for x in []:\n                if x:\n                    return x\n", encoding="utf-8")
+            over = root / "over.py"
+            over.write_text("def over():\n    if True:\n        while True:\n            for x in []:\n                if x:\n                    try:\n                        return x\n                    except Exception:\n                        return None\n", encoding="utf-8")
+            result = nesting.run(root, nesting.Config(True, nesting.DEFAULT_REVIEW_AT), analyze_files([exact, over]))
+            by_name = {item.callable: item for item in result.findings}
+            self.assertEqual((by_name["exact.exact"].measured, by_name["exact.exact"].state), (4, "pass"))
+            self.assertEqual((by_name["over.over"].measured, by_name["over.over"].state), (5, "review"))
+            self.assertNotIn("fail", {item.state for item in result.findings})
 
     def test_else_if_switch_and_try_families_use_normalized_fact_relationships(self) -> None:
         _, javascript = self.findings("javascript/decisions.js")
@@ -154,9 +178,10 @@ class NestingOrchestrationTests(unittest.TestCase):
             source.write_text("def sample():\n    if True:\n        return 1\n", encoding="utf-8")
             scope = ResolvedScope(root, (source,))
             configurations = [
-                ({}, 0, ["loc"]),
-                ({"callableSize": {"enabled": True, "reviewAt": 3}}, 1, ["loc", "callableSize"]),
-                ({"nesting": {"enabled": True, "reviewAt": 1}}, 1, ["loc", "nesting"]),
+                ({}, 1, ["loc", "callableSize", "nesting"]),
+                ({"callableSize": {"enabled": False}}, 1, ["loc", "nesting"]),
+                ({"nesting": {"enabled": False}}, 1, ["loc", "callableSize"]),
+                ({"callableSize": {"enabled": False}, "nesting": {"enabled": False}}, 0, ["loc"]),
                 ({
                     "callableSize": {"enabled": True, "reviewAt": 3},
                     "nesting": {"enabled": True, "reviewAt": 1},
@@ -177,7 +202,9 @@ class NestingOrchestrationTests(unittest.TestCase):
             source = root / "broken.py"
             source.write_text("def broken(:\n    pass\n", encoding="utf-8")
             scope = ResolvedScope(root, (source,))
-            config = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20})
+            config = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={
+                "callableSize": {"enabled": False}, "nesting": {"enabled": False},
+            })
             with patch("agent_code_guard.code_guard.import_module") as loader:
                 results = run_guards(scope, args(config))
                 loader.assert_not_called()
@@ -277,7 +304,9 @@ class NestingRunnerTests(CodeGuardTestCase):
             self.assertEqual(result.returncode, 3)
             self.assertIn("syntax tree contains errors", self.read_json(result)["error"])
 
-            disabled = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={"nesting": {"enabled": False}})
+            disabled = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={
+                "callableSize": {"enabled": False}, "nesting": {"enabled": False},
+            })
             result = self.run_guard(root, str(source), "--config", str(disabled), "--json")
             self.assertEqual((result.returncode, list(self.read_json(result)["guards"])), (0, ["loc"]))
 

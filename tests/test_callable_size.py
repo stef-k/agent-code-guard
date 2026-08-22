@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -43,6 +44,16 @@ class CallableSizeConfigTests(unittest.TestCase):
                 path.write_text(json.dumps(document), encoding="utf-8")
                 config = callable_size.load_config(args(path))
                 self.assertEqual((config.enabled, config.review_at), expected)
+
+    def test_no_discovered_config_uses_builtin_default(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            previous = Path.cwd()
+            try:
+                os.chdir(temp)
+                config = callable_size.load_config(args())
+            finally:
+                os.chdir(previous)
+            self.assertEqual((config.enabled, config.review_at), (True, callable_size.DEFAULT_REVIEW_AT))
 
     def test_present_enabled_must_be_boolean(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -103,6 +114,20 @@ class CallableSizeEvaluationTests(unittest.TestCase):
         self.assertEqual(callable_size.evaluate(fixtures, callable_size.Config(True, 12), target).state, "pass")
         self.assertEqual(callable_size.evaluate(fixtures, callable_size.Config(True, 11), target).state, "review")
 
+    def test_builtin_threshold_80_passes_and_81_reviews(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            paths = []
+            for lines in (80, 81):
+                path = root / f"callable_{lines}.py"
+                path.write_text("def measured():\n" + "    value = 1\n" * (lines - 1), encoding="utf-8")
+                paths.append(path)
+            result = callable_size.run(root, callable_size.Config(True, callable_size.DEFAULT_REVIEW_AT), analyze_files(paths))
+            self.assertEqual([(item.measured, item.state, item.thresholds["reviewAt"]) for item in result.findings], [
+                (80, "pass", 80), (81, "review", 80),
+            ])
+            self.assertNotIn("fail", {item.state for item in result.findings})
+
     def test_vue_preserves_original_range_path_and_embedded_language(self) -> None:
         fixtures = Path(__file__).parent / "fixtures" / "analyzers"
         facts = analyze_files([fixtures / "vue" / "Setup.vue"])
@@ -117,12 +142,15 @@ class CallableSizeOrchestrationTests(unittest.TestCase):
             source = root / "sample.py"
             source.write_text("def sample():\n    return 1\n", encoding="utf-8")
             scope = ResolvedScope(root, (source,))
-            disabled_args = SimpleNamespace(**vars(args()), warn=None, fail=None, include=[], exclude=[], count_blank_lines=False, ignore_comment_lines=False)
+            disabled_config = write_config(root, {}, guards={"callableSize": {"enabled": False}, "nesting": {"enabled": False}})
+            disabled_args = SimpleNamespace(**vars(args(disabled_config)), warn=None, fail=None, include=[], exclude=[], count_blank_lines=False, ignore_comment_lines=False)
             with patch("agent_code_guard.code_guard.import_module") as loader:
                 run_guards(scope, disabled_args)
                 loader.assert_not_called()
 
-            config = write_config(root, {"enabled": False}, guards={"callableSize": {"enabled": True, "reviewAt": 1}})
+            config = write_config(root, {"enabled": False}, guards={
+                "callableSize": {"enabled": True, "reviewAt": 1}, "nesting": {"enabled": False},
+            })
             enabled_args = SimpleNamespace(**vars(args(config)), warn=None, fail=None, include=[], exclude=[], count_blank_lines=False, ignore_comment_lines=False)
             with patch("agent_code_guard.analysis.pipeline.analyze_files", wraps=analyze_files) as analyze:
                 results = run_guards(scope, enabled_args)
@@ -167,7 +195,9 @@ class CallableSizeRunnerTests(CodeGuardTestCase):
             root = Path(temp)
             source = root / "broken.py"
             source.write_text("def broken(:\n    pass\n", encoding="utf-8")
-            config = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={"callableSize": {"enabled": False}})
+            config = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={
+                "callableSize": {"enabled": False}, "nesting": {"enabled": False},
+            })
             result = self.run_guard(root, str(source), "--config", str(config), "--json")
             self.assertEqual((result.returncode, self.read_json(result)["requiredPolicies"]), (0, []))
 

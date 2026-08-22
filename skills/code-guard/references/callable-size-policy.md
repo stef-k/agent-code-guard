@@ -6,8 +6,10 @@ This guard exists because a source file can remain modest in size while one oper
 
 ## Status
 
-There is no universal review threshold. Projects opt in by supplying
-`guards.callableSize.reviewAt`; the guard has no FAIL threshold.
+The calibrated universal default is REVIEW above 80 physical LOC. Exactly 80
+passes. Authorized project/user configuration may supply a positive
+`guards.callableSize.reviewAt` override or explicitly disable the guard. The
+guard has no FAIL threshold.
 
 ## On REVIEW
 
@@ -32,5 +34,6 @@ Do not create tiny meaningless helper methods merely to reduce callable LOC. Do 
 Do not compress formatting or combine independent statements onto fewer physical lines to lower the measurement.
 
 Do not alter the threshold or disable the guard merely to silence a finding.
+Only respect such a change when the project or user has authorized it.
 
 A lower callable LOC number is useful only when the resulting code is at least as readable and maintainable as before.

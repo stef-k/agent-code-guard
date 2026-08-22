@@ -32,7 +32,9 @@ from agent_code_guard.code_guard import main
 with tempfile.TemporaryDirectory() as temp:
     path = Path(temp) / "sample.py"
     path.write_text("value = 1\\n", encoding="utf-8")
-    with patch.object(sys, "argv", ["code-guard", str(path), "--json"]):
+    config = Path(temp) / "config.json"
+    config.write_text('{"guards":{"callableSize":{"enabled":false},"nesting":{"enabled":false}}}', encoding="utf-8")
+    with patch.object(sys, "argv", ["code-guard", str(path), "--config", str(config), "--json"]):
         result = main()
 
 loaded = sorted(name for name in sys.modules if name.startswith(("agent_code_guard.analysis", "tree_sitter")))

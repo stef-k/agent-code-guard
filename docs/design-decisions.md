@@ -362,9 +362,9 @@ with no per-language table, preset, or FAIL threshold. Agents may not weaken
 configuration merely to silence findings without authorization.
 
 Default activation for callable size and nesting is a material production and
-migration change, so D30 records the target contract without implementing it in
-the calibration slice. Issue #27 must implement complexity with default 15 and
-default enablement. Explicit existing false remains false, and explicit existing
-thresholds retain their values. LOC 400 REVIEW / 600 FAIL is unchanged and is
-retained as a pragmatic navigation, cohesion, and reasoning-surface guardrail,
-not retroactively presented as statistical proof.
+migration change. Issue #29 implements those two D30 defaults; issue #27 must
+still implement complexity with default 15 and default enablement. Explicit
+existing false remains false, and explicit existing thresholds retain their
+values. LOC 400 REVIEW / 600 FAIL is unchanged and is retained as a pragmatic
+navigation, cohesion, and reasoning-surface guardrail, not retroactively
+presented as statistical proof.

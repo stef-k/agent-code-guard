@@ -51,7 +51,9 @@ python3 skills/code-guard/scripts/code_guard.py . --changed-only --config exampl
 
 `pyproject.toml` canonically owns the production pins. Tree-sitter remains
 dormant during LOC-only execution; failure to load a required provider or
-grammar is a deterministic tool error when syntax analysis is requested.
+grammar is a deterministic tool error during normal zero-config syntax analysis.
+Only an authorized configuration that explicitly disables every syntax guard
+preserves the lazy LOC-only path.
 
 Without Git or another VCS that can provide changed scope, pass exactly the files you created or modified. You are responsible for supplying the complete edited-file set:
 
@@ -83,21 +85,26 @@ Guards:
 
 - file LOC (implemented and enabled by default);
 - source/container and syntax facts (production infrastructure, not a guard);
-- callable LOC (implemented; opt-in with a required project `reviewAt`);
-- structural nesting (implemented; opt-in with a required project `reviewAt`);
-- cyclomatic complexity (accepted configurable-only, not implemented or routable).
+- callable LOC (implemented and enabled by default; REVIEW greater than 80);
+- structural nesting (implemented and enabled by default; REVIEW greater than 4);
+- cyclomatic complexity (accepted for a future default of 15, not implemented or routable).
 
-Callable LOC has no universal review threshold. When a project enables
-`guards.callableSize`, it must supply a positive JSON integer `reviewAt`.
-Exactly that size passes; larger callables review and never fail. Load
+Callable LOC needs no invented configuration to activate it. Omission or
+`enabled: true` uses 80; an authorized positive-integer `reviewAt` overrides it,
+and `enabled: false` disables it. Exactly the effective threshold passes;
+larger callables review and never fail. Load
 `references/callable-size-policy.md` only when `callableSize` appears in
 `requiredPolicies`.
 
 Structural nesting is executable control-flow depth, not visual, markup, brace,
-or indentation depth. When a project enables `guards.nesting`, it must supply a
-positive JSON integer `reviewAt`. Exactly that depth passes; greater depth
-reviews and never fails. Load `references/nesting-policy.md` only when `nesting`
+or indentation depth. Omission or `enabled: true` uses 4; an authorized
+positive-integer `reviewAt` overrides it, and `enabled: false` disables it.
+Exactly the effective depth passes; greater depth reviews and never fails. Load `references/nesting-policy.md` only when `nesting`
 appears in `requiredPolicies`.
+
+Do not disable a syntax guard or raise its threshold merely to silence a
+finding. Respect overrides only when the project or user has authorized them.
+REVIEW requires inspection and justification, not mandatory refactoring.
 
 Agent Code Guard is the canonical LOC implementation. Agent LOC Guard is the completed prototype/reference whose mature behavior was migrated from commit `75ab39d261dbc65f78815836fac90add16d265d1`.
 

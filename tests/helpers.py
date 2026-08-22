@@ -12,7 +12,15 @@ CODE_GUARD = REPO_ROOT / "skills" / "code-guard" / "scripts" / "code_guard.py"
 
 def write_lines(path: Path, count: int, prefix: str = "line") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("".join(f"{prefix} {index}\n" for index in range(count)), encoding="utf-8")
+    statements = {
+        ".py": lambda index: f"{prefix}_{index} = {index}\n",
+        ".kt": lambda index: f"val {prefix}{index} = {index}\n",
+        ".ts": lambda index: f"const {prefix}{index} = {index};\n",
+        ".swift": lambda index: f"let {prefix}{index} = {index}\n",
+        ".vue": lambda index: "<template />\n",
+    }
+    render = statements.get(path.suffix, lambda index: f"{prefix} {index}\n")
+    path.write_text("".join(render(index) for index in range(count)), encoding="utf-8")
 
 
 def write_config(root: Path, loc: object, **document: object) -> Path:
