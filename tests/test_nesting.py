@@ -210,11 +210,18 @@ class NestingRunnerTests(CodeGuardTestCase):
             passed = self.run_guard(root, str(source), "--config", str(pass_config), "--json")
             self.assertEqual((passed.returncode, self.read_json(passed)["requiredPolicies"]), (0, []))
 
-            review_config = write_config(root, {"enabled": False}, guards={
-                "callableSize": {"enabled": True, "reviewAt": 1},
-                "nesting": {"enabled": True, "reviewAt": 0 + 1},
+            nesting_only_review = write_config(root, {"enabled": False}, guards={
+                "callableSize": {"enabled": True, "reviewAt": 4},
+                "nesting": {"enabled": True, "reviewAt": 1},
             })
-            reviewed = self.run_guard(root, str(source), "--config", str(review_config), "--json")
+            reviewed = self.run_guard(root, str(source), "--config", str(nesting_only_review), "--json")
+            self.assertEqual(self.read_json(reviewed)["requiredPolicies"], ["nesting"])
+
+            both_review = write_config(root, {"enabled": False}, guards={
+                "callableSize": {"enabled": True, "reviewAt": 1},
+                "nesting": {"enabled": True, "reviewAt": 1},
+            })
+            reviewed = self.run_guard(root, str(source), "--config", str(both_review), "--json")
             self.assertEqual(self.read_json(reviewed)["requiredPolicies"], ["callableSize", "nesting"])
 
     def test_loc_fail_dominates_nesting_review(self) -> None:
