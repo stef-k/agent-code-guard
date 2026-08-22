@@ -29,10 +29,10 @@ The first design targets four cross-language measurements:
 3. **Nesting depth** — maximum structural nesting inside a callable.
 4. **Cyclomatic complexity** — deterministic execution-path complexity.
 
-File LOC has mature default policy thresholds. Callable size and structural
-nesting are enabled by default with calibrated REVIEW thresholds of 80 physical
-LOC and depth 4. Complexity is accepted for a future default threshold of 15,
-but remains unimplemented and inactive until issue #27.
+All four guards are production defaults: file LOC reviews above 400 and fails
+above 600; callable size reviews above 80 physical LOC; structural nesting
+reviews above depth 4; and cyclomatic complexity reviews above 15. The three
+syntax guards are REVIEW-only. Only file LOC can FAIL.
 
 ## Adding new guards
 
@@ -166,7 +166,7 @@ resolve_scope() -> ResolvedScope.files
     -> source/container regions
     -> cached Tree-sitter parser
     -> immutable provider-neutral facts (built once)
-    -> callableSize / nesting
+    -> callableSize / nesting / complexity
 ```
 
 Ordinary files are identity-mapped regions. Vue template/style content is ignored;
@@ -195,10 +195,10 @@ grammar exposes PHP declarations alongside inert HTML `text` nodes, so mixed
 files retain exact original bytes and paths without copying or splitting PHP
 that can legally span close/reopen tags. HTML does not emit executable facts.
 
-Zero-config execution now uses this syntax pipeline because callable size and
-nesting are active by default. Supported malformed syntax or an unavailable
-required provider therefore produces deterministic exit 3. When both syntax
-guards are explicitly disabled, the public runner deliberately does not import
+Zero-config execution uses this syntax pipeline because all three syntax guards
+are active by default. Supported malformed syntax or an unavailable
+required provider therefore produces deterministic exit 3. When callable size,
+nesting, and complexity are all explicitly disabled, the public runner does not import
 or construct the pipeline: Tree-sitter remains dormant and execution is LOC-only.
 
 ## Callable size
@@ -246,8 +246,8 @@ PASS and REVIEW findings; human output prints REVIEW findings only:
 
 Only a REVIEW result adds `callableSize` to `requiredPolicies`. Callable size
 never fails. Because it is enabled by default, syntax analysis is normally
-authoritative. LOC-only execution requires both callable size and nesting to be
-explicitly disabled.
+authoritative. LOC-only execution requires callable size, nesting, and
+cyclomatic complexity to be explicitly disabled.
 
 ## Structural nesting
 
@@ -279,12 +279,35 @@ JSX, HTML, and Vue template hierarchy are not. Else-if, case, and catch-family
 normalization belongs to language adapters. Nested callables and callbacks reset
 depth because they have distinct `CallableKey` values.
 
-When callable size and nesting are both enabled, the runner calls analysis once
-and passes the same facts to both guards. JSON retains PASS and REVIEW findings,
+When multiple syntax guards are enabled, the runner calls analysis once and
+passes the same facts to each guard. JSON retains PASS and REVIEW findings,
 including a deterministic `details.deepestLine` when depth is nonzero. Human
 output prints REVIEW findings only. Only REVIEW routes `nesting`; nesting never
 fails. As with callable size, malformed applicable syntax or unavailable parser
 dependencies produce exit 3 only when a syntax guard is enabled.
+
+## Cyclomatic complexity
+
+Cyclomatic complexity is enabled by default at REVIEW greater than 15. Its
+configuration key is `guards.cyclomaticComplexity`; a REVIEW routes the stable
+result and policy ID `complexity`. Omission, an empty object, or `enabled: true`
+uses 15. A positive JSON integer `reviewAt` is an authorized project override.
+`enabled: false` disables the guard and wins even if an invalid `reviewAt` is
+also present. Exactly the effective threshold passes; greater values review;
+complexity never fails.
+
+The example configuration's value 20 only demonstrates override syntax; the
+built-in remains 15 and the example is not a recommendation.
+
+The language-neutral guard computes `1 +` the number of normalized
+`DecisionFact` values owned by each `CallableKey`. Categories include normalized
+conditions, loops, catches, ternaries, executable switch/when/match arms,
+pattern guards, and Python comprehension/generator decisions when present.
+Short-circuit booleans and fallback/null-aware constructs contribute zero.
+Nested and anonymous callables, including mainstream lambdas, own their decisions
+independently and restart from baseline 1. JSON details contain the callable's
+`boundaryKind` and sorted non-zero decision-category counts; human output prints
+only REVIEW findings.
 
 ## Canonical LOC implementation
 
@@ -308,16 +331,16 @@ There is no runtime dependency, synchronization layer, or second LOC implementat
 
 ## Result and exit contract
 
-Native LOC states normalize as `ok -> PASS`, `warn -> REVIEW`, `fail -> FAIL`, and `exempt -> PASS` with the exemption reason retained. Only REVIEW and FAIL add `loc` to `requiredPolicies`. Callable size and nesting contribute only PASS or REVIEW and route their stable guard IDs only on REVIEW.
+Native LOC states normalize as `ok -> PASS`, `warn -> REVIEW`, `fail -> FAIL`, and `exempt -> PASS` with the exemption reason retained. Only REVIEW and FAIL add `loc` to `requiredPolicies`. Callable size, nesting, and complexity contribute only PASS or REVIEW and route their stable guard IDs only on REVIEW.
 
 Normal exits are 0 for PASS, 1 for REVIEW, 2 for FAIL, and 3 for configuration/runtime errors. `--ci` changes REVIEW to exit 0; FAIL and errors remain 2 and 3.
 
 ## Status
 
-File LOC, callable LOC at 80, and structural nesting at 4 are enabled by default.
-The syntax guards are REVIEW-only and support authorized project overrides or
-explicit disablement. Cyclomatic complexity remains unimplemented, inactive,
-and absent from `requiredPolicies` until issue #27 adds its D30 default of 15.
+File LOC at 400/600, callable LOC at 80, structural nesting at 4, and cyclomatic
+complexity at 15 are enabled by default. Syntax guards are REVIEW-only and
+support authorized project overrides or explicit disablement. One shared syntax
+analysis pass serves every enabled syntax guard.
 
 ## License
 

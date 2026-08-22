@@ -142,7 +142,7 @@ class CallableSizeOrchestrationTests(unittest.TestCase):
             source = root / "sample.py"
             source.write_text("def sample():\n    return 1\n", encoding="utf-8")
             scope = ResolvedScope(root, (source,))
-            disabled_config = write_config(root, {}, guards={"callableSize": {"enabled": False}, "nesting": {"enabled": False}})
+            disabled_config = write_config(root, {}, guards={"callableSize": {"enabled": False}, "nesting": {"enabled": False}, "cyclomaticComplexity": {"enabled": False}})
             disabled_args = SimpleNamespace(**vars(args(disabled_config)), warn=None, fail=None, include=[], exclude=[], count_blank_lines=False, ignore_comment_lines=False)
             with patch("agent_code_guard.code_guard.import_module") as loader:
                 run_guards(scope, disabled_args)
@@ -150,6 +150,7 @@ class CallableSizeOrchestrationTests(unittest.TestCase):
 
             config = write_config(root, {"enabled": False}, guards={
                 "callableSize": {"enabled": True, "reviewAt": 1}, "nesting": {"enabled": False},
+                "cyclomaticComplexity": {"enabled": False},
             })
             enabled_args = SimpleNamespace(**vars(args(config)), warn=None, fail=None, include=[], exclude=[], count_blank_lines=False, ignore_comment_lines=False)
             with patch("agent_code_guard.analysis.pipeline.analyze_files", wraps=analyze_files) as analyze:
@@ -196,7 +197,7 @@ class CallableSizeRunnerTests(CodeGuardTestCase):
             source = root / "broken.py"
             source.write_text("def broken(:\n    pass\n", encoding="utf-8")
             config = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={
-                "callableSize": {"enabled": False}, "nesting": {"enabled": False},
+                "callableSize": {"enabled": False}, "nesting": {"enabled": False}, "cyclomaticComplexity": {"enabled": False},
             })
             result = self.run_guard(root, str(source), "--config", str(config), "--json")
             self.assertEqual((result.returncode, self.read_json(result)["requiredPolicies"]), (0, []))

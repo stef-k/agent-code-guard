@@ -18,7 +18,7 @@ class ResultContractTests(CodeGuardTestCase):
             root = Path(temp)
             (root / "sample.py").write_text("def sample():\n    return 1\n", encoding="utf-8")
             result = self.run_guard(root, ".", "--json")
-            self.assertEqual((result.returncode, list(self.read_json(result)["guards"])), (0, ["loc", "callableSize", "nesting"]))
+            self.assertEqual((result.returncode, list(self.read_json(result)["guards"])), (0, ["loc", "callableSize", "nesting", "complexity"]))
 
     def test_pass_review_fail_and_policy_routing(self) -> None:
         cases = [(2, "pass", "ok", 0, []), (4, "review", "warn", 1, ["loc"]), (7, "fail", "fail", 2, ["loc"])]
@@ -64,6 +64,7 @@ class ResultContractTests(CodeGuardTestCase):
                 "loc": {"state": "pass", "findings": []},
                 "callableSize": {"state": "pass", "findings": []},
                 "nesting": {"state": "pass", "findings": []},
+                "complexity": {"state": "pass", "findings": []},
             }})
 
 
@@ -79,6 +80,7 @@ class LocParityTests(CodeGuardTestCase):
             self.assertEqual(result.returncode, 3, result.stderr)
             config = write_config(root, {}, guards={
                 "loc": {}, "callableSize": {"enabled": False}, "nesting": {"enabled": False},
+                "cyclomaticComplexity": {"enabled": False},
             })
             result = subprocess.run(
                 [sys.executable, str(CODE_GUARD), "broken.py", "--config", str(config), "--json"],

@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from .file_selection import resolve_scope
-from .guards import callable_size, loc, nesting
+from .guards import callable_size, complexity, loc, nesting
 from .result_model import GuardResult, aggregate_state, required_policies
 
 
@@ -45,8 +45,9 @@ def run_guards(scope, args: argparse.Namespace) -> list[GuardResult]:
     loc_config = loc.load_config(args)
     callable_size_config = callable_size.load_config(args)
     nesting_config = nesting.load_config(args)
+    complexity_config = complexity.load_config(args)
     results = [loc.run(scope.root, loc_config, scope.files)]
-    needs_analysis = callable_size_config.enabled or nesting_config.enabled
+    needs_analysis = callable_size_config.enabled or nesting_config.enabled or complexity_config.enabled
     if needs_analysis:
         analysis = import_module("agent_code_guard.analysis.pipeline")
         facts = analysis.analyze_files(scope.files)
@@ -54,6 +55,8 @@ def run_guards(scope, args: argparse.Namespace) -> list[GuardResult]:
             results.append(callable_size.run(scope.root, callable_size_config, facts))
         if nesting_config.enabled:
             results.append(nesting.run(scope.root, nesting_config, facts))
+        if complexity_config.enabled:
+            results.append(complexity.run(scope.root, complexity_config, facts))
     return results
 
 
@@ -90,6 +93,16 @@ def print_text(data: dict[str, object]) -> None:
                 f"REVIEW: {finding['path']}:{finding['range']['startLine']}-{finding['range']['endLine']} "
                 f"— {finding['callable']} nesting depth {finding['measured']} "
                 f"(review {finding['thresholds']['reviewAt']}{explanation})"
+            )
+    complexity_result = data["guards"].get("complexity")
+    if complexity_result:
+        for finding in complexity_result["findings"]:
+            if finding["state"] != "review":
+                continue
+            print(
+                f"REVIEW: {finding['path']}:{finding['range']['startLine']}-{finding['range']['endLine']} "
+                f"— {finding['callable']} complexity {finding['measured']} "
+                f"(review {finding['thresholds']['reviewAt']})"
             )
     policies = data["requiredPolicies"]
     if policies:
