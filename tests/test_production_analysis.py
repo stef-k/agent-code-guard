@@ -104,7 +104,9 @@ class ProductionParityTests(unittest.TestCase):
     def test_jsx_markup_is_not_control_flow_but_expressions_are_decisions(self) -> None:
         facts = analyze_files([FIXTURES / "tsx" / "components.tsx"])
         self.assertNotIn("jsx_element", {item.provider_kind for item in facts.controls})
-        self.assertTrue({"ternary", "short_circuit_boolean"} & {item.category for item in facts.decisions})
+        categories = {item.category for item in facts.decisions}
+        self.assertIn("ternary", categories)
+        self.assertNotIn("short_circuit_boolean", categories)
 
     def test_callable_keys_disambiguate_duplicate_vue_lexical_identities(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
