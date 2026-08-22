@@ -132,18 +132,44 @@ python3 skills/code-guard/scripts/code_guard.py .
 
 Pull-request CI should evaluate files added or modified by the PR relative to its base rather than unrelated pre-existing oversized files.
 
-## Cross-language requirement
+## Production syntax infrastructure
 
-The policy is language-neutral even when deterministic measurement needs language-aware parsing.
+The shipped internal pipeline accepts only the files already selected by the runner:
 
-Initial feasibility work should prove the common result model across at least:
+```text
+resolve_scope() -> ResolvedScope.files
+    -> source/container regions
+    -> cached Tree-sitter parser
+    -> immutable provider-neutral facts
+    -> future syntax guards
+```
 
-- Python;
-- Go;
-- Kotlin;
-- C#.
+Ordinary files are identity-mapped regions. Vue template/style content is ignored;
+each inline `script` region is mapped back to exact original `.vue` byte coordinates.
+The first wave supports Python, Go, Kotlin, C#, Java, JavaScript, TypeScript,
+JSX, TSX, and Vue JavaScript/TypeScript scripts. Unsupported ordinary artifacts
+are not syntax errors. Supported malformed syntax, unsupported explicit Vue
+script languages, external Vue scripts, or a missing required grammar fail
+deterministically instead of returning partial facts.
 
-Java and JavaScript/TypeScript are also expected targets. Parser/provider technology should be selected only after the feasibility work; Tree-sitter or language-specific adapters are implementation options, not assumptions.
+Install the independently callable syntax infrastructure with Python 3.10 or newer:
+
+```bash
+python -m pip install -r skills/code-guard/requirements-analysis.txt
+```
+
+The exact production pins are `tree-sitter==0.26.0` and
+`tree-sitter-language-pack==1.14.3`. Both include native components. Published
+wheels cover CPython 3.10+ on mainstream Windows, macOS, and Linux platforms;
+unsupported platforms may require a local native build and are not silently
+downgraded to regex analysis. The language pack wheel is about 2–2.4 MB before
+installation. Parser instances are cached by embedded language inside one
+provider, and each executable region is parsed/extracted once for reuse by all
+future syntax guards.
+
+The public runner deliberately does not construct this pipeline while only LOC
+is enabled. Installing these dependencies is therefore optional for ordinary
+LOC-only use today.
 
 ## Canonical LOC implementation
 
@@ -173,7 +199,9 @@ Normal exits are 0 for PASS, 1 for REVIEW, 2 for FAIL, and 3 for configuration/r
 
 ## Status
 
-LOC migration complete. Callable size, nesting, complexity, and parser research remain deliberately unimplemented for later issues.
+File LOC is the enabled production guard. The source/container and syntax-fact
+pipeline is production infrastructure. Callable LOC, structural nesting, and
+cyclomatic complexity remain disabled and have no production thresholds.
 
 ## License
 
