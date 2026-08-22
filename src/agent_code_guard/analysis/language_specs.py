@@ -1,10 +1,11 @@
 """Declarative Tree-sitter node mappings for supported executable languages."""
 
 CALLABLE_TYPES = {
-    "python": {"function_definition"}, "go": {"function_declaration", "method_declaration"},
-    "kotlin": {"function_declaration", "secondary_constructor"},
-    "csharp": {"method_declaration", "constructor_declaration", "local_function_statement"},
-    "java": {"method_declaration", "constructor_declaration"},
+    "python": {"function_definition", "lambda"},
+    "go": {"function_declaration", "method_declaration", "func_literal"},
+    "kotlin": {"function_declaration", "secondary_constructor", "lambda_literal", "anonymous_function"},
+    "csharp": {"method_declaration", "constructor_declaration", "local_function_statement", "lambda_expression", "anonymous_method_expression"},
+    "java": {"method_declaration", "constructor_declaration", "lambda_expression"},
     "javascript": {"function_declaration", "method_definition", "arrow_function", "function_expression"},
     "typescript": {"function_declaration", "method_definition", "arrow_function", "function_expression"},
     "tsx": {"function_declaration", "method_definition", "arrow_function", "function_expression"},
@@ -15,8 +16,7 @@ CALLABLE_TYPES = {
 }
 
 OPAQUE_LAMBDA_TYPES = {
-    "python": {"lambda"}, "go": {"func_literal"}, "kotlin": {"lambda_literal", "anonymous_function"},
-    "csharp": {"lambda_expression", "anonymous_method_expression"}, "java": {"lambda_expression"},
+    "python": set(), "go": set(), "kotlin": set(), "csharp": set(), "java": set(),
     "javascript": set(), "typescript": set(), "tsx": set(), "cpp": set(), "rust": set(),
     "php": set(), "swift": set(), "dart": set(),
 }

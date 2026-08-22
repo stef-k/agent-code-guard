@@ -86,10 +86,9 @@ and is not charged to the parent. Coordinates shift when preceding source moves,
 as finding ranges already do, but the policy avoids major unmeasured complexity
 blind spots in callback-heavy applications.
 
-Phase A lambdas and Java lambdas remain opaque. A Java lambda fixture proves its
-control flow is not charged to the owning method. This is now an explicit
-language-specific callable-policy qualification, not a claim that every lambda
-has equivalent application-level identity.
+Kotlin, C#, Go, Java, and expression-only Python lambdas now use the same
+coordinate-owned callback boundary. Their controls and decisions belong to the
+child `CallableKey`, are not charged to the owner, and reset nesting.
 
 ## Measurement definitions
 
@@ -171,8 +170,8 @@ four-level nesting, wide branching, else-if, enhanced loops, two catches,
 ternary/boolean decisions, classic switch groups, and switch-expression rules
 are measured. Constructor identity is `package.Type.Type`; the annotation is in
 the constructor range. Both switch forms produce depth 1 and complexity 3 for
-two non-default executable arms. Java lambdas are opaque and reset/exclude their
-body from the owner.
+two non-default executable arms. Java lambdas are independently measured and
+reset/exclude their body from the owner.
 
 ### JavaScript
 
@@ -271,7 +270,7 @@ No production REVIEW or FAIL threshold is introduced.
 - Identities are lexical and do not resolve overloads, aliases, or dynamic
   property assignments; path and range remain the authoritative locator.
 - Anonymous JS-family callback identities shift with their source coordinates.
-- Java and Phase A lambdas remain unmeasured as independent callables.
+- Python lambdas are expression-only; statement controls cannot occur in them.
 - Simple variable assignment is proven; destructuring, computed property targets,
   assignment expressions, and class-field arrows need separate evidence.
 - Vue external scripts are unsupported, and the container grammar does not

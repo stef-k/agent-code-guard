@@ -139,6 +139,96 @@ class ProductionParityTests(unittest.TestCase):
             arms = [item for item in analyze_files([js_path]).decisions if item.category == "switch_arm"]
             self.assertEqual(len(arms), 3)
 
+    def test_boolean_decisions_are_one_per_maximal_connected_expression(self) -> None:
+        cases = {
+            ".js": (
+                "function sample(a, b, c, d) {\n"
+                "  if (a && b && c) return 1;\n"
+                "  const mixed = (a && b) || (c && d);\n"
+                "  const nestedCall = a && Boolean(b || c);\n"
+                "  return a ? (b && c) : (c || d);\n"
+                "}\n",
+                6,
+            ),
+            ".py": (
+                "def sample(a, b, c, d):\n"
+                "    if a and b and c:\n"
+                "        return 1\n"
+                "    mixed = (a and b) or (c and d)\n"
+                "    nested_call = a and bool(b or c)\n"
+                "    return (b and c) if a else (c or d)\n",
+                6,
+            ),
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for suffix, (source, expected) in cases.items():
+                with self.subTest(suffix=suffix):
+                    path = root / f"maximal{suffix}"
+                    path.write_text(source, encoding="utf-8")
+                    facts = analyze_files([path])
+                    boolean_facts = [item for item in facts.decisions if item.category == "short_circuit_boolean"]
+                    self.assertEqual(len(boolean_facts), expected)
+                    self.assertEqual(len({item.source_range for item in boolean_facts}), expected)
+
+    def test_mainstream_lambdas_are_independent_coordinate_owned_callables(self) -> None:
+        cases = {
+            ".kt": (
+                "package sample\nfun owner(values: List<Int>) {\n"
+                "  values.map { value -> if (value > 0) value else 0 }\n"
+                "  values.map { outer -> values.map { inner -> if (inner > outer) inner else outer } }\n"
+                "}\n",
+                "sample.owner", 4,
+            ),
+            ".cs": (
+                "class Sample { void Owner(int[] values) {\n"
+                "  System.Func<int, int> first = value => value > 0 ? value : 0;\n"
+                "  System.Func<int, int> second = async value => { if (value > 0) return value; return 0; };\n"
+                "  System.Func<int, int> third = delegate(int value) { while (value > 0) value--; return value; };\n"
+                "} }\n",
+                "Sample.Owner", 4,
+            ),
+            ".go": (
+                "package sample\nfunc Owner(values []int) {\n"
+                "  first := func(value int) int { if value > 0 { return value }; return 0 }\n"
+                "  _ = func() { go func() { for len(values) > 0 { return } }() }\n"
+                "  _ = first\n}\n",
+                "sample.Owner", 4,
+            ),
+            ".java": (
+                "package sample; class Sample { void owner(java.util.List<Integer> values) {\n"
+                "  values.stream().map(value -> value > 0 ? value : 0);\n"
+                "  values.stream().map(outer -> values.stream().map(inner -> { if (inner > outer) return inner; return outer; }));\n"
+                "} }\n",
+                "sample.Sample.owner", 4,
+            ),
+            ".py": (
+                "def owner(values):\n"
+                "    first = lambda value: value if value > 0 else 0\n"
+                "    second = lambda value: (lambda inner: inner and value)(value)\n"
+                "    return first, second\n",
+                "owner.owner", 4,
+            ),
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for suffix, (source, owner_identity, expected_callables) in cases.items():
+                with self.subTest(suffix=suffix):
+                    path = root / f"owner{suffix}"
+                    path.write_text(source, encoding="utf-8")
+                    facts = analyze_files([path])
+                    self.assertEqual(facts, analyze_files([path]))
+                    owner = next(item for item in facts.callables if item.identity == owner_identity)
+                    callbacks = [item for item in facts.callables if item.boundary_kind == "callback"]
+                    self.assertEqual(len(facts.callables), expected_callables)
+                    self.assertTrue(callbacks)
+                    self.assertEqual(len({item.key for item in callbacks}), len(callbacks))
+                    self.assertTrue(all("<callback@" in item.identity for item in callbacks))
+                    self.assertFalse(any(item.callable_key == owner.key for item in facts.decisions))
+                    self.assertTrue(any(item.callable_key in {callback.key for callback in callbacks}
+                                        for item in facts.decisions))
+                    self.assertTrue(all(item.parent_key is not None for item in callbacks))
+
 
 class RegionAndVueTests(unittest.TestCase):
     def test_ordinary_region_is_identity_mapped(self) -> None:

@@ -6,12 +6,12 @@ This guard exists because a callable can be short and only lightly nested while 
 
 ## Status
 
-Universal default thresholds are not finalized yet. They must be validated against representative code in multiple languages before becoming defaults.
-
-Issue #14 retained Outcome C: production complexity remains disabled while
-short-circuit normalization and opaque lambda ownership are unsettled. During
-research, values are `REVIEW` anchors only; no universal or FAIL threshold is
-authorized.
+Issue #25 rejected production admission. One fact per maximal connected boolean
+expression removes chain-length inflation, and mainstream lambdas now have
+independent ownership, but syntax cannot distinguish a single fallback `||`
+from a genuine boolean choice. The known fallback-noise outlier remained
+unchanged. Production complexity therefore remains disabled; no universal,
+project-configured, or FAIL threshold is authorized.
 
 ## On REVIEW
 

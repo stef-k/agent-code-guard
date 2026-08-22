@@ -187,3 +187,58 @@ Measurement consumes the one existing `AnalysisFacts` value after runner scope r
 **Final outcome: Outcome C.**
 
 **Current production recommendation: NO-GO / NEEDS MORE EVIDENCE.** Do not open the vertical production implementation issue yet. First settle maximal-expression short-circuit normalization and mainstream lambda ownership/coverage with focused analyzer fixtures plus a targeted rerun of the pinned evidence corpus. If those qualifications close, the future vertical issue should deliver one opt-in configurable-only slice: fact-only calculation, strict `enabled`/`reviewAt` config, one shared runner analysis, PASS/REVIEW findings with non-zero decision breakdown, human/JSON reporting, lazy complexity policy routing, deterministic errors, fixtures, and Ubuntu/Windows/macOS CI. It must not add FAIL, universal or per-language defaults, scope discovery, or alternate parsing.
+
+## #25 Boolean normalization and lambda ownership follow-up
+
+### Settled syntax semantics
+
+Issue #25 retained every #14 category except short-circuit weighting. The selected production rule is one `short_circuit_boolean` fact per **maximal connected short-circuit operator expression**. `&&`, `||`, Python `and`/`or`, and transparent parentheses form one tree; every other expression construct is a boundary. Thus `a && b && c`, `(a && b) || (c && d)`, `a && (b || c)`, and `(a || b) && c` each contribute one. Parentheses, mixed operators, and expression context do not add facts. A ternary with boolean expressions in both arms adds one ternary plus two boolean facts; `a && call(b || c)` has two boolean facts because the call is a boundary.
+
+Three candidates were compared: every operator (#14 baseline), zero short-circuit facts (lower bound), and the selected maximal expression. Zero discards compact-predicate signal. The selected rule removes chain-length inflation without names, types, value flow, or model judgment. It cannot distinguish `value || default` from a genuine one-operator boolean choice. Nullish coalescing, optional/safe navigation, and Kotlin Elvis remain excluded.
+
+Kotlin lambdas/anonymous functions, C# lambdas/anonymous delegates, Go function literals, Java lambdas, and Python expression lambdas now emit provider-neutral `CallableFact` values. Anonymous identities reuse `<callback@original-line:original-byte-column>` beneath their lexical owner. The range is the callable syntax, not its assignment or call site; `boundaryKind` is `callback`. Each receives a unique range-qualified `CallableKey`. Parent traversal stops at child callables, so decisions do not double count and nesting resets. Python is qualified to conditional and boolean expressions; statement controls cannot occur in its lambda grammar.
+
+### Pinned-corpus comparison
+
+The exact six #14 SHAs and recorded production-root exclusions were reused. “Boolean only” changes weighting with #14 callable coverage. “Final” also promotes mainstream lambdas. Values are `callables; median/P75/P90/P95/max; >10`.
+
+| Project / language | #14 baseline | Boolean only | Final combined |
+|---|---|---|---|
+| Wayfarer / C# | 1,887; 2/5/8/12/43; 118 | 1,887; 2/4/8/11/36; 95 | 3,980; 1/2/5/8/36; 95 |
+| Wayfarer / JavaScript | 1,348; 2/4/7/9/28; 50 | 1,348; 2/3/7/9/25; 44 | same |
+| Wayfarer / TypeScript/Vue | 1,289; 1/2/4/6/22; 18 | 1,289; 1/2/4/6/22; 15 | same |
+| CogniRelay / Python | 1,173; 3/7/14/22/87; 178 | 1,173; 3/7/14/22/87; 173 | 1,319; 2/6/13/20/87; 173 |
+| CogniRelay / JavaScript | 28; 2/3/13/16/28; 3 | unchanged | unchanged |
+| xrplnsapi / Go | 17; 3/4/11/11/11; 2 | unchanged | 18; 2.5/4/11/11/11; 2 |
+| WayfarerMobile / C# | 2,433; 1/3/6/9/51; 69 | 2,433; 1/3/6/8/41; 59 | 2,925; 1/3/6/8/41; 59 |
+| ripgrep / Rust | 3,219; 1/1/3/6/30; 55 | 3,219; 1/1/3/6/30; 53 | same |
+| nowinandroid / Kotlin | 476; 1/1/1/2/7; 0 | 1/1/1/2/7; 0 | 1,197; 1/1/1/2/8; 0 |
+
+Normalized boolean totals fell from 1,153 to 966 (Wayfarer C#), 802 to 676 (Wayfarer JavaScript), 524 to 356 (Wayfarer TypeScript), 1,282 to 1,143 (CogniRelay Python), 678 to 579 (WayfarerMobile C#), and 234 to 189 (ripgrep Rust). Go remained 5. Kotlin reached 10 only because newly represented lambdas surfaced formerly invisible facts.
+
+`HasMoreData` fell 26→2 and `SuggestIconForActivity` 51→36. Strong signals remained: `invoke_tool_by_name` 87, `RetrieveTileAsync` 38→36, `HiArgs::from_low_args` 30, and `focusActiveEntity` 22. The decisive counterexample is `applyDetail`: its 24 separate `value || fallback` expressions are 24 maximal expressions, so it remains 28. A uniform syntax-only rule cannot classify them differently from genuine single boolean choices without inference or dropping all single-operator signal.
+
+`NiaCatalog` itself remains 1 because it delegates to lambdas, but its file now exposes 100+ nested callable boundaries and the conditions/`when` arms owned by them. Compose calls and UI hierarchy add no controls. This is correct generic ownership, not a framework rule. Focused Kotlin, C#, Go, Java, and qualified Python fixtures prove deterministic identity/range, parent exclusion, and nested reset. Existing JS/TS/JSX/Vue and Rust/C++/PHP/Swift/Dart closure tests remain green.
+
+Callable size and nesting intentionally gain these callables: size uses each callable-syntax range, nesting uses only its `CallableKey`, and existing parents remain unpolluted. Existing non-lambda facts and LOC are unchanged. No complexity guard, configuration, result, policy routing, default, or FAIL state was added.
+
+### Admission reassessment
+
+| Criterion | Result |
+|---|---|
+| Deterministic anchor | PASS; syntax facts and coordinate ownership are deterministic |
+| Engineering value | PASS; strong branching anchors survive |
+| Broad applicability | PASS with Python expression qualification |
+| Distinct responsibility | PASS |
+| Stable measurement semantics | FAIL; identical `||` syntax has predicate and fallback uses |
+| Explainability/actionability | QUALIFIED; breakdown explains but does not make `applyDetail` actionable |
+| State semantics | PASS; only prospective PASS/REVIEW was defensible |
+| Signal/noise | FAIL; the known fallback outlier remains 28 |
+| Threshold/config evidence | QUALIFIED; project configuration cannot repair semantic noise |
+| Gaming resistance | QUALIFIED; equivalent fallback rewrites change scores |
+| Scope compatibility | PASS |
+| Architecture fit/cost | PASS; existing facts suffice |
+| Deterministic failure behavior | PASS; syntax errors and lazy LOC behavior are preserved |
+| Portability/testability | PASS; adapters are fixture-tested across supported platforms |
+
+**Final decision: REJECT / OUT OF SCOPE.** Lambda coverage is production-correct, but the original boolean-noise blocker is not closable with a uniform deterministic syntax rule. Stable measurement semantics and signal/noise fail admission. Do not open a production complexity vertical-slice issue. The illustrative config and result shape from #14 remain design sketches, not implementation recommendations.
