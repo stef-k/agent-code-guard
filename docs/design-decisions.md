@@ -343,3 +343,28 @@ Complexity therefore remains **Outcome C** and is not admitted to production yet
 Short-circuit boolean operators contribute no `DecisionFact`. The pinned zero-candidate comparison removed fallback and compact-predicate inflation while retaining every mandatory strong-signal outlier through conditions, catches, arms, guards, and ternaries. Kotlin, C#, Go, Java, and expression-only Python anonymous callables use existing coordinate-qualified callback identities, callable ranges, `CallableKey` ownership, and reset semantics. No fact-model field is added.
 
 Cyclomatic complexity is **ACCEPT — CONFIGURABLE ONLY**. A separate production issue must deliver the complete opt-in vertical slice. Enabling it requires a project-supplied positive `reviewAt`; exactly that value passes, larger values review, and complexity never fails. No universal or per-language default, exemption, or override is authorized by this evidence.
+
+## D30 — Conservative syntax defaults are universal review guardrails
+
+Pinned-corpus distributions, inspected boundary callables, and mature-tool
+precedent support conservative universal `reviewAt` values of 80 physical LOC
+for callable size, 4 for normalized executable nesting, and 15 for #26
+cyclomatic complexity. Each guard should be enabled when omitted once its
+production activation ships. These values identify code worth inspection; they
+do not define objective quality or command refactoring.
+
+The shared configuration contract is: omission or `enabled: true` uses the
+built-in; a supplied positive JSON integer `reviewAt` enables and overrides the
+built-in; and explicit `enabled: false` disables. Boolean, float, string,
+zero, and negative thresholds remain invalid. Exactly the threshold passes and
+greater values review. Callable size, nesting, and complexity remain REVIEW-only
+with no per-language table, preset, or FAIL threshold. Agents may not weaken
+configuration merely to silence findings without authorization.
+
+Default activation for callable size and nesting is a material production and
+migration change, so D30 records the target contract without implementing it in
+the calibration slice. Issue #27 must implement complexity with default 15 and
+default enablement. Explicit existing false remains false, and explicit existing
+thresholds retain their values. LOC 400 REVIEW / 600 FAIL is unchanged and is
+retained as a pragmatic navigation, cohesion, and reasoning-surface guardrail,
+not retroactively presented as statistical proof.
