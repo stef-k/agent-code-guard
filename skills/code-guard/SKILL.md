@@ -41,6 +41,18 @@ Run the canonical repository runner directly when it is installed as a skill:
 python3 skills/code-guard/scripts/code_guard.py . --changed-only --config examples/code-guard.config.json
 ```
 
+The enabled LOC guard has no third-party runtime dependency. The shipped but
+currently dormant syntax-fact infrastructure requires Python 3.10+ and can be
+installed for development/future syntax guards with:
+
+```bash
+python -m pip install -r skills/code-guard/requirements-analysis.txt
+```
+
+Its production pins are `tree-sitter==0.26.0` and
+`tree-sitter-language-pack==1.14.3`; failure to load a required provider or
+grammar is a deterministic tool error when syntax analysis is requested.
+
 Without Git or another VCS that can provide changed scope, pass exactly the files you created or modified. You are responsible for supplying the complete edited-file set:
 
 ```bash
@@ -69,9 +81,10 @@ Code Guard is intentionally limited to deterministic concerns that are broadly a
 Guards:
 
 - file LOC (implemented and enabled by default);
-- callable LOC (reserved, disabled, and unimplemented);
-- nesting depth (reserved, disabled, and unimplemented);
-- cyclomatic complexity (reserved, disabled, and unimplemented).
+- source/container and syntax facts (production infrastructure, not a guard);
+- callable LOC (reserved and disabled);
+- nesting depth (reserved and disabled);
+- cyclomatic complexity (reserved and disabled).
 
 Agent Code Guard is the canonical LOC implementation. Agent LOC Guard is the completed prototype/reference whose mature behavior was migrated from commit `75ab39d261dbc65f78815836fac90add16d265d1`.
 

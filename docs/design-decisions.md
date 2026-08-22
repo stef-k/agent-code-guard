@@ -206,3 +206,30 @@ boundaries. No production REVIEW or FAIL threshold is enabled by the prototype.
 ## D21 — Scope resolution precedes guard applicability
 
 The runner resolves one normalized file scope before invoking guards. Git-derived modes require an enclosing Git repository. Positional files and directories work independently of Git; missing explicit paths are errors, while existing artifacts remain in common scope even when LOC does not support their extension. Each guard receives the same common scope and applies its own inclusion and exclusion rules. A directory or `.` is always a deliberate recursive audit, never a fallback for a failed Git mode.
+
+## D22 — Syntax analysis is a lazy, shared production service
+
+The production syntax pipeline accepts `ResolvedScope.files`; it does not walk,
+query Git, apply `.gitignore`, or own exclusions. Applicability is limited to
+mapping each supplied file to a supported source/container adapter. This keeps
+future scope policy in issue #16 and preserves one runner-owned selection.
+
+LOC consumes selected files directly. Syntax facts are built only when an
+enabled syntax guard needs them, so the current LOC-only runner has no parser
+startup, installation, or syntax-validity dependency.
+
+One analysis call creates byte-mapped executable regions, parses each region
+once with provider-owned parsers cached by embedded language, and extracts one
+immutable `AnalysisFacts` value. Future callable LOC, nesting, and complexity
+guards share that value. Facts contain callable ownership/ranges, structural
+control relationships, and categorized decisions rather than public findings or
+precomputed metric totals. A range-qualified immutable callable key disambiguates
+duplicate lexical display identities across regions and anchors parent, control,
+and decision relationships. Tree-sitter nodes never cross the extraction boundary.
+
+Tree-sitter 0.26.0 and tree-sitter-language-pack 1.14.3 are the pinned initial
+provider. Python 3.10+ and a compatible platform wheel/native build are required
+only when syntax analysis is invoked. Unsupported ordinary artifacts are
+inapplicable; a supported artifact with malformed syntax or an unavailable
+provider/grammar is a deterministic analysis error suitable for the existing
+runner exit-3 boundary.
