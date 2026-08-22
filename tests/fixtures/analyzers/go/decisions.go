@@ -37,3 +37,23 @@ func Switches(value any) int {
 		return 0
 	}
 }
+
+func ElseIf(a, b bool) int {
+	if a {
+		return 1
+	} else if b {
+		return 2
+	}
+	return 0
+}
+
+func ValueSwitch(value int) string {
+	switch value {
+	case 1:
+		return "one"
+	case 2, 3:
+		return "few"
+	default:
+		return "other"
+	}
+}

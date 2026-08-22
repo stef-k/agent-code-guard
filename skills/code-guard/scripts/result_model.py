@@ -44,7 +44,7 @@ class CallableFinding:
     end_line: int
     measured: int
     state: str
-    threshold: int | None = None
+    thresholds: dict[str, int] | None = None
     details: dict[str, int] | None = None
 
     def to_json(self) -> dict[str, Any]:
@@ -54,7 +54,7 @@ class CallableFinding:
             "range": {"startLine": self.start_line, "endLine": self.end_line},
             "measured": self.measured,
             "state": self.state,
-            "threshold": self.threshold,
+            "thresholds": self.thresholds,
             "details": self.details,
         }
 

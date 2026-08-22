@@ -32,10 +32,10 @@ LAMBDA_TYPES = {
 }
 
 CONTROL_TYPES = {
-    "python": {"if_statement", "for_statement", "while_statement", "match_statement", "try_statement", "with_statement"},
+    "python": {"if_statement", "for_statement", "while_statement", "match_statement", "try_statement"},
     "go": {"if_statement", "for_statement", "expression_switch_statement", "type_switch_statement", "select_statement"},
     "kotlin": {"if_expression", "for_statement", "while_statement", "do_while_statement", "when_expression", "try_expression"},
-    "csharp": {"if_statement", "for_statement", "foreach_statement", "while_statement", "do_statement", "switch_statement", "try_statement", "using_statement", "lock_statement"},
+    "csharp": {"if_statement", "for_statement", "foreach_statement", "while_statement", "do_statement", "switch_statement", "try_statement"},
 }
 
 DECISION_TYPES = {
@@ -155,7 +155,7 @@ def _identity(node: Node, language: str, source: bytes, path: Path) -> str:
         "python": {"class_definition", "function_definition"},
         "go": set(),
         "kotlin": {"class_declaration", "object_declaration", "function_declaration"},
-        "csharp": {"namespace_declaration", "file_scoped_namespace_declaration", "class_declaration", "struct_declaration", "record_declaration", "local_function_statement"},
+        "csharp": {"namespace_declaration", "file_scoped_namespace_declaration", "class_declaration", "struct_declaration", "record_declaration", "method_declaration", "constructor_declaration", "local_function_statement"},
     }[language]
     while current:
         if current.type in owner_types:
@@ -198,7 +198,7 @@ def _nesting(callable_node: Node, language: str) -> int:
             if (child.type in CALLABLE_TYPES[language] and child is not callable_node) or child.type in LAMBDA_TYPES[language]:
                 continue
             increment = 1 if child.type in CONTROL_TYPES[language] else 0
-            if child.type in {"elif_clause"}:
+            if child.type == "elif_clause" or _is_else_if(child, language):
                 increment = 0
             maximum = max(maximum, visit(child, depth + increment))
         return maximum
@@ -215,8 +215,18 @@ def _decision_count(callable_node: Node, language: str, source: bytes) -> int:
         if node.type in {"boolean_operator", "conjunction_expression", "disjunction_expression", "binary_expression"}:
             count += _short_circuit_operator_count(node, source)
         if language == "csharp" and node.type == "switch_section":
-            count += sum(1 for child in node.named_children if child.type == "case_switch_label")
+            text = _text(node, source).strip()
+            count += int(text.startswith("case ") and not text.endswith(":") and not _is_default_branch(node, source))
     return count
+
+
+def _is_else_if(node: Node, language: str) -> bool:
+    if node.type not in {"if_statement", "if_expression"}:
+        return False
+    parent = node.parent
+    if language == "kotlin":
+        return bool(parent and parent.type == "control_structure_body" and parent.parent and parent.parent.type == "if_expression")
+    return bool(parent and parent.type == "if_statement" and parent.child_by_field_name("alternative") == node)
 
 
 def _walk_without_nested_callables(root: Node, language: str) -> Iterator[Node]:
@@ -229,7 +239,7 @@ def _walk_without_nested_callables(root: Node, language: str) -> Iterator[Node]:
 
 def _is_default_branch(node: Node, source: bytes) -> bool:
     text = _text(node, source).lstrip()
-    return text.startswith(("default", "else", "case _", "_ ->", "_ =>"))
+    return text.startswith(("default", "else", "case _", "case var _", "_ ->", "_ =>"))
 
 
 def _short_circuit_operator_count(node: Node, source: bytes) -> int:

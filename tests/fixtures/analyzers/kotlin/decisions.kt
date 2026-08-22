@@ -42,3 +42,23 @@ fun localOwner(value: Int): Int {
     fun local(item: Int): Int = item * 2
     return local(value)
 }
+
+fun elseIf(a: Boolean, b: Boolean): Int {
+    return if (a) {
+        1
+    } else if (b) {
+        2
+    } else {
+        0
+    }
+}
+
+fun exceptions(value: String): Int {
+    return try {
+        if (value.isEmpty()) 0 else value.toInt()
+    } catch (error: NumberFormatException) {
+        -1
+    } catch (error: IllegalArgumentException) {
+        -2
+    }
+}

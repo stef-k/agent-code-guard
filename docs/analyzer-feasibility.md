@@ -119,7 +119,7 @@ control flow unmeasured. Lambda policy is a separate production decision.
 
 ## Fixture results
 
-Eight fixture files contain 39 measured callables. Every row below is asserted
+Eight fixture files contain 47 measured callables. Every row below is asserted
 by `tests/test_analyzer_feasibility.py`; values are `LOC / depth / complexity`.
 
 | Language | Simple | Long linear | Deep nested | Wide branching | Metadata/comments | Language-specific evidence |
@@ -143,7 +143,7 @@ metrics in Python, Kotlin, and C#. Go has no named local-function declaration.
 | --- | --- | --- | --- | --- |
 | Tree-sitter | Implemented for all four languages with pinned Python packages and exact fixture assertions | One in-process parse, concrete ranges, broad grammar coverage, no target-language toolchain | Native wheels and grammar ABI must be pinned; node taxonomies differ; syntactic identities only; error recovery must be rejected | Recommended initial provider behind adapters |
 | Python `ast` | Compared against Python fixtures | Standard library, semantic node categories, stable end positions | Python only; decorator start requires explicit adjustment; no comments in AST | Useful oracle for the Python adapter, not a universal layer |
-| Go `go/parser` / `go/ast` | Go 1.25.4 tooling was available and source ranges are compiler-native | Authoritative Go syntax and positions | Requires Go at runtime or helper binaries for every OS/architecture | Useful oracle or optional Go backend |
+| Go `go/parser` / `go/ast` | Go 1.25.4 tooling was available and both fixture files compiled with `go test callables.go decisions.go`; native range API was assessed | Authoritative Go syntax and positions | Requires Go at runtime or helper binaries for every OS/architecture | Useful oracle or optional Go backend |
 | Roslyn | .NET 8/10 SDKs were present; packaging/runtime path assessed | Authoritative C# syntax, symbols available when needed | Requires .NET plus a maintained helper/package graph; much heavier than syntactic guards | Oracle or future backend if syntax-only identity proves insufficient |
 | Kotlin compiler/PSI | Runtime feasibility assessed; Java 11 was present but `kotlinc` was absent | Authoritative Kotlin model | Largest/version-sensitive dependency, compiler/JVM distribution burden | Not a universal baseline; possible future Kotlin backend |
 | Regex, indentation, or brace counting | Rejected against fixture constructs | Minimal dependency | Fails metadata/signatures, else-if normalization, expressions, comprehensions, switches, and comments/strings | Not suitable |
@@ -159,7 +159,7 @@ unavailable rather than falling back to text heuristics.
 ## Result-model compatibility
 
 `CallableFinding` is an additive generic result shape with path, callable,
-inclusive range, measured value, state, optional threshold, and optional detail
+inclusive range, measured value, state, optional threshold metadata, and optional detail
 breakdown. `GuardResult` already supplies the guard id and required policy id.
 The JSON compatibility test serializes the issue's nesting example. LOC keeps
 its existing `Finding` shape and semantics unchanged.
@@ -168,9 +168,9 @@ its existing `Finding` shape and semantics unchanged.
 
 Observed on Windows, Python 3.14.2, Tree-sitter 0.26.0, language-pack 1.14.3:
 
-- research module import: 119 ms;
-- first parse/measurement of all eight fixture files: 87 ms;
-- 800 warm file parses: 914 ms, approximately 1.14 ms/file.
+- research module import: 46 ms;
+- first parse/measurement of all eight fixture files: 56 ms;
+- 800 warm file parses: 624 ms, approximately 0.78 ms/file.
 
 These are sanity observations, not a benchmark. Parser initialization dominates
 the tiny corpus, while warm per-file cost is reasonable for post-edit workflows.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import sys
 import tempfile
@@ -45,6 +46,8 @@ EXPECTED = {
         ("sample.Branching", 17, 24, 8, 1, 5),
         ("sample.Expressions", 26, 28, 3, 0, 3),
         ("sample.Switches", 30, 39, 10, 1, 3),
+        ("sample.ElseIf", 41, 48, 8, 1, 3),
+        ("sample.ValueSwitch", 50, 59, 10, 1, 3),
     ],
     "kotlin/callables.kt": [
         ("sample.simple", 3, 3, 1, 0, 1),
@@ -60,13 +63,15 @@ EXPECTED = {
         ("sample.choices", 35, 39, 5, 1, 3),
         ("sample.localOwner", 41, 44, 4, 0, 1),
         ("sample.localOwner.local", 42, 42, 1, 0, 1),
+        ("sample.elseIf", 46, 54, 9, 1, 3),
+        ("sample.exceptions", 56, 64, 9, 2, 4),
     ],
     "csharp/Callables.cs": [
         ("Sample.Callables.Simple", 5, 5, 1, 0, 1),
         ("Sample.Callables.LongLinear", 7, 16, 10, 0, 1),
         ("Sample.Callables.Documented", 18, 26, 9, 0, 1),
         ("Sample.Callables.LocalOwner", 28, 32, 5, 0, 1),
-        ("Sample.Callables.Local", 30, 30, 1, 0, 1),
+        ("Sample.Callables.LocalOwner.Local", 30, 30, 1, 0, 1),
         ("Sample.Worker.Worker", 37, 37, 1, 0, 1),
     ],
     "csharp/Decisions.cs": [
@@ -74,6 +79,10 @@ EXPECTED = {
         ("Sample.Decisions.Branching", 25, 33, 9, 1, 5),
         ("Sample.Decisions.Expressions", 35, 36, 2, 0, 4),
         ("Sample.Decisions.Choices", 38, 43, 6, 0, 3),
+        ("Sample.Decisions.ElseIf", 45, 50, 6, 1, 3),
+        ("Sample.Decisions.ClassicSwitch", 52, 61, 10, 1, 3),
+        ("Sample.Decisions.Exceptions", 63, 72, 10, 2, 4),
+        ("Sample.Decisions.WildcardSwitch", 74, 81, 8, 1, 2),
     ],
 }
 
@@ -123,12 +132,19 @@ class FixtureMeasurementTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "syntax tree contains errors"):
                 analyze_file(path)
 
+    def test_python_native_ast_confirms_ranges_and_decorator_adjustment(self) -> None:
+        path = FIXTURES / "python" / "callables.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        documented = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "documented")
+        self.assertEqual((documented.lineno, documented.end_lineno), (16, 22))
+        self.assertEqual(documented.decorator_list[0].lineno, 15)
+
 
 class CallableResultCompatibilityTests(unittest.TestCase):
     def test_callable_finding_is_additive_and_json_serializable(self) -> None:
         finding = CallableFinding(
             path="src/Foo.kt", callable="Foo.process", start_line=20, end_line=48,
-            measured=5, state="review", threshold=4, details={"conditional": 3, "loop": 2},
+            measured=5, state="review", thresholds={"reviewAt": 4}, details={"conditional": 3, "loop": 2},
         )
         result = GuardResult("nesting", "review", [finding])
         payload = {"requiredPolicies": result.required_policies, "guards": {"nesting": result.to_json()}}
@@ -137,7 +153,7 @@ class CallableResultCompatibilityTests(unittest.TestCase):
         self.assertEqual(encoded["guards"]["nesting"]["findings"][0], {
             "path": "src/Foo.kt", "callable": "Foo.process",
             "range": {"startLine": 20, "endLine": 48}, "measured": 5,
-            "state": "review", "threshold": 4, "details": {"conditional": 3, "loop": 2},
+            "state": "review", "thresholds": {"reviewAt": 4}, "details": {"conditional": 3, "loop": 2},
         })
 
 
