@@ -71,9 +71,10 @@ def main() -> int:
         root = find_repo_root(Path.cwd())
         result = loc.run(args, root, loc.load_config(args))
         data = payload([result])
-        print(json.dumps(data, indent=2) if args.json else "", end="" if args.json else "") if args.json else print_text(data)
         if args.json:
-            print()
+            print(json.dumps(data, indent=2))
+        else:
+            print_text(data)
         return exit_code(data["overall"], args.ci)
     except Exception as exc:
         if args.json:
