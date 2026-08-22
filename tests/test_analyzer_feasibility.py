@@ -127,7 +127,7 @@ EXPECTED = {
         ("callables.arrow", 14, 16, 3, 0, 1),
         ("callables.expression", 18, 20, 3, 0, 1),
         ("callables.Worker.constructor", 23, 23, 1, 0, 1),
-        ("callables.Worker.method", 25, 28, 4, 0, 2),
+        ("callables.Worker.method", 25, 29, 5, 0, 2),
     ],
     "typescript/decisions.ts": [
         ("decisions.typedDecisions", 1, 7, 7, 1, 3),
@@ -233,6 +233,12 @@ class FixtureMeasurementTests(unittest.TestCase):
             measurement = analyze_file(path)[0]
             self.assertEqual((measurement.identity, measurement.language), ("Inline.inline", "javascript"))
             self.assertEqual((measurement.range.start_line, measurement.range.end_line), (2, 2))
+
+    def test_vue_language_detection_uses_the_exact_lang_attribute(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "Attributes.vue"
+            path.write_text('<script data-lang="ts">const inline = () => 1;</script>\n', encoding="utf-8")
+            self.assertEqual(analyze_file(path)[0].language, "javascript")
 
 
 class CallableResultCompatibilityTests(unittest.TestCase):

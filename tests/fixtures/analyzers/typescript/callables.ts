@@ -22,6 +22,7 @@ export const expression = function <T>(value: T): T {
 export class Worker {
     constructor(public readonly value: number) {}
 
+    @Trace()
     @Audit()
     method<T>(value: T, optional?: boolean): T {
         return optional ? value : value;

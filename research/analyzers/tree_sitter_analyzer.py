@@ -132,8 +132,11 @@ def _range_start_node(node: Node, language: str) -> Node:
             return declarator.parent if declarator.parent and declarator.parent.type == "lexical_declaration" else declarator
     if language in {"typescript", "tsx"} and node.type == "method_definition":
         previous = node.prev_named_sibling
-        if previous and previous.type == "decorator":
-            return previous
+        first = node
+        while previous and previous.type == "decorator":
+            first = previous
+            previous = previous.prev_named_sibling
+        return first
     return node
 
 

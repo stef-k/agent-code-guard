@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from tree_sitter import Node
 from tree_sitter_language_pack import get_parser
 
 
@@ -54,10 +55,10 @@ def _vue_regions(path: Path, source: bytes) -> list[ExecutableRegion]:
         raw_text = next((child for child in element.named_children if child.type == "raw_text"), None)
         if raw_text is None:
             continue
-        tag = source[start_tag.start_byte:start_tag.end_byte].decode("utf-8").lower()
-        if " src=" in tag:
+        attributes = _attributes(start_tag, source)
+        if "src" in attributes:
             raise ValueError(f"unable to analyze {path}: external Vue script regions are unsupported")
-        language = "typescript" if 'lang="ts"' in tag or "lang='ts'" in tag else "javascript"
+        language = "typescript" if attributes.get("lang") in {"ts", "typescript"} else "javascript"
         regions.append(ExecutableRegion(
             path, language, source[raw_text.start_byte:raw_text.end_byte], source, raw_text.start_byte,
         ))
@@ -71,3 +72,17 @@ def _byte_at_point(source: bytes, row: int, column: int) -> int:
     for _ in range(row):
         position = source.index(b"\n", position) + 1
     return position + column
+
+
+def _attributes(start_tag: Node, source: bytes) -> dict[str, str | None]:
+    values: dict[str, str | None] = {}
+    for attribute in (child for child in start_tag.named_children if child.type == "attribute"):
+        children = attribute.named_children
+        name_node = next(child for child in children if child.type == "attribute_name")
+        value_node = next((child for child in children if child.type == "quoted_attribute_value"), None)
+        name = source[name_node.start_byte:name_node.end_byte].decode("utf-8").lower()
+        value = None
+        if value_node is not None:
+            value = source[value_node.start_byte:value_node.end_byte].decode("utf-8")[1:-1].lower()
+        values[name] = value
+    return values
