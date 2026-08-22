@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+CODE_GUARD = REPO_ROOT / "skills" / "code-guard" / "scripts" / "code_guard.py"
 
 class InstalledPackageTests(unittest.TestCase):
     def test_distribution_declares_canonical_runtime_dependencies(self) -> None:
@@ -57,6 +59,15 @@ print(json.dumps({"result": result, "loaded": loaded}))
                 [sys.executable, "-c", script, str(path)], text=True, capture_output=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_checkout_compatibility_launcher_finds_source_package(self) -> None:
+        result = subprocess.run(
+            [sys.executable, "-I", str(CODE_GUARD), "--help"],
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Run deterministic Code Guard checks.", result.stdout)
 
 
 if __name__ == "__main__":

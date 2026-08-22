@@ -29,10 +29,10 @@ Code Guard provides deterministic measurements that act as anchors for agent jud
 
 ## Workflow
 
-With Git, run the project-local Code Guard command after source edits when available:
+With Git, run the installed Code Guard command after source edits:
 
 ```bash
-python3 .agent-tools/code_guard.py . --changed-only --config .agent-tools/code-guard.config.json
+code-guard . --changed-only --config .agent-tools/code-guard.config.json
 ```
 
 The normal packaged workflow installs Code Guard and its syntax dependencies in
@@ -43,8 +43,7 @@ python -m pip install .
 code-guard . --changed-only --config examples/code-guard.config.json
 ```
 
-The compatibility runner remains available in an installed checkout or copied
-project-local tooling:
+The compatibility runner remains available directly from a repository checkout:
 
 ```bash
 python3 skills/code-guard/scripts/code_guard.py . --changed-only --config examples/code-guard.config.json
