@@ -292,3 +292,30 @@ next syntax guard: scope is resolved once, LOC runs directly, one analysis value
 is built if any syntax guard needs it, and all such guards consume that value.
 Disabled syntax guards retain LOC-only behavior without analysis imports,
 provider initialization, parser construction, or syntax validation.
+
+## D26 — Structural nesting is normalized executable control depth
+
+The opt-in `nesting` guard consumes only `CallableFact` and `ControlFlowFact`
+relationships from the runner's single shared `AnalysisFacts` value. It groups
+facts by range-qualified `CallableKey`, follows `parent_control_range`, and adds
+one only when `increases_nesting` is true. The maximum active depth is therefore
+computed without source reads, parser nodes, syntax reconstruction, or language
+concepts inside the guard.
+
+Executable conditions, loops, switch/match, and try-family controls are
+meaningful. Visual indentation, braces, plain blocks, pattern depth, JSX, HTML,
+and Vue template hierarchy are not. Language adapters remain authoritative for
+else-if, case, catch-family, and related normalization. Nested callables and
+callbacks reset depth because their controls use another `CallableKey`.
+
+The `guards.nesting` section is disabled when omitted or explicitly false.
+Enabling it requires a positive JSON integer `reviewAt`; there is no universal
+default, FAIL threshold, override, or per-language threshold. Exactly the
+threshold passes and greater depth reviews. JSON includes all callable findings
+and an optional deterministic deepest line; human output includes only REVIEW.
+Only REVIEW routes the stable `nesting` policy ID.
+
+Runner orchestration activates analysis when callable size or nesting is
+enabled, constructs facts exactly once, and passes that same immutable value to
+each enabled guard. Complexity remains disabled, and scope/exclusion behavior
+remains owned by the existing runner rather than introducing issue #16 policy.

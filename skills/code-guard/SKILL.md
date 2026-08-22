@@ -83,7 +83,7 @@ Guards:
 - file LOC (implemented and enabled by default);
 - source/container and syntax facts (production infrastructure, not a guard);
 - callable LOC (implemented; opt-in with a required project `reviewAt`);
-- nesting depth (reserved and disabled);
+- structural nesting (implemented; opt-in with a required project `reviewAt`);
 - cyclomatic complexity (reserved and disabled).
 
 Callable LOC has no universal review threshold. When a project enables
@@ -91,6 +91,12 @@ Callable LOC has no universal review threshold. When a project enables
 Exactly that size passes; larger callables review and never fail. Load
 `references/callable-size-policy.md` only when `callableSize` appears in
 `requiredPolicies`.
+
+Structural nesting is executable control-flow depth, not visual, markup, brace,
+or indentation depth. When a project enables `guards.nesting`, it must supply a
+positive JSON integer `reviewAt`. Exactly that depth passes; greater depth
+reviews and never fails. Load `references/nesting-policy.md` only when `nesting`
+appears in `requiredPolicies`.
 
 Agent Code Guard is the canonical LOC implementation. Agent LOC Guard is the completed prototype/reference whose mature behavior was migrated from commit `75ab39d261dbc65f78815836fac90add16d265d1`.
 

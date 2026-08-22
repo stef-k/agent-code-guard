@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ..reporting import reporting_path
 from ..result_model import CallableFinding, GuardResult
 
 if TYPE_CHECKING:
@@ -74,11 +75,3 @@ def evaluate(root: Path, config: Config, fact: CallableFact) -> CallableFinding:
         thresholds={"reviewAt": config.review_at},
         embedded_language=fact.embedded_language,
     )
-
-
-def reporting_path(path: Path, root: Path) -> str:
-    resolved = path.resolve()
-    try:
-        return resolved.relative_to(root.resolve()).as_posix()
-    except ValueError:
-        return resolved.as_posix()

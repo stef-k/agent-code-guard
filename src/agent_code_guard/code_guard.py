@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from .file_selection import resolve_scope
-from .guards import callable_size, loc
+from .guards import callable_size, loc, nesting
 from .result_model import GuardResult, aggregate_state, required_policies
 
 
@@ -44,12 +44,16 @@ def run_guards(scope, args: argparse.Namespace) -> list[GuardResult]:
     """Load guard configuration, then construct shared syntax facts at most once."""
     loc_config = loc.load_config(args)
     callable_size_config = callable_size.load_config(args)
+    nesting_config = nesting.load_config(args)
     results = [loc.run(scope.root, loc_config, scope.files)]
-    needs_analysis = callable_size_config.enabled
+    needs_analysis = callable_size_config.enabled or nesting_config.enabled
     if needs_analysis:
         analysis = import_module("agent_code_guard.analysis.pipeline")
         facts = analysis.analyze_files(scope.files)
-        results.append(callable_size.run(scope.root, callable_size_config, facts))
+        if callable_size_config.enabled:
+            results.append(callable_size.run(scope.root, callable_size_config, facts))
+        if nesting_config.enabled:
+            results.append(nesting.run(scope.root, nesting_config, facts))
     return results
 
 
@@ -74,6 +78,18 @@ def print_text(data: dict[str, object]) -> None:
                 f"REVIEW: {finding['path']}:{finding['range']['startLine']}-{finding['range']['endLine']} "
                 f"— {finding['callable']} is {finding['measured']} LOC "
                 f"(review {finding['thresholds']['reviewAt']})"
+            )
+    nesting_result = data["guards"].get("nesting")
+    if nesting_result:
+        for finding in nesting_result["findings"]:
+            if finding["state"] != "review":
+                continue
+            deepest = finding.get("details", {}).get("deepestLine")
+            explanation = f"; deepest at line {deepest}" if deepest is not None else ""
+            print(
+                f"REVIEW: {finding['path']}:{finding['range']['startLine']}-{finding['range']['endLine']} "
+                f"— {finding['callable']} nesting depth {finding['measured']} "
+                f"(review {finding['thresholds']['reviewAt']}{explanation})"
             )
     policies = data["requiredPolicies"]
     if policies:

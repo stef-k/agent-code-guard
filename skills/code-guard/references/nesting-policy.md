@@ -6,9 +6,8 @@ This guard exists because deeply nested code can be difficult to reason about ev
 
 ## Status
 
-Universal default thresholds are not finalized yet. They must be validated across representative code in multiple languages before becoming defaults.
-
-Until then, nesting findings should be treated primarily as `REVIEW` signals under configured or experimental thresholds.
+Nesting is opt-in with a project-supplied `guards.nesting.reviewAt`; the guard
+has no universal default and no FAIL threshold.
 
 ## On REVIEW
 
@@ -20,12 +19,16 @@ Inspect whether the nesting reflects:
 - multiple responsibilities entangled in one callable;
 - state-machine, parser, traversal, or other logic where deeper nesting may be inherent and still readable.
 
-Consider restructuring only when it improves the control-flow model.
+REVIEW means inspect control-flow readability; it is not an automatic refactor.
+Consider guard clauses or extraction only when they improve clarity. Preserve
+idiomatic language and project structure.
 
 ## Anti-gaming
 
 Do not flatten code merely to reduce the measured depth if the result becomes harder to follow.
 
 Do not hide nested decisions behind meaningless helper calls or obscure boolean expressions. Do not replace clear structured control flow with clever expressions, compressed conditionals, exception tricks, or other forms whose primary purpose is lowering the metric.
+
+Do not change or disable the configured threshold merely to silence a finding.
 
 The preferred outcome is clearer control flow, not a smaller number at any cost.
