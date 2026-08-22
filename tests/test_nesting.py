@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+import io
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,7 +15,7 @@ from helpers import CodeGuardTestCase, write_config
 
 from agent_code_guard.analysis import analyze_files
 from agent_code_guard.analysis.errors import ProviderUnavailableError
-from agent_code_guard.code_guard import run_guards
+from agent_code_guard.code_guard import main, run_guards
 from agent_code_guard.file_selection import ResolvedScope
 from agent_code_guard.guards import nesting
 
@@ -222,6 +225,19 @@ class NestingOrchestrationTests(unittest.TestCase):
                 side_effect=ProviderUnavailableError("provider unavailable"),
             ), self.assertRaisesRegex(ProviderUnavailableError, "provider unavailable"):
                 run_guards(scope, args(config))
+
+    def test_default_provider_failure_is_cli_exit_three(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            source = Path(temp) / "sample.py"
+            source.write_text("def sample():\n    pass\n", encoding="utf-8")
+            output = io.StringIO()
+            with patch.object(sys, "argv", ["code-guard", str(source), "--json"]), patch(
+                "agent_code_guard.analysis.pipeline.analyze_files",
+                side_effect=ProviderUnavailableError("provider unavailable"),
+            ), redirect_stdout(output):
+                result = main()
+            self.assertEqual(result, 3)
+            self.assertEqual(json.loads(output.getvalue()), {"error": "provider unavailable"})
 
 
 class NestingRunnerTests(CodeGuardTestCase):
