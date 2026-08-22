@@ -202,3 +202,7 @@ configurable callable LOC and nesting review points but does not justify
 universal defaults. Complexity requires language-specific interpretation for
 comprehensions, fallback operators, switch forms, JSX expressions, and callback
 boundaries. No production REVIEW or FAIL threshold is enabled by the prototype.
+
+## D21 — Scope resolution precedes guard applicability
+
+The runner resolves one normalized file scope before invoking guards. Git-derived modes require an enclosing Git repository. Positional files and directories work independently of Git; missing explicit paths are errors, while existing artifacts remain in common scope even when LOC does not support their extension. Each guard receives the same common scope and applies its own inclusion and exclusion rules. A directory or `.` is always a deliberate recursive audit, never a fallback for a failed Git mode.

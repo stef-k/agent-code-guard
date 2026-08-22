@@ -8,7 +8,7 @@ import json
 import sys
 from pathlib import Path
 
-from file_selection import find_repo_root, validate_selection_args
+from file_selection import resolve_scope
 from guards import loc
 from result_model import GuardResult, aggregate_state, required_policies
 
@@ -68,9 +68,8 @@ def exit_code(overall: str, ci: bool) -> int:
 def main() -> int:
     args = parser().parse_args()
     try:
-        root = find_repo_root(Path.cwd())
-        validate_selection_args(args, root)
-        result = loc.run(args, root, loc.load_config(args))
+        scope = resolve_scope(args, Path.cwd())
+        result = loc.run(scope.root, loc.load_config(args), scope.files)
         data = payload([result])
         if args.json:
             print(json.dumps(data, indent=2))

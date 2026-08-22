@@ -29,7 +29,7 @@ Code Guard provides deterministic measurements that act as anchors for agent jud
 
 ## Workflow
 
-Run the project-local Code Guard command after source edits when available:
+With Git, run the project-local Code Guard command after source edits when available:
 
 ```bash
 python3 .agent-tools/code_guard.py . --changed-only --config .agent-tools/code-guard.config.json
@@ -40,6 +40,14 @@ Run the canonical repository runner directly when it is installed as a skill:
 ```bash
 python3 skills/code-guard/scripts/code_guard.py . --changed-only --config examples/code-guard.config.json
 ```
+
+Without Git or another VCS that can provide changed scope, pass exactly the files you created or modified. You are responsible for supplying the complete edited-file set:
+
+```bash
+python3 skills/code-guard/scripts/code_guard.py src/Foo.py src/Bar.ts tests/FooTests.cs
+```
+
+Do not create a manifest or temporary scope file. Specific positional files mean “inspect these artifacts.” A directory or `.` means a deliberate recursive audit of that scope. `--changed-only` means “ask Git for current work” and fails outside a Git repository; it never falls back to an audit.
 
 When all guards return `PASS`, no detailed policy file needs to be loaded.
 

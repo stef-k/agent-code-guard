@@ -102,15 +102,33 @@ These apply to every guard:
 - Agents must not create or broaden policy exceptions without explicit user approval.
 - Normal development checks current changed files; unrelated legacy debt belongs to explicit audit work.
 
-## Changed-code-first
+## Scope modes
 
-Normal agent use should evaluate the complete current change set relative to `HEAD`:
+Code Guard keeps three scope sources distinct:
 
-- staged source changes;
-- unstaged source changes;
-- untracked non-ignored source files.
+- Git-derived current work: `--changed-only`, `--staged`, or `--base-ref <ref>` asks Git for scope and requires a Git repository.
+- Explicit caller scope: one or more positional file paths inspect exactly those existing artifacts, subject to each guard's applicability and exclusions.
+- Explicit audit scope: a positional directory or `.` recursively inspects that supplied tree. It does not mean changed-only.
 
-Full-repository analysis remains a separate audit mode.
+With Git, normal agent use evaluates the complete current change set relative to `HEAD`:
+
+```bash
+python3 skills/code-guard/scripts/code_guard.py . --changed-only
+```
+
+Without Git or another VCS, the coding agent must pass exactly the files it created or modified:
+
+```bash
+python3 skills/code-guard/scripts/code_guard.py src/Foo.py src/Bar.ts tests/FooTests.cs
+```
+
+No manifest or intermediate file list is needed. A missing explicit path is a scope error (exit 3), while unsupported existing artifacts remain valid scope and are simply ignored by guards that do not apply. Git-derived deleted files remain ignored under ACMR selection.
+
+Full-directory analysis remains a separate deliberate audit mode:
+
+```bash
+python3 skills/code-guard/scripts/code_guard.py .
+```
 
 Pull-request CI should evaluate files added or modified by the PR relative to its base rather than unrelated pre-existing oversized files.
 
@@ -129,7 +147,7 @@ Java and JavaScript/TypeScript are also expected targets. Parser/provider techno
 
 ## Canonical LOC implementation
 
-Agent Code Guard owns LOC behavior. The unified runner supports full audit and the `--changed-only`, `--staged`, `--base-ref <ref>`, `--json`, and `--ci` modes:
+Agent Code Guard owns LOC behavior. The unified runner supports explicit files/directories, full audit, and the `--changed-only`, `--staged`, `--base-ref <ref>`, `--json`, and `--ci` modes:
 
 ```bash
 python3 skills/code-guard/scripts/code_guard.py . --changed-only
