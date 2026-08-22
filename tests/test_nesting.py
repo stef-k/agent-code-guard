@@ -34,26 +34,38 @@ class NestingConfigTests(unittest.TestCase):
         path.write_text(json.dumps({"guards": {"nesting": value}}), encoding="utf-8")
         return path
 
-    def test_omitted_and_explicit_false_are_disabled(self) -> None:
+    def test_omitted_empty_override_and_disable_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            omitted = root / "omitted.json"
-            omitted.write_text("{}", encoding="utf-8")
-            self.assertFalse(nesting.load_config(args(omitted)).enabled)
-            self.assertFalse(nesting.load_config(args(self.write_document(root, {"enabled": False}))).enabled)
+            cases = [
+                ({}, (True, 4)),
+                ({"guards": {}}, (True, 4)),
+                ({"guards": {"nesting": {}}}, (True, 4)),
+                ({"guards": {"nesting": {"enabled": True}}}, (True, 4)),
+                ({"guards": {"nesting": {"reviewAt": 6}}}, (True, 6)),
+                ({"guards": {"nesting": {"enabled": True, "reviewAt": 8}}}, (True, 8)),
+                ({"guards": {"nesting": {"enabled": False}}}, (False, None)),
+                ({"guards": {"nesting": {"enabled": False, "reviewAt": "ignored"}}}, (False, None)),
+            ]
+            for index, (document, expected) in enumerate(cases):
+                path = root / f"config-{index}.json"
+                path.write_text(json.dumps(document), encoding="utf-8")
+                config = nesting.load_config(args(path))
+                self.assertEqual((config.enabled, config.review_at), expected)
 
-    def test_enabled_requires_positive_json_integer_review_at(self) -> None:
-        invalid = [None, True, 1.5, "4", 0, -1]
+    def test_present_enabled_must_be_boolean(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            for value in invalid:
-                section = {"enabled": True}
-                if value is not None:
-                    section["reviewAt"] = value
-                with self.subTest(value=value), self.assertRaisesRegex(
-                    ValueError, "guards.nesting.reviewAt must be a positive integer"
-                ):
-                    nesting.load_config(args(self.write_document(root, section)))
+            for value in [None, 1, 0, "true", [], {}]:
+                with self.subTest(value=value), self.assertRaisesRegex(ValueError, "guards.nesting.enabled must be a boolean"):
+                    nesting.load_config(args(self.write_document(root, {"enabled": value})))
+
+    def test_explicit_review_at_requires_positive_json_integer_while_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for value in [None, True, False, 1.5, "4", 0, -1]:
+                with self.subTest(value=value), self.assertRaisesRegex(ValueError, "guards.nesting.reviewAt must be a positive integer"):
+                    nesting.load_config(args(self.write_document(root, {"reviewAt": value})))
 
 
 class NestingEvaluationTests(unittest.TestCase):

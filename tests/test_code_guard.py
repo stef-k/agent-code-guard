@@ -57,12 +57,20 @@ class ResultContractTests(CodeGuardTestCase):
 
 
 class LocParityTests(CodeGuardTestCase):
-    def test_loc_only_does_not_parse_malformed_supported_syntax(self) -> None:
+    def test_default_parses_malformed_source_but_explicit_syntax_disable_is_loc_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "broken.py").write_text("def broken(:\n", encoding="utf-8")
             result = subprocess.run(
                 [sys.executable, str(CODE_GUARD), "broken.py", "--json"],
+                cwd=root, text=True, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 3, result.stderr)
+            config = write_config(root, {}, guards={
+                "loc": {}, "callableSize": {"enabled": False}, "nesting": {"enabled": False},
+            })
+            result = subprocess.run(
+                [sys.executable, str(CODE_GUARD), "broken.py", "--config", str(config), "--json"],
                 cwd=root, text=True, capture_output=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)

@@ -25,24 +25,38 @@ class CallableSizeConfigTests(unittest.TestCase):
         path.write_text(json.dumps({"guards": {"callableSize": value}}), encoding="utf-8")
         return path
 
-    def test_omitted_and_explicit_false_are_disabled(self) -> None:
+    def test_omitted_empty_override_and_disable_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            omitted = root / "omitted.json"
-            omitted.write_text("{}", encoding="utf-8")
-            self.assertFalse(callable_size.load_config(args(omitted)).enabled)
-            self.assertFalse(callable_size.load_config(args(self.write_document(root, {"enabled": False}))).enabled)
+            cases = [
+                ({}, (True, 80)),
+                ({"guards": {}}, (True, 80)),
+                ({"guards": {"callableSize": {}}}, (True, 80)),
+                ({"guards": {"callableSize": {"enabled": True}}}, (True, 80)),
+                ({"guards": {"callableSize": {"reviewAt": 100}}}, (True, 100)),
+                ({"guards": {"callableSize": {"enabled": True, "reviewAt": 120}}}, (True, 120)),
+                ({"guards": {"callableSize": {"enabled": False}}}, (False, None)),
+                ({"guards": {"callableSize": {"enabled": False, "reviewAt": "ignored"}}}, (False, None)),
+            ]
+            for index, (document, expected) in enumerate(cases):
+                path = root / f"config-{index}.json"
+                path.write_text(json.dumps(document), encoding="utf-8")
+                config = callable_size.load_config(args(path))
+                self.assertEqual((config.enabled, config.review_at), expected)
 
-    def test_enabled_requires_positive_json_integer_review_at(self) -> None:
-        invalid = [None, True, 1.5, "80", 0, -1]
+    def test_present_enabled_must_be_boolean(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            for value in invalid:
-                section = {"enabled": True}
-                if value is not None:
-                    section["reviewAt"] = value
+            for value in [None, 1, 0, "true", [], {}]:
+                with self.subTest(value=value), self.assertRaisesRegex(ValueError, "guards.callableSize.enabled must be a boolean"):
+                    callable_size.load_config(args(self.write_document(root, {"enabled": value})))
+
+    def test_explicit_review_at_requires_positive_json_integer_while_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for value in [None, True, False, 1.5, "80", 0, -1]:
                 with self.subTest(value=value), self.assertRaisesRegex(ValueError, "guards.callableSize.reviewAt must be a positive integer"):
-                    callable_size.load_config(args(self.write_document(root, section)))
+                    callable_size.load_config(args(self.write_document(root, {"reviewAt": value})))
 
 
 class CallableSizeEvaluationTests(unittest.TestCase):
