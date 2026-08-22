@@ -233,3 +233,29 @@ only when syntax analysis is invoked. Unsupported ordinary artifacts are
 inapplicable; a supported artifact with malformed syntax or an unavailable
 provider/grammar is a deterministic analysis error suitable for the existing
 runner exit-3 boundary.
+
+## D23 — Second-wave languages preserve the production fact contract
+
+C++, Rust, PHP, Swift, and Dart extend the shipped adapter tables and lexical
+identity/range helpers without changing `AnalysisFacts`. Their functions,
+methods, constructors/initializers, and mainstream closures emit the existing
+callable, control, and decision facts. Assigned closures use their stable lexical
+owner; anonymous closures use original source-coordinate identities and reset
+control measurement at their boundary.
+
+PHP validates a second container shape: the whole mixed file is one
+identity-mapped PHP region because the grammar keeps HTML inert while allowing
+PHP syntax to span tags. C++ preprocessing remains lexical: directives are
+parsed but not expanded or configured, and runtime decisions never arise from
+`#if` itself. Generic `.h` remains excluded because suffix alone cannot choose C
+versus C++ honestly.
+
+Rust `if let`/`while let` use ordinary condition/loop facts; patterns add no
+decision, non-wildcard match arms do, and explicit match guards add a separate
+`pattern_guard`. Swift `guard` is a condition whose failure body is structurally
+nested while following statements are not; non-default switch arms and `where`
+guards are decisions. PHP `??`, Swift optional navigation/coalescing, and Dart
+null-aware/coalescing remain non-decisions, consistent with the settled fallback
+policy. These qualifications strengthen callable LOC and nesting Outcome B and
+strengthen while further qualifying complexity Outcome C. No syntax guard or
+threshold is enabled.

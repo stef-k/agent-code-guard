@@ -19,6 +19,22 @@ from analysis.regions import executable_regions  # noqa: E402
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "analyzers"
 
 
+def _measurements(facts, identity: str) -> tuple[int, int, int]:
+    """Derive validation-only LOC, nesting, and complexity from normalized facts."""
+    callable_fact = next(item for item in facts.callables if item.identity == identity)
+    controls = [item for item in facts.controls if item.callable_key == callable_fact.key]
+    by_range = {item.source_range: item for item in controls}
+
+    def depth(control) -> int:
+        value = int(control.increases_nesting)
+        parent = by_range.get(control.parent_control_range)
+        return value + (depth(parent) if parent is not None else 0)
+
+    nesting = max((depth(item) for item in controls), default=0)
+    decisions = sum(item.callable_key == callable_fact.key for item in facts.decisions)
+    return callable_fact.source_range.physical_loc, nesting, 1 + decisions
+
+
 class ProductionParityTests(unittest.TestCase):
     def test_representative_first_wave_files_produce_provider_neutral_facts(self) -> None:
         cases = {
@@ -216,6 +232,110 @@ class ProviderContractTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ProviderUnavailableError, "supported language 'python'.*requirements-analysis.txt"):
             analyze_files([FIXTURES / "python" / "callables.py"], TreeSitterProvider(unavailable))
+
+
+class SecondWaveLanguageTests(unittest.TestCase):
+    def test_cpp_callables_preprocessor_and_exact_measurements(self) -> None:
+        facts = analyze_files([FIXTURES / "cpp" / "second_wave.cpp"])
+        identities = {item.identity for item in facts.callables}
+        self.assertTrue({
+            "second_wave.choose", "second_wave.Worker.Worker", "second_wave.Worker.~Worker",
+            "second_wave.Worker.operator()", "second_wave.Worker.Nested.run", "second_wave.stable",
+            "second_wave.consume.<callback@40:9>", "second_wave.configured",
+        }.issubset(identities))
+        self.assertEqual(_measurements(facts, "second_wave.choose"), (9, 2, 4))
+        self.assertEqual(_measurements(facts, "second_wave.Worker.operator()"), (3, 0, 2))
+        self.assertFalse(any(item.provider_kind.startswith("preproc") for item in facts.decisions))
+
+    def test_rust_patterns_closures_and_exact_measurements(self) -> None:
+        facts = analyze_files([FIXTURES / "rust" / "second_wave.rs"])
+        by_identity = {item.identity: item for item in facts.callables}
+        self.assertTrue({"second_wave.evaluate", "second_wave.Work.default_run",
+                         "second_wave.Worker.default_run", "second_wave.closures.stable"}.issubset(by_identity))
+        callback = next(item for item in facts.callables if "<callback@24:13>" in item.identity)
+        self.assertEqual((callback.parent_callable, callback.boundary_kind), ("second_wave.closures", "callback"))
+        self.assertEqual(_measurements(facts, "second_wave.evaluate"), (12, 3, 8))
+        self.assertIn("pattern_guard", {item.category for item in facts.decisions})
+
+    def test_php_mixed_source_preserves_original_coordinates_and_ignores_html(self) -> None:
+        path = FIXTURES / "php" / "Mixed.php"
+        facts = analyze_files([path])
+        self.assertEqual(facts.files[0].region_count, 1)
+        by_identity = {item.identity: item for item in facts.callables}
+        self.assertEqual((by_identity["Mixed.foo"].source_range.start_line,
+                          by_identity["Mixed.bar"].source_range.start_line), (4, 26))
+        self.assertEqual(by_identity["Mixed.bar"].source_range.start.byte_offset,
+                         path.read_bytes().index(b"function bar"))
+        self.assertTrue(all(item.path == path and item.embedded_language == "php" for item in facts.callables))
+        self.assertFalse(any(item.provider_kind in {"text", "text_interpolation"}
+                             for item in (*facts.controls, *facts.decisions)))
+        self.assertEqual(_measurements(facts, "Mixed.foo"), (6, 1, 4))
+        callback = next(item for item in facts.callables if item.boundary_kind == "callback")
+        self.assertEqual(callback.parent_callable, "Mixed.bar")
+
+    def test_swift_guard_patterns_closures_and_exact_measurements(self) -> None:
+        facts = analyze_files([FIXTURES / "swift" / "second_wave.swift"])
+        identities = {item.identity for item in facts.callables}
+        self.assertTrue({"second_wave.evaluate", "second_wave.Worker.init", "second_wave.Worker.run",
+                         "second_wave.Worker.extra", "second_wave.Work.provided", "second_wave.stable"}.issubset(identities))
+        self.assertEqual(_measurements(facts, "second_wave.evaluate"), (13, 2, 9))
+        guard = next(item for item in facts.controls if item.provider_kind == "guard_statement")
+        self.assertEqual((guard.category, guard.increases_nesting), ("condition", True))
+        self.assertIn("pattern_guard", {item.category for item in facts.decisions})
+
+    def test_dart_async_local_closures_null_aware_and_exact_measurements(self) -> None:
+        facts = analyze_files([FIXTURES / "dart" / "second_wave.dart"])
+        by_identity = {item.identity: item for item in facts.callables}
+        self.assertTrue({"second_wave.evaluate", "second_wave.local", "second_wave.stable",
+                         "second_wave.Worker.Worker", "second_wave.Worker.run"}.issubset(by_identity))
+        self.assertEqual(by_identity["second_wave.local"].parent_callable, "second_wave.evaluate")
+        self.assertEqual(_measurements(facts, "second_wave.evaluate"), (14, 3, 6))
+        self.assertNotIn("fallback", {item.category for item in facts.decisions})
+
+    def test_all_second_wave_languages_reject_malformed_supported_source(self) -> None:
+        cases = {
+            ".cpp": "int broken( {",
+            ".rs": "fn broken( {",
+            ".php": "<?php function broken( { ?>",
+            ".swift": "func broken( {",
+            ".dart": "void broken( {",
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            for suffix, source in cases.items():
+                path = Path(temp) / f"broken{suffix}"
+                path.write_text(source, encoding="utf-8")
+                with self.subTest(suffix=suffix), self.assertRaises(SyntaxAnalysisError):
+                    analyze_files([path])
+
+    def test_second_wave_suffix_policy_excludes_ambiguous_generic_header(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            paths = []
+            for suffix in (".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx"):
+                path = root / f"sample{suffix}"
+                path.write_text("int run() { return 1; }", encoding="utf-8")
+                paths.append(path)
+            generic_header = root / "sample.h"
+            generic_header.write_text("int run() { return 1; }", encoding="utf-8")
+            facts = analyze_files([*paths, generic_header])
+            self.assertEqual(len(facts.files), len(paths))
+
+    def test_second_wave_parser_cache_and_parse_once_contract(self) -> None:
+        from tree_sitter_language_pack import get_parser
+        created = []
+
+        def factory(language: str):
+            created.append(language)
+            return get_parser(language)
+
+        provider = TreeSitterProvider(factory)
+        paths = [FIXTURES / language / filename for language, filename in (
+            ("cpp", "second_wave.cpp"), ("rust", "second_wave.rs"), ("php", "Mixed.php"),
+            ("swift", "second_wave.swift"), ("dart", "second_wave.dart"),
+        )]
+        facts = analyze_files([*paths, paths[0]], provider)
+        self.assertEqual(created, ["cpp", "rust", "php", "swift", "dart"])
+        self.assertTrue(facts.callables)
 
 
 if __name__ == "__main__":
