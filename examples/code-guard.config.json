@@ -27,7 +27,7 @@
       "overrides": []
     },
     "callableSize": { "enabled": false },
-    "nesting": { "enabled": false },
+    "nesting": { "enabled": false, "reviewAt": 4 },
     "cyclomaticComplexity": { "enabled": false }
   }
 }

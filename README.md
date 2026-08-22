@@ -29,9 +29,9 @@ The first design targets four cross-language measurements:
 3. **Nesting depth** — maximum structural nesting inside a callable.
 4. **Cyclomatic complexity** — deterministic execution-path complexity.
 
-File LOC has mature default policy thresholds. Callable size is the first active
-syntax guard, but it has no universal review threshold: projects opt in by
-supplying `reviewAt`. Nesting and complexity remain disabled.
+File LOC has mature default policy thresholds. Callable size and structural
+nesting are active syntax guards, but neither has a universal review threshold:
+projects opt in by supplying `reviewAt`. Complexity remains disabled.
 
 ## Scope rule
 
@@ -152,7 +152,7 @@ resolve_scope() -> ResolvedScope.files
     -> source/container regions
     -> cached Tree-sitter parser
     -> immutable provider-neutral facts (built once)
-    -> callableSize
+    -> callableSize / nesting
 ```
 
 Ordinary files are identity-mapped regions. Vue template/style content is ignored;
@@ -230,6 +230,42 @@ applicable syntax or unavailable parser dependencies produce exit 3. When it is
 disabled, LOC-only execution performs no analysis import, parser construction,
 or syntax validation.
 
+## Structural nesting
+
+Enable executable control-flow nesting explicitly:
+
+```json
+{
+  "guards": {
+    "nesting": {
+      "enabled": true,
+      "reviewAt": 4
+    }
+  }
+}
+```
+
+An omitted section or `"enabled": false` disables the guard. When enabled,
+`reviewAt` is required and must be a positive JSON integer. Exactly the
+threshold passes and a greater depth reviews. There is no default, FAIL
+threshold, override, or per-language threshold.
+
+Structural nesting is maximum active executable control-flow depth inside each
+callable. It follows the normalized `ControlFlowFact` parent relationships from
+the shared `AnalysisFacts`; it does not parse or reread source, inspect parser
+nodes, or reconstruct language syntax. Conditions, loops, switch/match, and
+try-family regions are meaningful. Indentation, braces, plain blocks, patterns,
+JSX, HTML, and Vue template hierarchy are not. Else-if, case, and catch-family
+normalization belongs to language adapters. Nested callables and callbacks reset
+depth because they have distinct `CallableKey` values.
+
+When callable size and nesting are both enabled, the runner calls analysis once
+and passes the same facts to both guards. JSON retains PASS and REVIEW findings,
+including a deterministic `details.deepestLine` when depth is nonzero. Human
+output prints REVIEW findings only. Only REVIEW routes `nesting`; nesting never
+fails. As with callable size, malformed applicable syntax or unavailable parser
+dependencies produce exit 3 only when a syntax guard is enabled.
+
 ## Canonical LOC implementation
 
 Agent Code Guard owns LOC behavior. The unified runner supports explicit files/directories, full audit, and the `--changed-only`, `--staged`, `--base-ref <ref>`, `--json`, and `--ci` modes:
@@ -252,15 +288,15 @@ There is no runtime dependency, synchronization layer, or second LOC implementat
 
 ## Result and exit contract
 
-Native LOC states normalize as `ok -> PASS`, `warn -> REVIEW`, `fail -> FAIL`, and `exempt -> PASS` with the exemption reason retained. Only REVIEW and FAIL add `loc` to `requiredPolicies`. Callable size contributes only PASS or REVIEW and routes `callableSize` only on REVIEW.
+Native LOC states normalize as `ok -> PASS`, `warn -> REVIEW`, `fail -> FAIL`, and `exempt -> PASS` with the exemption reason retained. Only REVIEW and FAIL add `loc` to `requiredPolicies`. Callable size and nesting contribute only PASS or REVIEW and route their stable guard IDs only on REVIEW.
 
 Normal exits are 0 for PASS, 1 for REVIEW, 2 for FAIL, and 3 for configuration/runtime errors. `--ci` changes REVIEW to exit 0; FAIL and errors remain 2 and 3.
 
 ## Status
 
-File LOC is enabled by default. Callable LOC is production-ready and opt-in with
-a project-supplied review threshold. Structural nesting and cyclomatic
-complexity remain disabled and have no production thresholds.
+File LOC is enabled by default. Callable LOC and structural nesting are
+production-ready and opt-in with project-supplied review thresholds. Cyclomatic
+complexity remains disabled and has no production threshold.
 
 ## License
 
