@@ -4,13 +4,16 @@ import dataclasses
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from helpers import REPO_ROOT
 
 from agent_code_guard.analysis import (
     ProviderUnavailableError, SyntaxAnalysisError, TreeSitterProvider, analyze_files,
 )
-from agent_code_guard.analysis.regions import executable_regions
+from agent_code_guard.analysis.adapters import _callable_range
+from agent_code_guard.analysis.facts import SourcePoint
+from agent_code_guard.analysis.regions import ExecutableRegion, executable_regions
 
 
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "analyzers"
@@ -193,6 +196,39 @@ class RegionAndVueTests(unittest.TestCase):
 
 
 class ProviderContractTests(unittest.TestCase):
+    def test_callable_range_snapshots_each_native_point_once(self) -> None:
+        class Node:
+            start_reads = 0
+            end_reads = 0
+
+            @property
+            def start_point(self):
+                self.start_reads += 1
+                return 2, 3
+
+            @property
+            def end_point(self):
+                self.end_reads += 1
+                return 4, 5
+
+        node = Node()
+        region = SimpleNamespace(
+            language="csharp",
+            original_point=lambda row, column: SourcePoint(row + 1, column + 1, row * 10 + column),
+        )
+
+        source_range = _callable_range(node, region)
+
+        self.assertEqual((node.start_reads, node.end_reads), (1, 1))
+        self.assertEqual((source_range.start.line, source_range.end.line), (3, 5))
+
+        node.start_reads = node.end_reads = 0
+        source = b"xxxxxx\n" * 6
+        executable = ExecutableRegion(Path("sample.cs"), "csharp", source, source)
+        mapped = executable.original_range(node)
+        self.assertEqual((node.start_reads, node.end_reads), (1, 1))
+        self.assertEqual((mapped.start.line, mapped.end.line), (3, 5))
+
     def test_provider_caches_parser_instances_by_language(self) -> None:
         from tree_sitter_language_pack import get_parser
         created: list[str] = []
