@@ -319,3 +319,13 @@ Runner orchestration activates analysis when callable size or nesting is
 enabled, constructs facts exactly once, and passes that same immutable value to
 each enabled guard. Complexity remains disabled, and scope/exclusion behavior
 remains owned by the existing runner rather than introducing issue #16 policy.
+
+## D27 — New guards require evidence-based admission before implementation
+
+After the initial universal guard set, new candidates begin as evaluation issues rather than implementation requests. A candidate must first demonstrate a deterministic anchor, real engineering value, broad applicability, distinct responsibility from mature tooling, stable measurement semantics, actionable/explainable findings, a defensible PASS/REVIEW/FAIL model, and acceptable signal-to-noise on representative code.
+
+Candidates that pass that primary gate must also address threshold/configuration evidence, metric-gaming risk, compatibility with runner-owned scope, architecture/dependency cost, deterministic failure behavior, and portable deterministic tests. For numerical guards, deterministic measurability, engineering usefulness, and universal-default threshold evidence are separate questions; an accepted guard may remain configurable-only.
+
+Every candidate issue ends with one explicit decision: `ACCEPT`, `ACCEPT — CONFIGURABLE ONLY`, `NEEDS MORE EVIDENCE`, or `REJECT / OUT OF SCOPE`. The repository's candidate-guard issue template and `docs/guard-admission.md` define the reusable evidence record.
+
+Once admitted, a guard should normally ship as one complete vertical production slice from deterministic provider/facts through configuration, runner/result/policy integration, tests, CI, and documentation. Internals remain modular, but the project should not accumulate half-integrated production engines that cannot be reached through the normal `code-guard` workflow.

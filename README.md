@@ -33,17 +33,30 @@ File LOC has mature default policy thresholds. Callable size and structural
 nesting are active syntax guards, but neither has a universal review threshold:
 projects opt in by supplying `reviewAt`. Complexity remains disabled.
 
-## Scope rule
+## Adding new guards
 
-A new guard should be added only when all of the following hold:
+Agent Code Guard should remain deliberately small. A new candidate guard is not accepted merely because a metric can be computed; its evaluation issue must gather evidence that the concern belongs in the universal deterministic core.
 
-- it has a deterministic measurement or objective detector;
-- the concern is meaningful across languages and frameworks;
-- the detector does not depend on the model inventing the measurement;
-- a finding gives the agent something genuinely worth inspecting;
-- the metric can be used without encouraging mechanical or readability-damaging transformations.
+The primary admission gate asks whether the candidate:
 
-Project-specific architecture boundaries, framework-specific rules, arbitrary style preferences, security scanning, dependency auditing, and similar concerns are outside the universal core.
+1. has a **deterministic anchor** — identical source/configuration produces the same measurement or detection without model judgment or unstable external state;
+2. has **real engineering value** — the condition corresponds to a maintainability, readability, cohesion, control-flow, or design concern genuinely worth inspecting;
+3. has **broad applicability** — the underlying concern is useful across a meaningful range of conventional languages/stacks, even if parsing requires language-specific adapters;
+4. has a **distinct responsibility** — it does not merely duplicate a mature formatter, compiler, linter, scanner, test runner, dependency tool, or framework analyzer;
+5. has **stable measurement semantics** — what is measured can be defined precisely without hiding important language differences;
+6. produces **actionable, explainable findings** — the relevant source identity/range and trigger can be understood without raw parser internals;
+7. has a **useful state model** — PASS / REVIEW / FAIL semantics can be justified, with FAIL requiring substantially stronger evidence than REVIEW;
+8. has an **acceptable signal-to-noise ratio** on representative code, not only synthetic fixtures.
+
+Candidates that pass that gate must also demonstrate threshold/configuration evidence, resistance to metric gaming, compatibility with runner-owned scope, reasonable architecture/dependency cost, deterministic failure behavior, and portable deterministic tests.
+
+For numerical candidates, keep three questions separate: **can we measure it deterministically?**, **is the measurement useful?**, and **can we justify a universal default threshold?** Passing the first two does not require inventing a default; an opt-in configurable guard is a valid outcome.
+
+Every new proposal should begin as a **Candidate guard** issue using the repository issue template and end with one of four explicit decisions: **ACCEPT**, **ACCEPT — CONFIGURABLE ONLY**, **NEEDS MORE EVIDENCE**, or **REJECT / OUT OF SCOPE**. Accepted guards should normally ship as one vertical production slice from deterministic provider/facts through configuration, runner/result/policy integration, tests, CI, and documentation.
+
+See [Guard Admission and Candidate Evaluation](docs/guard-admission.md) for the full evidence checklist, decision record, and delivery rules.
+
+Project-specific architecture boundaries, framework-specific rules, arbitrary style preferences, security scanning, dependency auditing, and similar concerns remain outside the universal core unless a candidate evaluation produces evidence for a distinct Code Guard responsibility.
 
 ## Agent-facing architecture
 
