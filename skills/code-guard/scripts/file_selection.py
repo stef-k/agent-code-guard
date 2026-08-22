@@ -6,10 +6,10 @@ import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 
-@dataclass(frozen=True)
-class SelectionArgs:
+class SelectionArgs(Protocol):
     paths: list[str]
     changed_only: bool
     staged: bool

@@ -4,11 +4,12 @@ import json
 import sys
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 from helpers import CODE_GUARD, CodeGuardTestCase, git, init_git, write_config, write_lines
 
 sys.path.insert(0, str(CODE_GUARD.parent))
-from file_selection import SelectionArgs, resolve_scope
+from file_selection import resolve_scope
 
 
 class ResultContractTests(CodeGuardTestCase):
@@ -168,7 +169,9 @@ class ExplicitScopeTests(CodeGuardTestCase):
             root = Path(temp)
             write_lines(root / "Foo.py", 1)
             (root / "artifact.custom").write_text("future guard input\n", encoding="utf-8")
-            args = SelectionArgs(["Foo.py", "artifact.custom"], False, False, None)
+            args = SimpleNamespace(
+                paths=["Foo.py", "artifact.custom"], changed_only=False, staged=False, base_ref=None,
+            )
             scope = resolve_scope(args, root)
             self.assertEqual(scope.root, root.resolve())
             self.assertEqual(scope.files, ((root / "Foo.py").resolve(), (root / "artifact.custom").resolve()))
