@@ -6,11 +6,19 @@ Use the Code Guard skill when creating, modifying, reviewing, or refactoring han
 
 Normal development should check the current changed source files rather than unrelated legacy files.
 
-When the unified runner is available, use:
+With Git, use:
 
 ```bash
 python3 .agent-tools/code_guard.py . --changed-only --config .agent-tools/code-guard.config.json
 ```
+
+Without Git/VCS, pass exactly the files you created or modified; you are responsible for supplying the complete edited-file set:
+
+```bash
+python3 .agent-tools/code_guard.py src/Foo.py src/Bar.ts tests/FooTests.cs --config .agent-tools/code-guard.config.json
+```
+
+Do not create a manifest. Specific files inspect those artifacts, a directory or `.` is a deliberate recursive audit, and `--changed-only` requires Git.
 
 Interpret results as:
 

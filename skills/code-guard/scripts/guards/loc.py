@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from file_selection import collect_candidates
 from result_model import Finding, GuardResult
 
 DEFAULT_WARN_AT = 400
@@ -168,15 +167,10 @@ def normalise_extension(value: str) -> str:
     return value if not value or value.startswith(".") else f".{value}"
 
 
-def run(args: argparse.Namespace, root: Path, config: Config) -> GuardResult:
+def run(root: Path, config: Config, selected_files: tuple[Path, ...]) -> GuardResult:
     if not config.enabled:
         return GuardResult("loc", "pass", [])
-    files = []
-    for candidate in collect_candidates(args, root):
-        resolved = candidate if candidate.is_absolute() else Path.cwd() / candidate
-        resolved = resolved.resolve()
-        if resolved.exists() and resolved.is_file() and should_include(resolved, config, root):
-            files.append(resolved)
+    files = [path for path in selected_files if should_include(path, config, root)]
     findings = [evaluate(path, config, root) for path in sorted(set(files), key=lambda p: relative_path(p, root))]
     state = "fail" if any(item.state == "fail" for item in findings) else (
         "review" if any(item.state == "review" for item in findings) else "pass"
