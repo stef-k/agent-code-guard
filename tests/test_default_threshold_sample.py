@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from argparse import ArgumentTypeError
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from agent_code_guard.analysis.facts import (
     AnalysisFacts,
@@ -14,7 +15,7 @@ from agent_code_guard.analysis.facts import (
     SourcePoint,
     SourceRange,
 )
-from research.default_threshold_sample import _candidate, summarize
+from research.default_threshold_sample import _candidate, measure, summarize
 
 
 class DefaultThresholdSampleTests(unittest.TestCase):
@@ -23,6 +24,18 @@ class DefaultThresholdSampleTests(unittest.TestCase):
         for value in ("unknown=15", "complexity", "complexity=true", "complexity=0", "complexity=-1"):
             with self.subTest(value=value), self.assertRaises(ArgumentTypeError):
                 _candidate(value)
+
+    def test_measure_uses_explicit_scope_and_exclusions(self) -> None:
+        candidates = {"callableSize": (80,), "nesting": (4,), "complexity": (15,)}
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "sample.py").write_text("def sample():\n    return 1\n", encoding="utf-8")
+
+            included = measure(["."], root, (), candidates)
+            excluded = measure(["."], root, ("sample.py",), candidates)
+
+        self.assertEqual((included["supportedFiles"], len(included["callables"])), (1, 1))
+        self.assertEqual((excluded["supportedFiles"], excluded["callables"]), (0, []))
 
     def test_summarizes_all_metrics_and_strict_candidate_rates(self) -> None:
         path = Path("sample.py")
