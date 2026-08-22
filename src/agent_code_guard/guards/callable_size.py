@@ -65,7 +65,7 @@ def evaluate(root: Path, config: Config, fact: CallableFact) -> CallableFinding:
     assert config.review_at is not None
     measured = fact.source_range.physical_loc
     return CallableFinding(
-        path=fact.path.resolve().relative_to(root.resolve()).as_posix(),
+        path=reporting_path(fact.path, root),
         callable=fact.identity,
         start_line=fact.source_range.start_line,
         end_line=fact.source_range.end_line,
@@ -74,3 +74,11 @@ def evaluate(root: Path, config: Config, fact: CallableFact) -> CallableFinding:
         thresholds={"reviewAt": config.review_at},
         embedded_language=fact.embedded_language,
     )
+
+
+def reporting_path(path: Path, root: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return resolved.as_posix()
