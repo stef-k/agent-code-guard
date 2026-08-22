@@ -82,9 +82,15 @@ Guards:
 
 - file LOC (implemented and enabled by default);
 - source/container and syntax facts (production infrastructure, not a guard);
-- callable LOC (reserved and disabled);
+- callable LOC (implemented; opt-in with a required project `reviewAt`);
 - nesting depth (reserved and disabled);
 - cyclomatic complexity (reserved and disabled).
+
+Callable LOC has no universal review threshold. When a project enables
+`guards.callableSize`, it must supply a positive JSON integer `reviewAt`.
+Exactly that size passes; larger callables review and never fail. Load
+`references/callable-size-policy.md` only when `callableSize` appears in
+`requiredPolicies`.
 
 Agent Code Guard is the canonical LOC implementation. Agent LOC Guard is the completed prototype/reference whose mature behavior was migrated from commit `75ab39d261dbc65f78815836fac90add16d265d1`.
 

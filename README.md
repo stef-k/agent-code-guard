@@ -29,7 +29,9 @@ The first design targets four cross-language measurements:
 3. **Nesting depth** — maximum structural nesting inside a callable.
 4. **Cyclomatic complexity** — deterministic execution-path complexity.
 
-Only file LOC currently has mature policy thresholds. Thresholds for callable size, nesting, and complexity must be validated against representative code in multiple languages before becoming defaults.
+File LOC has mature default policy thresholds. Callable size is the first active
+syntax guard, but it has no universal review threshold: projects opt in by
+supplying `reviewAt`. Nesting and complexity remain disabled.
 
 ## Scope rule
 
@@ -149,8 +151,8 @@ The shipped internal pipeline accepts only the files already selected by the run
 resolve_scope() -> ResolvedScope.files
     -> source/container regions
     -> cached Tree-sitter parser
-    -> immutable provider-neutral facts
-    -> future syntax guards
+    -> immutable provider-neutral facts (built once)
+    -> callableSize
 ```
 
 Ordinary files are identity-mapped regions. Vue template/style content is ignored;
@@ -172,7 +174,7 @@ unsupported platforms may require a local native build and are not silently
 downgraded to regex analysis. The language pack wheel is about 2–2.4 MB before
 installation. Parser instances are cached by embedded language inside one
 provider, and each executable region is parsed/extracted once for reuse by all
-future syntax guards.
+enabled syntax guards.
 
 PHP files use one identity-mapped whole-file executable region. The pinned PHP
 grammar exposes PHP declarations alongside inert HTML `text` nodes, so mixed
@@ -182,6 +184,51 @@ that can legally span close/reopen tags. HTML does not emit executable facts.
 The public runner deliberately does not import or construct this pipeline while
 only LOC is enabled. Tree-sitter is installed as an ordinary dependency but
 remains dormant until a syntax guard requests analysis facts.
+
+## Callable size
+
+Enable callable physical LOC explicitly:
+
+```json
+{
+  "guards": {
+    "callableSize": {
+      "enabled": true,
+      "reviewAt": 80
+    }
+  }
+}
+```
+
+An omitted section or `"enabled": false` disables the guard. When enabled,
+`reviewAt` is required and must be a positive JSON integer; booleans, floats,
+numeric strings, zero, and negative values are rejected. A callable measuring
+exactly `reviewAt` passes, while `reviewAt + 1` reviews. There is no default,
+FAIL threshold, override, or per-language threshold.
+
+The runner resolves scope once, runs LOC directly, then builds one shared
+`AnalysisFacts` value only if an enabled syntax guard requires it. Callable size
+uses each `CallableFact.source_range.physical_loc`; it does not reread source,
+reconstruct ranges, or contain Tree-sitter/language-specific logic. JSON retains
+PASS and REVIEW findings; human output prints REVIEW findings only:
+
+```json
+{
+  "path": "src/Foo.ts",
+  "callable": "Foo.process",
+  "range": {"startLine": 20, "endLine": 108},
+  "measured": 89,
+  "state": "review",
+  "thresholds": {"reviewAt": 80},
+  "embeddedLanguage": "typescript"
+}
+```
+
+Only a REVIEW result adds `callableSize` to `requiredPolicies`. Callable size
+never fails. Enabling it makes syntax analysis authoritative, so malformed
+applicable syntax or unavailable parser dependencies produce exit 3. When it is
+disabled, LOC-only execution performs no analysis import, parser construction,
+or syntax validation.
 
 ## Canonical LOC implementation
 
@@ -205,15 +252,15 @@ There is no runtime dependency, synchronization layer, or second LOC implementat
 
 ## Result and exit contract
 
-Native LOC states normalize as `ok -> PASS`, `warn -> REVIEW`, `fail -> FAIL`, and `exempt -> PASS` with the exemption reason retained. Only REVIEW and FAIL add `loc` to `requiredPolicies`.
+Native LOC states normalize as `ok -> PASS`, `warn -> REVIEW`, `fail -> FAIL`, and `exempt -> PASS` with the exemption reason retained. Only REVIEW and FAIL add `loc` to `requiredPolicies`. Callable size contributes only PASS or REVIEW and routes `callableSize` only on REVIEW.
 
 Normal exits are 0 for PASS, 1 for REVIEW, 2 for FAIL, and 3 for configuration/runtime errors. `--ci` changes REVIEW to exit 0; FAIL and errors remain 2 and 3.
 
 ## Status
 
-File LOC is the enabled production guard. The source/container and syntax-fact
-pipeline is production infrastructure. Callable LOC, structural nesting, and
-cyclomatic complexity remain disabled and have no production thresholds.
+File LOC is enabled by default. Callable LOC is production-ready and opt-in with
+a project-supplied review threshold. Structural nesting and cyclomatic
+complexity remain disabled and have no production thresholds.
 
 ## License
 

@@ -6,9 +6,8 @@ This guard exists because a source file can remain modest in size while one oper
 
 ## Status
 
-Default thresholds are not finalized yet. They must be validated against representative code in multiple languages before becoming universal defaults.
-
-Until then, callable-size findings should be treated primarily as `REVIEW` signals under configured or experimental thresholds.
+There is no universal review threshold. Projects opt in by supplying
+`guards.callableSize.reviewAt`; the guard has no FAIL threshold.
 
 ## On REVIEW
 
@@ -22,10 +21,16 @@ Inspect whether the callable:
 
 Extract code only when the extracted operation is genuinely cohesive and its name/interface improves comprehension.
 
+REVIEW requires inspection, not automatic refactoring. Examine the callable's
+cohesion, responsibility, and growth. Split it only when the resulting design is
+clearer, and preserve the project's conventions.
+
 ## Anti-gaming
 
 Do not create tiny meaningless helper methods merely to reduce callable LOC. Do not move arbitrary chunks of a procedure behind names such as `ProcessPart1`, `HandleStuff`, or equivalent abstractions that add navigation without improving design.
 
 Do not compress formatting or combine independent statements onto fewer physical lines to lower the measurement.
+
+Do not alter the threshold or disable the guard merely to silence a finding.
 
 A lower callable LOC number is useful only when the resulting code is at least as readable and maintainable as before.

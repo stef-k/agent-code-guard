@@ -272,3 +272,23 @@ Unified installation does not imply eager activation. LOC-only execution does
 not import the analysis package, load Tree-sitter, construct parsers, or parse
 source. Syntax dependencies remain dormant until a syntax guard requests
 `AnalysisFacts`.
+
+## D25 — Callable physical LOC is an opt-in shared-facts guard
+
+Callable size is the first active syntax guard. It consumes only
+`CallableFact.source_range.physical_loc` from the immutable facts created once
+by runner orchestration. It performs no source discovery, reads, parsing, range
+reconstruction, or language-specific measurement.
+
+The `guards.callableSize` section is disabled when omitted or explicitly false.
+Enabling it requires a positive JSON integer `reviewAt`; there is no universal
+default, FAIL threshold, override, or per-language threshold. Exactly the
+threshold passes and larger callables review. JSON includes every measured
+callable while human text includes only REVIEW findings. Only REVIEW routes the
+`callableSize` policy.
+
+The runner's explicit `needs_analysis` decision is the extension seam for the
+next syntax guard: scope is resolved once, LOC runs directly, one analysis value
+is built if any syntax guard needs it, and all such guards consume that value.
+Disabled syntax guards retain LOC-only behavior without analysis imports,
+provider initialization, parser construction, or syntax validation.
