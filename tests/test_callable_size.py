@@ -104,6 +104,19 @@ class CallableSizeOrchestrationTests(unittest.TestCase):
 
 
 class CallableSizeRunnerTests(CodeGuardTestCase):
+    def test_explicit_supported_file_outside_reporting_root_uses_absolute_path(self) -> None:
+        with tempfile.TemporaryDirectory() as root_temp, tempfile.TemporaryDirectory() as source_temp:
+            root = Path(root_temp)
+            source = Path(source_temp) / "external.py"
+            source.write_text("def external():\n    return 1\n", encoding="utf-8")
+            config = write_config(root, {"enabled": False}, guards={"callableSize": {"enabled": True, "reviewAt": 2}})
+
+            result = self.run_guard(root, str(source), "--config", str(config), "--json")
+
+            self.assertEqual(result.returncode, 0)
+            finding = self.read_json(result)["guards"]["callableSize"]["findings"][0]
+            self.assertEqual(finding["path"], source.resolve().as_posix())
+
     def test_review_exit_policy_ci_and_json_shape(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
