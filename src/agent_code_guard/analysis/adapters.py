@@ -69,10 +69,6 @@ def _structural_facts(callable_node, callable_key: CallableKey, region: Executab
                 decisions.append(DecisionFact(
                     callable_key.identity, callable_key, DECISION_CATEGORIES.get(child.type, child.type), child.type, child_range,
                 ))
-            if _is_maximal_boolean_expression(child, region.source):
-                decisions.append(DecisionFact(
-                    callable_key.identity, callable_key, "short_circuit_boolean", child.type, child_range,
-                ))
             for arm_range in _extra_switch_arm_ranges(child, language, region):
                 decisions.append(DecisionFact(callable_key.identity, callable_key, "switch_arm", child.type, arm_range))
             guard = _pattern_guard(child, language)
@@ -447,27 +443,6 @@ def _is_else_if(node, language: str) -> bool:
 
 def _is_default_branch(node, source: bytes) -> bool:
     return _text(node, source).lstrip().startswith(("default", "else", "case _", "case var _", "_ ->", "_ =>"))
-
-
-def _short_circuit_count(node, source: bytes) -> int:
-    return sum(_text(child, source) in {"and", "or", "&&", "||"} for child in node.children)
-
-
-_BOOLEAN_EXPRESSION_TYPES = {
-    "boolean_operator", "conjunction_expression", "disjunction_expression",
-    "logical_and_expression", "logical_or_expression", "binary_expression",
-}
-_BOOLEAN_GROUP_TYPES = {"parenthesized_expression", "parenthesized_expression_list"}
-
-
-def _is_maximal_boolean_expression(node, source: bytes) -> bool:
-    if node.type not in _BOOLEAN_EXPRESSION_TYPES or _short_circuit_count(node, source) == 0:
-        return False
-    parent = node.parent
-    while parent is not None and parent.type in _BOOLEAN_GROUP_TYPES:
-        parent = parent.parent
-    return not (parent is not None and parent.type in _BOOLEAN_EXPRESSION_TYPES
-                and _short_circuit_count(parent, source) > 0)
 
 
 def _control_category(provider_kind: str, language: str) -> str:

@@ -6,12 +6,12 @@ This guard exists because a callable can be short and only lightly nested while 
 
 ## Status
 
-Issue #25 rejected production admission. One fact per maximal connected boolean
-expression removes chain-length inflation, and mainstream lambdas now have
-independent ownership, but syntax cannot distinguish a single fallback `||`
-from a genuine boolean choice. The known fallback-noise outlier remained
-unchanged. Production complexity therefore remains disabled; no universal,
-project-configured, or FAIL threshold is authorized.
+Issue #25 accepted complexity as configurable-only after zero short-circuit
+weighting preserved strong review signals and removed boolean-expression noise.
+The guard is not implemented yet, so this policy is research-only and cannot be
+requested through current `requiredPolicies`. A future opt-in guard must require
+a project-supplied positive `reviewAt`, provide PASS/REVIEW only, and have no
+universal or per-language default.
 
 ## On REVIEW
 
