@@ -38,9 +38,11 @@ class ExecutableRegion:
         return SourcePoint(line, byte_column, absolute)
 
     def original_range(self, node) -> SourceRange:
+        start_row, start_column = node.start_point
+        end_row, end_column = node.end_point
         return SourceRange(
-            self.original_point(node.start_point.row, node.start_point.column),
-            self.original_point(node.end_point.row, node.end_point.column),
+            self.original_point(start_row, start_column),
+            self.original_point(end_row, end_column),
         )
 
 

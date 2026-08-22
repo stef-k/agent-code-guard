@@ -8,7 +8,10 @@ This guard exists because a callable can be short and only lightly nested while 
 
 Universal default thresholds are not finalized yet. They must be validated against representative code in multiple languages before becoming defaults.
 
-Until then, complexity findings should be treated primarily as `REVIEW` signals under configured or experimental thresholds.
+Issue #14 retained Outcome C: production complexity remains disabled while
+short-circuit normalization and opaque lambda ownership are unsettled. During
+research, values are `REVIEW` anchors only; no universal or FAIL threshold is
+authorized.
 
 ## On REVIEW
 

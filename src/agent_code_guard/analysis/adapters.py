@@ -15,14 +15,7 @@ from .regions import ExecutableRegion
 def extract_facts(root, region: ExecutableRegion) -> tuple[tuple[CallableFact, ...], tuple[ControlFlowFact, ...], tuple[DecisionFact, ...]]:
     nodes = [node for node in _walk(root) if node.type in CALLABLE_TYPES[region.language] and _has_body(node, region.language)]
     identities = {_node_key(node): _identity(node, region) for node in nodes}
-    ranges = {
-        _node_key(node): SourceRange(
-            region.original_point(_range_start_node(node, region.language).start_point.row,
-                                  _range_start_node(node, region.language).start_point.column),
-            region.original_point(_range_end_node(node, region.language).end_point.row,
-                                  _range_end_node(node, region.language).end_point.column),
-        ) for node in nodes
-    }
+    ranges = {_node_key(node): _callable_range(node, region) for node in nodes}
     keys = {
         node_key: CallableKey(region.original_path, region.language, identity, ranges[node_key])
         for node_key, identity in identities.items()
@@ -114,6 +107,16 @@ def _has_body(node, language: str) -> bool:
 
 def _range_end_node(node, language: str):
     return _dart_body(node) if language == "dart" and _dart_body(node) is not None else node
+
+
+def _callable_range(node, region: ExecutableRegion) -> SourceRange:
+    """Snapshot provider points once before mapping them to original source."""
+    start_row, start_column = _range_start_node(node, region.language).start_point
+    end_row, end_column = _range_end_node(node, region.language).end_point
+    return SourceRange(
+        region.original_point(start_row, start_column),
+        region.original_point(end_row, end_column),
+    )
 
 
 def _structural_roots(node, language: str):
@@ -357,7 +360,8 @@ def _javascript_lexical_name(node, source: bytes) -> str | None:
 
 
 def _callback_name(node, region: ExecutableRegion) -> str:
-    point = region.original_point(node.start_point.row, node.start_point.column)
+    row, column = node.start_point
+    point = region.original_point(row, column)
     return f"<callback@{point.line}:{point.byte_column}>"
 
 
