@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-code-guard"
+version = "0.1.0.dev0"
+description = "Deterministic cross-language guardrails for agent-assisted development"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "tree-sitter==0.26.0",
+    "tree-sitter-language-pack==1.14.3",
+]
+
+[project.scripts]
+code-guard = "agent_code_guard.code_guard:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

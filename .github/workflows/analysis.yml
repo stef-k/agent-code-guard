@@ -18,8 +18,12 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: skills/code-guard/requirements-analysis.txt
-      - run: python -m pip install -r skills/code-guard/requirements-analysis.txt
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install .
+      - run: code-guard --help
+      - run: python -c "from pathlib import Path; Path('package-smoke.py').write_text('value = 1\n', encoding='utf-8')"
+      - run: code-guard package-smoke.py --json
+      - run: python -m unittest tests.test_packaging.InstalledPackageTests.test_installed_syntax_pipeline_loads_parser_dependency
       - run: python -m unittest discover -s tests
-      - run: python -m compileall -q skills research tests
+      - run: python -m compileall -q src skills research tests
       - run: git diff --check
