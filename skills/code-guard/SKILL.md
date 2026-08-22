@@ -72,10 +72,9 @@ Policy references:
 - file LOC: `references/loc-policy.md`
 - callable size: `references/callable-size-policy.md`
 - nesting depth: `references/nesting-policy.md`
+- cyclomatic complexity: `references/complexity-policy.md`
 
 Do not load unrelated guard policies merely because they exist.
-`references/complexity-policy.md` records accepted future policy only; do not
-load it until a production guard can emit `complexity` in `requiredPolicies`.
 
 ## Scope
 
@@ -87,7 +86,7 @@ Guards:
 - source/container and syntax facts (production infrastructure, not a guard);
 - callable LOC (implemented and enabled by default; REVIEW greater than 80);
 - structural nesting (implemented and enabled by default; REVIEW greater than 4);
-- cyclomatic complexity (accepted for a future default of 15, not implemented or routable).
+- cyclomatic complexity (implemented and enabled by default; REVIEW greater than 15).
 
 Callable LOC needs no invented configuration to activate it. Omission or
 `enabled: true` uses 80; an authorized positive-integer `reviewAt` overrides it,
@@ -102,8 +101,16 @@ positive-integer `reviewAt` overrides it, and `enabled: false` disables it.
 Exactly the effective depth passes; greater depth reviews and never fails. Load `references/nesting-policy.md` only when `nesting`
 appears in `requiredPolicies`.
 
-Do not disable a syntax guard or raise its threshold merely to silence a
-finding. Respect overrides only when the project or user has authorized them.
+Cyclomatic complexity is baseline 1 plus normalized decisions owned by the
+callable. Omission or `enabled: true` uses 15; an authorized positive-integer
+`reviewAt` overrides it, and `enabled: false` disables it. Short-circuit
+booleans and fallback/null-aware constructs contribute zero. Lambda boundaries
+are independent. Exactly the effective threshold passes; greater complexity
+reviews and never fails. Load `references/complexity-policy.md` only when
+`complexity` appears in `requiredPolicies`.
+
+Do not invent configuration, disable a syntax guard, or raise its threshold
+merely to silence a finding. Respect built-ins and only project/user-authorized overrides.
 REVIEW requires inspection and justification, not mandatory refactoring.
 
 Agent Code Guard is the canonical LOC implementation. Agent LOC Guard is the completed prototype/reference whose mature behavior was migrated from commit `75ab39d261dbc65f78815836fac90add16d265d1`.

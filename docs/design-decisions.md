@@ -361,10 +361,9 @@ greater values review. Callable size, nesting, and complexity remain REVIEW-only
 with no per-language table, preset, or FAIL threshold. Agents may not weaken
 configuration merely to silence findings without authorization.
 
-Default activation for callable size and nesting is a material production and
-migration change. Issue #29 implements those two D30 defaults; issue #27 must
-still implement complexity with default 15 and default enablement. Explicit
-existing false remains false, and explicit existing thresholds retain their
+Default activation for callable size and nesting shipped in issue #29.
+Issue #27 completes D30 by shipping complexity with default 15 and default
+enablement. Explicit false remains false, and explicit thresholds retain their
 values. LOC 400 REVIEW / 600 FAIL is unchanged and is retained as a pragmatic
 navigation, cohesion, and reasoning-surface guardrail, not retroactively
 presented as statistical proof.

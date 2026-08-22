@@ -45,7 +45,7 @@ class CallableFinding:
     measured: int
     state: str
     thresholds: dict[str, int] | None = None
-    details: dict[str, int] | None = None
+    details: dict[str, Any] | None = None
     embedded_language: str | None = None
 
     def to_json(self) -> dict[str, Any]:

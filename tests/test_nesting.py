@@ -181,14 +181,15 @@ class NestingOrchestrationTests(unittest.TestCase):
             source.write_text("def sample():\n    if True:\n        return 1\n", encoding="utf-8")
             scope = ResolvedScope(root, (source,))
             configurations = [
-                ({}, 1, ["loc", "callableSize", "nesting"]),
-                ({"callableSize": {"enabled": False}}, 1, ["loc", "nesting"]),
-                ({"nesting": {"enabled": False}}, 1, ["loc", "callableSize"]),
-                ({"callableSize": {"enabled": False}, "nesting": {"enabled": False}}, 0, ["loc"]),
+                ({}, 1, ["loc", "callableSize", "nesting", "complexity"]),
+                ({"cyclomaticComplexity": {"enabled": False}}, 1, ["loc", "callableSize", "nesting"]),
+                ({"callableSize": {"enabled": False}, "nesting": {"enabled": False}}, 1, ["loc", "complexity"]),
+                ({"callableSize": {"enabled": False}, "nesting": {"enabled": False}, "cyclomaticComplexity": {"enabled": False}}, 0, ["loc"]),
                 ({
                     "callableSize": {"enabled": True, "reviewAt": 3},
                     "nesting": {"enabled": True, "reviewAt": 1},
-                }, 1, ["loc", "callableSize", "nesting"]),
+                    "cyclomaticComplexity": {"enabled": True, "reviewAt": 2},
+                }, 1, ["loc", "callableSize", "nesting", "complexity"]),
             ]
             for guards, expected_calls, expected_ids in configurations:
                 config = write_config(root, {"enabled": False}, guards=guards)
@@ -206,7 +207,7 @@ class NestingOrchestrationTests(unittest.TestCase):
             source.write_text("def broken(:\n    pass\n", encoding="utf-8")
             scope = ResolvedScope(root, (source,))
             config = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={
-                "callableSize": {"enabled": False}, "nesting": {"enabled": False},
+                "callableSize": {"enabled": False}, "nesting": {"enabled": False}, "cyclomaticComplexity": {"enabled": False},
             })
             with patch("agent_code_guard.code_guard.import_module") as loader:
                 results = run_guards(scope, args(config))
@@ -321,7 +322,7 @@ class NestingRunnerTests(CodeGuardTestCase):
             self.assertIn("syntax tree contains errors", self.read_json(result)["error"])
 
             disabled = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={
-                "callableSize": {"enabled": False}, "nesting": {"enabled": False},
+                "callableSize": {"enabled": False}, "nesting": {"enabled": False}, "cyclomaticComplexity": {"enabled": False},
             })
             result = self.run_guard(root, str(source), "--config", str(disabled), "--json")
             self.assertEqual((result.returncode, list(self.read_json(result)["guards"])), (0, ["loc"]))

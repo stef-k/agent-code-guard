@@ -6,12 +6,11 @@ This guard exists because a callable can be short and only lightly nested while 
 
 ## Status
 
-Issue #25 accepted complexity as configurable-only after zero short-circuit
-weighting preserved strong review signals and removed boolean-expression noise.
-The guard is not implemented yet, so this policy is research-only and cannot be
-requested through current `requiredPolicies`. A future opt-in guard must require
-a project-supplied positive `reviewAt`, provide PASS/REVIEW only, and have no
-universal or per-language default.
+Complexity is enabled by default. Exactly 15 passes and greater complexity
+reviews. It is REVIEW-only and never fails. An authorized project/user positive
+integer `reviewAt` may override the default, and explicit disablement is allowed.
+Short-circuit booleans deliberately contribute zero. Agents must not weaken or
+disable the guard merely to silence findings.
 
 ## On REVIEW
 
@@ -25,11 +24,16 @@ Inspect whether complexity comes from:
 - legitimate parsers, protocol handling, state machines, or rule evaluation where branching may be inherent.
 
 Consider refactoring only when the resulting structure makes behavior easier to understand, test, or change.
+REVIEW is an inspection request, not an automatic decomposition instruction.
 
 ## Anti-gaming
 
 Do not lower complexity by hiding decisions behind meaningless wrappers, opaque boolean expressions, lookup tricks, exception flow, or abstractions whose main purpose is changing the score.
 
 Do not split one coherent decision process into scattered helpers when that makes the execution model harder to follow.
+
+Do not convert clear branches into clever expressions or split coherent parsers,
+state machines, and protocol handlers merely to lower the number. Preserve
+project and language idioms.
 
 A lower complexity score is not an improvement unless the resulting behavior and structure are clearer.
