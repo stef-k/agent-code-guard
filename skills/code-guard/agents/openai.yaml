@@ -1,0 +1,8 @@
+interface:
+  display_name: "Code Guard"
+  short_description: "Deterministic code guardrails for agents"
+  brand_color: "#2563EB"
+  default_prompt: "Use $code-guard to check changed source files and load only the policies required by triggered findings."
+
+policy:
+  allow_implicit_invocation: true
