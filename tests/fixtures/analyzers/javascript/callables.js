@@ -41,5 +41,8 @@ export class Worker {
 
 export function localOwner(value) {
     const local = (item) => item * 2;
-    return local(value);
+    const localExpression = function (item) {
+        return item + 1;
+    };
+    return local(localExpression(value));
 }

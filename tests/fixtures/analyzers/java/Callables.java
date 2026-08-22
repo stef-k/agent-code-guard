@@ -25,5 +25,15 @@ public final class Callables {
         this.value = left + right;
     }
 
+    public static int lambdaOwner(int value) {
+        java.util.function.IntUnaryOperator operation = item -> {
+            if (item > 0) return item;
+            return 0;
+        };
+        return operation.applyAsInt(value);
+    }
+
     private final int value;
 }
+
+@interface Audit {}

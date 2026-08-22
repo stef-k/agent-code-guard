@@ -156,11 +156,24 @@ Technology should be selected from that evidence.
 
 ## D18 — Callable analysis uses a provider-neutral language adapter
 
-Issue #4 demonstrated deterministic named-callable ranges and syntax metrics for
-Python, Go, Kotlin, and C# using one Tree-sitter parse per file. Production should
-use a small language-adapter boundary, initially backed by pinned Tree-sitter
-grammars, while retaining language-specific facts and allowing a native backend
-where later evidence justifies it. Raw parser nodes must not become guard APIs.
+Phase A provisionally selected a provider-neutral language adapter after proving
+Python, Go, Kotlin, and C#. Phase B added Java, JS, TS, JSX, TSX, and Vue and
+confirmed the provider choice while changing the top-level boundary.
+
+Production should use:
+
+```text
+source/container adapter
+    -> executable regions with original location mapping
+    -> provider-neutral language adapter
+    -> normalized callable/control facts
+    -> independent metrics
+```
+
+Tree-sitter remains the recommended initial pinned provider. Vue proves one file
+cannot be assumed to equal one parser language. Raw parser nodes must not become
+guard APIs, and native backends remain possible where later evidence justifies
+them. Template/style metrics are separate guard families tracked in issue #6.
 
 The research dependency is not yet a shipped Code Guard dependency. Packaging
 and cross-platform wheel verification are a separate production slice.
@@ -174,14 +187,18 @@ from canonical file LOC.
 
 Nesting is maximum active meaningful control-flow depth, not indentation or
 brace depth. Cyclomatic complexity is one plus documented syntactic decisions.
-Named local callables reset control metrics; lambdas are excluded pending a
-separate policy decision. See `analyzer-feasibility.md` for the exact prototype
-construct mapping and limitations.
+Named local callables reset control metrics. Phase B qualifies the range start to
+include stable JS/TS lexical assignment ownership and maps Vue ranges to the
+original container. Named JS-family arrows/function expressions are callables;
+truly anonymous JS-family callbacks use deterministic source-coordinate
+identities and independent scopes. Phase A and Java lambdas remain opaque, so
+lambda policy is explicitly language-specific. See `analyzer-feasibility.md` for
+the exact construct mapping and limitations.
 
 ## D20 — No new universal thresholds are established
 
-The fixture corpus supports configurable callable LOC and nesting review points,
-but does not justify universal defaults. Complexity needs language-specific
-interpretation for constructs such as Python comprehensions and Kotlin/C#
-fallback expressions. No production REVIEW or FAIL threshold is enabled by the
-feasibility prototype.
+This Phase A conclusion survived Phase B. The expanded fixture corpus supports
+configurable callable LOC and nesting review points but does not justify
+universal defaults. Complexity requires language-specific interpretation for
+comprehensions, fallback operators, switch forms, JSX expressions, and callback
+boundaries. No production REVIEW or FAIL threshold is enabled by the prototype.

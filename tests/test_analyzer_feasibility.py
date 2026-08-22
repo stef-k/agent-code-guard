@@ -88,6 +88,7 @@ EXPECTED = {
         ("sample.Callables.simple", 4, 6, 3, 0, 1),
         ("sample.Callables.longLinear", 8, 16, 9, 0, 1),
         ("sample.Callables.Callables", 18, 26, 9, 0, 1),
+        ("sample.Callables.lambdaOwner", 28, 34, 7, 0, 1),
     ],
     "java/Decisions.java": [
         ("sample.Decisions.deeplyNested", 4, 17, 14, 4, 5),
@@ -106,8 +107,9 @@ EXPECTED = {
         ("callables.helpers.method", 27, 29, 3, 0, 1),
         ("callables.Worker.constructor", 33, 35, 3, 0, 1),
         ("callables.Worker.method", 37, 39, 3, 0, 1),
-        ("callables.localOwner", 42, 45, 4, 0, 1),
+        ("callables.localOwner", 42, 48, 7, 0, 1),
         ("callables.localOwner.local", 43, 43, 1, 0, 1),
+        ("callables.localOwner.localExpression", 44, 46, 3, 0, 1),
     ],
     "javascript/decisions.js": [
         ("decisions.deeplyNested", 1, 14, 14, 4, 5),
@@ -223,6 +225,14 @@ class FixtureMeasurementTests(unittest.TestCase):
         self.assertEqual([(value.language, value.range.start_line, value.range.end_line) for value in setup], [
             ("typescript", 8, 13), ("typescript", 17, 19),
         ])
+
+    def test_vue_byte_mapping_handles_unicode_and_same_line_script_content(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "Inline.vue"
+            path.write_text("<template>é</template>\n<script>const inline = () => 1;</script>\n", encoding="utf-8")
+            measurement = analyze_file(path)[0]
+            self.assertEqual((measurement.identity, measurement.language), ("Inline.inline", "javascript"))
+            self.assertEqual((measurement.range.start_line, measurement.range.end_line), (2, 2))
 
 
 class CallableResultCompatibilityTests(unittest.TestCase):

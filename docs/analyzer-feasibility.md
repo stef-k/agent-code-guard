@@ -1,221 +1,292 @@
 # Callable Analyzer Feasibility
 
-This report records the issue #4 research prototype. It is evidence for a later
-production design, not an enabled Code Guard feature. The canonical LOC guard
+This report records issue #4's two-phase research prototype. It is evidence for
+a later production design, not an enabled Code Guard feature. Canonical file LOC
 and its policy are unchanged.
 
-## Questions and measurement definitions
+## Evidence phases and final conclusion
 
-The prototype asks whether one parse can provide stable named-callable ranges
-and enough syntax facts for three independent metrics in Python, Go, Kotlin,
-and C#.
+Phase A established exact measurements for Python, Go, Kotlin, and C#. It
+provisionally recommended provider-neutral language adapters backed by one
+Tree-sitter parse per file, range-based callable LOC, meaningful control-flow
+nesting, and documented decision counting.
 
-### Callable scope and identity
+Phase B added Java, JavaScript, TypeScript, JSX, TSX, and Vue SFC script regions.
+It tested the two assumptions most likely to fail: modern JS/TS function-like
+syntax and files containing more than one language.
 
-Included callables are named top-level functions, named methods, constructors,
-and named local/nested functions where the language supports them. Named
-expression-bodied declarations are included. C# accessors and all anonymous
-lambdas/closures are excluded. A nested named callable receives its own finding;
-its control flow is not charged to the enclosing callable.
+The final conclusion is that the Phase A provider recommendation **survived with
+modifications**:
 
-Identity is lexical rather than symbol-resolved and is always paired with path
-and range:
+```text
+source file
+    -> source/container adapter
+    -> one or more executable regions
+       { original path, embedded language, bytes, original offset mapping }
+    -> provider-neutral language adapter
+    -> named callable and control-flow facts
+    -> callable LOC / nesting / complexity
+```
+
+Ordinary files yield one identity-mapped executable region. Vue uses one
+container parse followed by one embedded parse per script region. The three
+metrics share each executable parse. Grammar nodes remain private to adapters.
+This is a small region boundary, not a generic plugin framework.
+
+Tree-sitter remains the recommended initial pinned provider after the expanded
+corpus. Java and all JS-family grammars produced stable syntax/ranges without
+requiring target-language toolchains. Vue proves that `suffix -> language`
+cannot be the top-level architecture: container extraction must precede language
+parsing. Native parsers remain useful oracles and possible per-language backends.
+
+## Final callable model
+
+The common rule includes named top-level functions, named methods, constructors,
+and named local functions where supported. Named expression-bodied declarations
+are included. Identities are lexical rather than symbol-resolved and are always
+paired with original path and a 1-based inclusive source range.
+
+Language-appropriate identities include:
 
 - Python: `module.Type.method` or `module.outer.local`;
 - Go: `package.function` or `package.Receiver.method`;
-- Kotlin: `package.Type.method` or `package.outer.local`;
-- C#: `Namespace.Type.Method`; constructors use the containing type name.
+- Kotlin/Java: `package.Type.method` and `package.Type.Type` for constructors;
+- C#: `Namespace.Type.Method`, with the containing type repeated for constructors;
+- JS family: `file.Type.method`, `file.object.method`, or `file.outer.local`.
 
-Overloads can share an identity. Path plus the 1-based inclusive range makes a
-finding unambiguous without requiring compiler symbol resolution.
+Overloads can share an identity; path plus range disambiguates them.
 
-The callable range begins at its first attached decorator, annotation, or
-attribute; otherwise it begins at the declaration. It ends at the last
-syntactic token of the body or expression. Unattached leading comments are not
-included. Tree-sitter's zero-based, end-exclusive coordinates are converted to
-1-based inclusive line ranges.
+### JS/TS functions, arrows, and callbacks
+
+JS/TS/JSX/TSX include executable `function` declarations, class methods and
+constructors, object shorthand methods, variable-assigned arrows, and
+variable-assigned function expressions. TypeScript method signatures, function
+types, interfaces, and other bodyless declarations are excluded.
+
+A function expression or arrow assigned to a simple lexical variable receives
+that target's name. Its measurement range starts at the sole lexical declaration
+(`const`/`let`/`var`) and ends at the callable body or expression token; the
+trailing semicolon is excluded. This counts the readable ownership syntax in:
+
+```javascript
+const calculate =
+    (value) => {
+        return value;
+    };
+```
+
+Named local arrows and function expressions nest under their enclosing callable.
+React arrow components are ordinary lexical callables; there is no React rule.
+
+Truly anonymous JS-family callbacks are first-class callables. Their identity is
+the enclosing callable plus original 1-based source coordinates, for example
+`owner.<callback@46:30>`. This is deterministic and directly locatable without
+depending on AST traversal order. Callback control flow is measured independently
+and is not charged to the parent. Coordinates shift when preceding source moves,
+as finding ranges already do, but the policy avoids major unmeasured complexity
+blind spots in callback-heavy applications.
+
+Phase A lambdas and Java lambdas remain opaque. A Java lambda fixture proves its
+control flow is not charged to the owning method. This is now an explicit
+language-specific callable-policy qualification, not a claim that every lambda
+has equivalent application-level identity.
+
+## Measurement definitions
 
 ### Callable physical LOC
 
 `physical LOC = inclusive end line - inclusive start line + 1`
 
-Every physical line in that range counts: annotations, attributes, decorators,
-multi-line signatures, braces, blank lines, comments, and expression bodies.
-An outer callable's range includes the source occupied by a local function,
-while that local function is also measured independently. This is source extent,
-not canonical file-LOC semantics.
+The range begins at the first attached decorator, annotation, or attribute;
+otherwise it begins at the declaration or stable lexical assignment owner. It
+ends at the final syntactic token of the body or expression. Signature lines,
+braces, JSX, comments, blank lines, and named nested declarations inside the
+range count. An outer callable's physical range can overlap a local callable,
+while its control metrics exclude that nested callable.
+
+Phase B supports this Phase A definition with one qualification: stable JS/TS
+assignment ownership is part of the callable start. Vue uses the mapped original
+container range, never temporary extracted-script coordinates.
 
 ### Structural nesting depth
 
 Depth starts at zero and is the maximum number of simultaneously active,
-meaningful control-flow regions. An `if` chain, loop, switch/when/match, or
-try/catch/finally family adds one region. `else` and `elif`/else-if share their
-corresponding `if` level. Case arms share the switch level; labels do not add a
-second level. Catch and finally arms share the try level. Plain lexical blocks,
-boolean expressions, conditional expressions, comprehensions, safe calls,
-Elvis/null-coalescing expressions, and lambdas do not add depth. Nested named
-callables reset to zero.
+meaningful executable control-flow regions. An `if` chain, loop,
+switch/when/match, or try/catch/finally family adds one region. Else and else-if
+share the if level. Case arms share the switch level; catch/finally arms share
+the try level. Plain lexical blocks, resource/synchronization scopes, boolean or
+conditional expressions, comprehensions, safe calls, nullish/fallback operators,
+and function boundaries do not add depth. Nested callables reset at zero.
 
-This definition measures how many control regions a reader must track, not
-indentation or brace count.
+JSX element hierarchy and Vue template hierarchy add no executable nesting.
+Phase B therefore supports the Phase A nesting definition unchanged.
 
 ### Cyclomatic complexity
 
 Complexity is `1 + decision increments`. The prototype adds one for each:
 
-- `if` condition and `elif`/else-if condition;
+- `if` and else-if condition;
 - loop;
-- non-default switch/when/match arm (one per arm, not per comma-separated label);
+- non-default/non-wildcard switch/when/match executable arm;
 - catch handler;
 - conditional/ternary expression;
-- short-circuit boolean operator occurrence (`and`, `or`, `&&`, `||`);
+- short-circuit `and`/`or` or `&&`/`||` operator occurrence;
 - Python comprehension/generator expression as one implicit decision.
 
-The switch node, `else`/default/wildcard arm, `try`, `finally`, safe navigation,
-Kotlin Elvis, C# null coalescing, and lambda bodies add zero. These exclusions
-are deliberate: value fallback and deferred anonymous code do not normalize
-cleanly enough across the four languages. Nested named callable bodies are not
-charged to the parent.
+Grouped labels leading to one executable arm count once. Switch nodes, default
+or wildcard arms, `try`, `finally`, optional navigation, Kotlin Elvis, C# null
+coalescing, and JS/TS nullish coalescing add zero. In JSX, `{enabled && ...}` and
+ternaries are ordinary executable decisions; markup nodes are not decisions.
 
-## Prototype architecture
+Phase B strengthens Outcome C: the common decision core is useful, but Python
+comprehensions, fallback operators, switch grammars, and callable boundaries
+still require language-specific interpretation.
 
-```text
-source bytes
-    -> language adapter backed by one parser
-    -> named callable plus syntax facts
-    -> callable LOC / nesting / complexity measurements
-    -> additive callable-scoped finding
-```
+## Support table
 
-The research implementation uses one Tree-sitter parse per file. The current
-prototype calculates facts directly inside the adapter to keep the experiment
-small. Production should expose immutable `ParsedFile`, `CallableFact`, and
-control-flow fact values rather than leaking Tree-sitter nodes to guards. Facts
-must retain language-specific categories and decision breakdowns so a common
-model does not erase meaningful differences.
+| Capability | Python | Go | Kotlin | C# | Java | JS | TS | JSX | TSX | Vue SFC |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Named declarations/methods | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Delegated |
+| Constructors | Method convention | N/A | Yes | Yes | Yes | Yes | Yes | N/A | N/A | Delegated |
+| Named local callable | Yes | N/A | Yes | Yes | Lambda opaque | Yes | Yes | Yes | Yes | Delegated |
+| Lexically assigned arrow/function | N/A | N/A | N/A | N/A | Lambda opaque | Yes | Yes | Yes | Yes | Delegated |
+| Anonymous callback finding | No | N/A | No | No | No | Coordinate identity | Coordinate identity | Coordinate identity | Coordinate identity | Delegated |
+| Attached metadata in range | Decorator | N/A | Annotation | Attribute | Annotation | N/A | Decorator | N/A | Supported by TSX grammar | Delegated |
+| Bodyless declaration excluded | N/A | N/A | N/A | N/A | Yes | Yes | Yes | Yes | Yes | Delegated |
+| Original stable range | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes, remapped |
+| LOC/depth/complexity | Proven | Proven | Proven | Proven | Proven | Proven | Proven | Proven | Proven | Proven for scripts |
 
-Malformed trees are rejected. Silent partial measurements from Tree-sitter's
-error recovery would look authoritative but would not be deterministic enough
-for a guard.
+Vue is a container, not an embedded language. Each finding retains JavaScript or
+TypeScript as its embedded language.
 
-## Language support
+## Phase B results
 
-| Capability | Python | Go | Kotlin | C# |
+Eighteen fixture files now assert exact identity, original 1-based inclusive
+range, physical LOC, nesting, and complexity for 95 callables across both phases.
+
+### Java
+
+Methods, constructors, annotations, multi-line signatures, long linear code,
+four-level nesting, wide branching, else-if, enhanced loops, two catches,
+ternary/boolean decisions, classic switch groups, and switch-expression rules
+are measured. Constructor identity is `package.Type.Type`; the annotation is in
+the constructor range. Both switch forms produce depth 1 and complexity 3 for
+two non-default executable arms. Java lambdas are opaque and reset/exclude their
+body from the owner.
+
+### JavaScript
+
+Function declarations, class constructors/methods, object methods,
+variable-assigned arrows/function expressions, and named local expressions have
+stable lexical identities. Deep/wide flow, else-if, loops, catch, switch,
+ternary, and short-circuit expressions are measured. Optional chaining and `??`
+are deliberately excluded. Map/Promise callbacks receive independent
+source-coordinate identities, preventing parent double counting or blind spots.
+
+### TypeScript
+
+Type annotations, generic functions/methods, optional parameters, decorators,
+arrows, and function expressions preserve callable ranges and measurements.
+Interface methods and function types produce no findings. Optional chaining and
+nullish coalescing do not increment complexity; ordinary if/boolean/ternary
+syntax does.
+
+### JSX and TSX / React syntax
+
+Declaration and arrow components are ordinary JS-family callables. JSX
+short-circuit rendering and ternaries count as normal expressions. Nested
+`div/section/article` markup remains depth 0. Event and map callbacks receive
+independent coordinate identities. React-specific framework policy is absent.
+
+### Vue SFC
+
+The Vue container parser locates `script_element` regions and ignores template
+and style elements. A missing `lang` delegates to JavaScript; `lang="ts"` in
+normal or setup scripts delegates to TypeScript. `setup` affects component
+semantics, not parser selection.
+
+Each executable region stores original path, embedded language, exact raw bytes,
+and its starting byte offset. Parser points map through the original UTF-8 bytes,
+so same-line tags, non-ASCII prefixes, multiple script blocks, and original line
+numbers remain representable. Exact tests prove `Options.vue` reports its
+callable at lines 8–13 and `Setup.vue` reports TypeScript callables at 8–13 and
+17–19 rather than extracted coordinates. Malformed container or embedded syntax
+is rejected. External `src` scripts are explicitly unsupported by this prototype.
+
+No template or style metrics are implemented; those belong to issue #6.
+
+## Parser/provider comparison
+
+| Provider | Phase B evidence | Strengths | Costs/limits | Conclusion |
 | --- | --- | --- | --- | --- |
-| Top-level functions | Yes | Yes | Yes | Not a named language construct |
-| Methods | Yes | Yes, receiver-qualified | Yes | Yes |
-| Named local functions | Yes | Not supported by Go | Yes | Yes |
-| Expression-bodied named callable | Lambda-like one-line body is still a `def` | Not supported | Yes | Yes |
-| Constructors | `__init__` is a method | Not distinct syntax | Secondary constructor proven | Constructor proven |
-| Attached declaration metadata in range | Decorator wrapper adjustment | N/A | Annotation included | Attribute included |
-| Stable 1-based ranges | Yes | Yes | Yes | Yes |
-| Callable LOC | Proven | Proven | Proven | Proven |
-| Structural nesting | Proven | Proven | Proven | Proven |
-| Complexity | Proven, with comprehension/match rules | Proven, including type switch | Proven, including `when` | Proven, including switch expressions |
+| Tree-sitter | Implemented for ten languages/formats with pinned packages and exact fixtures | One executable parse feeds all metrics; concrete byte/point ranges; Java, JS, TS, JSX, TSX and Vue grammars available | Grammar taxonomy differs; ABI/versions and native wheels must be pinned; tolerant errors must be rejected | Recommended initial provider behind region/language adapters |
+| Python `ast` | Retained decorator/range oracle test | Standard library and authoritative Python categories | Python only; decorators need start adjustment | Python oracle |
+| Go `go/parser` | Go fixtures compile with Go 1.25.4; native position API assessed | Authoritative Go syntax | Go runtime or helper binaries | Go oracle/optional backend |
+| Java compiler | Java 11 available; ordinary Java fixture compilation used where supported | Authoritative Java syntax | Local Java 11 cannot validate modern switch expressions; runtime/helper burden | Oracle, not universal runtime |
+| JS/TS compiler ecosystems | Node 22 available; runtime/package implications assessed | Authoritative JS and TS semantics | Multiple parser modes/package graph; Vue still needs container extraction | Useful oracles, not required prototype dependencies |
+| Roslyn / Kotlin PSI | Phase A environment/runtime assessment | Authoritative native models | Heavy/version-sensitive toolchains | Possible per-language backends |
+| Regex/brace/indentation | Rejected by metadata, callbacks, JSX, switches, and Vue regions | Minimal dependency | Incorrect ranges and decision boundaries | Not suitable |
 
-Lambdas are intentionally opaque. This avoids unstable identities and avoids
-charging deferred code to an enclosing callable, but it leaves anonymous
-control flow unmeasured. Lambda policy is a separate production decision.
-
-## Fixture results
-
-Eight fixture files contain 47 measured callables. Every row below is asserted
-by `tests/test_analyzer_feasibility.py`; values are `LOC / depth / complexity`.
-
-| Language | Simple | Long linear | Deep nested | Wide branching | Metadata/comments | Language-specific evidence |
-| --- | --- | --- | --- | --- | --- | --- |
-| Python | 2 / 0 / 1 | 8 / 0 / 1 | 8 / 4 / 5 | 10 / 1 / 5 | 8 / 0 / 1 | comprehension + ternary + booleans = 4; match/catch = 4 |
-| Go | 3 / 0 / 1 | 9 / 0 / 1 | 13 / 4 / 5 | 8 / 1 / 5 | 8 / 0 / 1 | booleans = 3; type switch = 3 |
-| Kotlin | 1 / 0 / 1 | 9 / 0 / 1 | 14 / 4 / 5 | 8 / 1 / 5 | 9 / 0 / 1 | `when` = 3; lambda/Elvis/safe-call excluded |
-| C# | 1 / 0 / 1 | 10 / 0 / 1 | 19 / 4 / 5 | 9 / 1 / 5 | 9 / 0 / 1 | ternary + booleans = 4; switch expression = 3 |
-
-The long-linear and branching fixtures demonstrate that callable size is not a
-complexity proxy. Deep and wide fixtures both reach complexity 5 while their
-depths are 4 and 1, demonstrating that complexity is not a nesting proxy.
-Comments, strings, and identifiers are never keyword-counted.
-
-Local-function fixtures prove overlapping physical ranges and reset control
-metrics in Python, Kotlin, and C#. Go has no named local-function declaration.
-
-## Provider comparison
-
-| Provider | Evidence | Strengths | Costs/limits | Production conclusion |
-| --- | --- | --- | --- | --- |
-| Tree-sitter | Implemented for all four languages with pinned Python packages and exact fixture assertions | One in-process parse, concrete ranges, broad grammar coverage, no target-language toolchain | Native wheels and grammar ABI must be pinned; node taxonomies differ; syntactic identities only; error recovery must be rejected | Recommended initial provider behind adapters |
-| Python `ast` | Compared against Python fixtures | Standard library, semantic node categories, stable end positions | Python only; decorator start requires explicit adjustment; no comments in AST | Useful oracle for the Python adapter, not a universal layer |
-| Go `go/parser` / `go/ast` | Go 1.25.4 tooling was available and both fixture files compiled with `go test callables.go decisions.go`; native range API was assessed | Authoritative Go syntax and positions | Requires Go at runtime or helper binaries for every OS/architecture | Useful oracle or optional Go backend |
-| Roslyn | .NET 8/10 SDKs were present; packaging/runtime path assessed | Authoritative C# syntax, symbols available when needed | Requires .NET plus a maintained helper/package graph; much heavier than syntactic guards | Oracle or future backend if syntax-only identity proves insufficient |
-| Kotlin compiler/PSI | Runtime feasibility assessed; Java 11 was present but `kotlinc` was absent | Authoritative Kotlin model | Largest/version-sensitive dependency, compiler/JVM distribution burden | Not a universal baseline; possible future Kotlin backend |
-| Regex, indentation, or brace counting | Rejected against fixture constructs | Minimal dependency | Fails metadata/signatures, else-if normalization, expressions, comprehensions, switches, and comments/strings | Not suitable |
-
-The prototype dependency is `tree-sitter==0.26.0` plus
-`tree-sitter-language-pack==1.14.3`, recorded in `research/requirements.txt`.
-On the tested Windows CPython 3.14 environment the language pack installed as a
-2.1 MB wheel. It is a research dependency, not a shipped Code Guard dependency.
-Production should evaluate individually pinned grammar wheels, verify exact
-Windows/Linux/macOS wheel coverage in CI, and fail clearly when an analyzer is
-unavailable rather than falling back to text heuristics.
+The research dependency remains `tree-sitter==0.26.0` and
+`tree-sitter-language-pack==1.14.3`. The broad language pack is convenient for
+research, not an automatic production dependency choice. Production packaging
+must test individually pinned grammar wheels and exact Windows/Linux/macOS
+coverage, cache parsers, and fail clearly rather than fall back to text counting.
 
 ## Result-model compatibility
 
-`CallableFinding` is an additive generic result shape with path, callable,
-inclusive range, measured value, state, optional threshold metadata, and optional detail
-breakdown. `GuardResult` already supplies the guard id and required policy id.
-The JSON compatibility test serializes the issue's nesting example. LOC keeps
-its existing `Finding` shape and semantics unchanged.
+`CallableFinding` remains additive and leaves LOC's `Finding` untouched. It can
+carry original path, callable, inclusive range, measured value, state, threshold
+metadata, detail breakdown, and optional embedded language. A Vue compatibility
+test serializes `src/Foo.vue`, original lines 21–35, and `typescript`.
+`GuardResult` continues to provide guard and required-policy identity.
 
 ## Performance sanity
 
-Observed on Windows, Python 3.14.2, Tree-sitter 0.26.0, language-pack 1.14.3:
+Recordings use Windows, Python 3.14.2, Tree-sitter 0.26.0, and language-pack
+1.14.3. These are workflow sanity observations, not benchmarks. Phase B records
+cold import at 44 ms, first analysis of 18 files/95 callables at 102 ms, 1,800
+warm file analyses at 1,302 ms (about 0.72 ms/file), and 200 warm Vue
+container-plus-region analyses at 59 ms (about 0.30 ms/file). Production should
+cache parsers and retain separate container/executable parse telemetry.
 
-- research module import: 46 ms;
-- first parse/measurement of all eight fixture files: 56 ms;
-- 800 warm file parses: 624 ms, approximately 0.78 ms/file.
+## Threshold conclusions after Phase B
 
-These are sanity observations, not a benchmark. Parser initialization dominates
-the tiny corpus, while warm per-file cost is reasonable for post-edit workflows.
-Production should cache parser instances and separately track cold start and
-large-file behavior.
-
-## Known limitations
-
-- Identities are lexical and do not resolve aliases, partial types, or overloads.
-- Lambdas are opaque; anonymous code is not measured.
-- Tree-sitter grammar upgrades may rename nodes or alter ranges.
-- Incomplete files are rejected rather than partially analyzed.
-- Python comprehensions have no direct cross-language equivalent.
-- Elvis and null-coalescing could reasonably be classified as decisions; this
-  prototype excludes both pending product evidence.
-- The fixtures prove deterministic normalization, not useful universal review
-  points across real repositories.
-- Java and JavaScript/TypeScript remain follow-up probes.
-
-## Threshold conclusions
-
-- Callable physical LOC: **Outcome B** — useful with project configuration, but
-  eight controlled fixtures do not justify a universal REVIEW default.
-- Structural nesting: **Outcome B** — the cross-language definition is stable,
-  but no universal REVIEW value is justified without representative projects.
-- Cyclomatic complexity: **Outcome C** — the common core is useful, but
-  comprehensions and fallback/expression constructs require language-specific
-  interpretation before thresholds can be compared responsibly.
+- Callable physical LOC: **Outcome B survived with qualification** — a
+  configurable REVIEW point is useful, but lexical assignment/container ranges
+  expand the definition and no universal default is justified.
+- Structural nesting: **Outcome B survived unchanged** — normalization remains
+  stable across executable languages and ignores markup hierarchy, but fixture
+  evidence does not establish a universal REVIEW value.
+- Cyclomatic complexity: **Outcome C survived and strengthened** — a shared core
+  exists, while comprehensions, fallback operators, switch forms, JSX expression
+  usage, and callback boundaries require language-specific interpretation.
 
 No production REVIEW or FAIL threshold is introduced.
 
-## Recommendation and next slices
+## Known limitations
 
-Adopt a small language-adapter boundary with Tree-sitter as the initial pinned
-syntax provider, parsing each file once and returning named callables plus
-normalized, inspectable control-flow facts. Keep the boundary provider-neutral
-so a native oracle/backend can replace one language without changing guards.
-Do not build a generic plugin framework.
+- Identities are lexical and do not resolve overloads, aliases, or dynamic
+  property assignments; path and range remain the authoritative locator.
+- Anonymous JS-family callback identities shift with their source coordinates.
+- Java and Phase A lambdas remain unmeasured as independent callables.
+- Simple variable assignment is proven; destructuring, computed property targets,
+  assignment expressions, and class-field arrows need separate evidence.
+- Vue external scripts are unsupported, and the container grammar does not
+  validate embedded syntax; each region is validated separately.
+- Tree-sitter grammar upgrades can change taxonomy or ranges.
+- Syntax trees containing errors are rejected rather than partially measured.
+- The corpus proves deterministic normalization, not universal threshold value.
 
-Small follow-up issues should be:
+## Recommended production slices
 
-1. productionize the adapter/fact contract, parser packaging matrix, syntax
-   error behavior, and Python/Go oracle parity without enabling guards;
-2. implement configurable callable physical LOC as PASS/REVIEW with no default;
-3. implement configurable structural nesting as PASS/REVIEW with no default;
-4. expand complexity fixtures and real-project sampling to settle the
-   comprehension/Elvis/null-coalescing policy before implementing the guard;
-5. evaluate lambda treatment and Java/JavaScript/TypeScript coverage separately.
+1. Productionize source/container regions, byte mapping, language adapter/fact
+   contracts, parser caching, syntax errors, and cross-platform grammar packaging
+   without enabling guards.
+2. Harden JS-family lexical targets (object properties, class fields, assignment
+   expressions) and callback identity/details behind the adapter contract.
+3. Add configurable callable physical LOC as PASS/REVIEW with no default.
+4. Add configurable structural nesting as PASS/REVIEW with no default.
+5. Expand real-project complexity sampling and settle fallback/comprehension and
+   Java/JS-family lambda policy before enabling complexity.
+6. Keep template/style and other structured-artifact guard research in issue #6.
