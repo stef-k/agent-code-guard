@@ -35,10 +35,39 @@ class Finding:
 
 
 @dataclass(frozen=True)
+class CallableFinding:
+    """Additive result shape proven by analyzer research; unused by LOC."""
+
+    path: str
+    callable: str
+    start_line: int
+    end_line: int
+    measured: int
+    state: str
+    thresholds: dict[str, int] | None = None
+    details: dict[str, int] | None = None
+    embedded_language: str | None = None
+
+    def to_json(self) -> dict[str, Any]:
+        value = {
+            "path": self.path,
+            "callable": self.callable,
+            "range": {"startLine": self.start_line, "endLine": self.end_line},
+            "measured": self.measured,
+            "state": self.state,
+            "thresholds": self.thresholds,
+            "details": self.details,
+        }
+        if self.embedded_language is not None:
+            value["embeddedLanguage"] = self.embedded_language
+        return value
+
+
+@dataclass(frozen=True)
 class GuardResult:
     guard_id: str
     state: str
-    findings: list[Finding]
+    findings: list[Finding | CallableFinding]
 
     @property
     def required_policies(self) -> list[str]:
