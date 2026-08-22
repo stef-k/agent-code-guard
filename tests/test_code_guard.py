@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import json
+import sys
 import tempfile
 from pathlib import Path
 
-from helpers import CodeGuardTestCase, git, init_git, write_config, write_lines
+from helpers import CODE_GUARD, CodeGuardTestCase, git, init_git, write_config, write_lines
+
+sys.path.insert(0, str(CODE_GUARD.parent))
+from file_selection import SelectionArgs, resolve_scope
 
 
 class ResultContractTests(CodeGuardTestCase):
@@ -116,6 +120,60 @@ class LocParityTests(CodeGuardTestCase):
             self.assertEqual({item["path"] for item in self.findings(result)}, {"one.py", "two.kt"})
 
 
+class ExplicitScopeTests(CodeGuardTestCase):
+    def test_one_explicit_file_works_without_git(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            write_lines(root / "sample.py", 4)
+            result = self.run_guard(root, "sample.py", "--warn", "3", "--fail", "6", "--json")
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertEqual([item["path"] for item in self.findings(result)], ["sample.py"])
+
+    def test_multiple_explicit_files_work_without_git(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name in ["a.py", "b.kt", "c.ts"]:
+                write_lines(root / name, 2)
+            result = self.run_guard(root, "a.py", "b.kt", "c.ts", "--json")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual({item["path"] for item in self.findings(result)}, {"a.py", "b.kt", "c.ts"})
+
+    def test_explicit_directory_and_dot_are_recursive_audits_without_git(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            write_lines(root / "src" / "nested" / "sample.py", 2)
+            write_lines(root / "outside.ts", 2)
+            directory = self.run_guard(root, "src", "--json")
+            audit = self.run_guard(root, ".", "--json")
+            self.assertEqual([item["path"] for item in self.findings(directory)], ["src/nested/sample.py"])
+            self.assertEqual({item["path"] for item in self.findings(audit)}, {"src/nested/sample.py", "outside.ts"})
+
+    def test_missing_explicit_path_is_a_scope_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            result = self.run_guard(Path(temp), "missing.py", "--json")
+            self.assertEqual(result.returncode, 3)
+            self.assertIn("explicit path does not exist: missing.py", self.read_json(result)["error"])
+
+    def test_unsupported_explicit_file_is_valid_but_not_applicable_to_loc(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            write_lines(root / "A.py", 2)
+            (root / "notes.txt").write_text("notes\n", encoding="utf-8")
+            result = self.run_guard(root, "A.py", "notes.txt", "--json")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual([item["path"] for item in self.findings(result)], ["A.py"])
+
+    def test_common_scope_preserves_files_before_guard_applicability(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            write_lines(root / "Foo.py", 1)
+            (root / "artifact.custom").write_text("future guard input\n", encoding="utf-8")
+            args = SelectionArgs(["Foo.py", "artifact.custom"], False, False, None)
+            scope = resolve_scope(args, root)
+            self.assertEqual(scope.root, root.resolve())
+            self.assertEqual(scope.files, ((root / "Foo.py").resolve(), (root / "artifact.custom").resolve()))
+
+
 class ConfigurationValidationTests(CodeGuardTestCase):
     def test_global_thresholds_require_positive_json_integers(self) -> None:
         invalid_values = ["3", True, 3.0]
@@ -168,6 +226,17 @@ class ConfigurationValidationTests(CodeGuardTestCase):
 
 
 class GitSelectionTests(CodeGuardTestCase):
+    def test_git_modes_fail_cleanly_without_git_even_when_loc_is_disabled(self) -> None:
+        modes = [("--changed-only",), ("--staged",), ("--base-ref", "main")]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = write_config(root, {"enabled": False})
+            for mode in modes:
+                with self.subTest(mode=mode):
+                    result = self.run_guard(root, ".", *mode, "--config", str(config), "--json")
+                    self.assertEqual(result.returncode, 3)
+                    self.assertEqual(self.read_json(result), {"error": "Git file-selection mode requires a Git repository"})
+
     def test_disabled_loc_does_not_bypass_conflicting_selection_modes(self) -> None:
         combinations = [
             ("--changed-only", "--staged"),
