@@ -86,10 +86,9 @@ and is not charged to the parent. Coordinates shift when preceding source moves,
 as finding ranges already do, but the policy avoids major unmeasured complexity
 blind spots in callback-heavy applications.
 
-Phase A lambdas and Java lambdas remain opaque. A Java lambda fixture proves its
-control flow is not charged to the owning method. This is now an explicit
-language-specific callable-policy qualification, not a claim that every lambda
-has equivalent application-level identity.
+Kotlin, C#, Go, Java, and expression-only Python lambdas now use the same
+coordinate-owned callback boundary. Their controls and decisions belong to the
+child `CallableKey`, are not charged to the owner, and reset nesting.
 
 ## Measurement definitions
 
@@ -130,13 +129,12 @@ Complexity is `1 + decision increments`. The prototype adds one for each:
 - non-default/non-wildcard switch/when/match executable arm;
 - catch handler;
 - conditional/ternary expression;
-- short-circuit `and`/`or` or `&&`/`||` operator occurrence;
 - Python comprehension/generator expression as one implicit decision.
 
 Grouped labels leading to one executable arm count once. Switch nodes, default
 or wildcard arms, `try`, `finally`, optional navigation, Kotlin Elvis, C# null
-coalescing, and JS/TS nullish coalescing add zero. In JSX, `{enabled && ...}` and
-ternaries are ordinary executable decisions; markup nodes are not decisions.
+coalescing, JS/TS nullish coalescing, and all short-circuit boolean operators add
+zero. JSX ternaries remain decisions; short-circuit rendering and markup do not.
 
 Phase B strengthens Outcome C: the common decision core is useful, but Python
 comprehensions, fallback operators, switch grammars, and callable boundaries
@@ -148,9 +146,9 @@ still require language-specific interpretation.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Named declarations/methods | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Delegated |
 | Constructors | Method convention | N/A | Yes | Yes | Yes | Yes | Yes | N/A | N/A | Delegated |
-| Named local callable | Yes | N/A | Yes | Yes | Lambda opaque | Yes | Yes | Yes | Yes | Delegated |
-| Lexically assigned arrow/function | N/A | N/A | N/A | N/A | Lambda opaque | Yes | Yes | Yes | Yes | Delegated |
-| Anonymous callback finding | No | N/A | No | No | No | Coordinate identity | Coordinate identity | Coordinate identity | Coordinate identity | Delegated |
+| Named local callable | Yes | N/A | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Delegated |
+| Lexically assigned arrow/function | Coordinate lambda | Function literal | Coordinate lambda | Coordinate lambda | Coordinate lambda | Yes | Yes | Yes | Yes | Delegated |
+| Anonymous callback finding | Coordinate identity | Coordinate identity | Coordinate identity | Coordinate identity | Coordinate identity | Coordinate identity | Coordinate identity | Coordinate identity | Coordinate identity | Delegated |
 | Attached metadata in range | Decorator | N/A | Annotation | Attribute | Annotation | N/A | Decorator | N/A | Supported by TSX grammar | Delegated |
 | Bodyless declaration excluded | N/A | N/A | N/A | N/A | Yes | Yes | Yes | Yes | Yes | Delegated |
 | Original stable range | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes, remapped |
@@ -171,16 +169,16 @@ four-level nesting, wide branching, else-if, enhanced loops, two catches,
 ternary/boolean decisions, classic switch groups, and switch-expression rules
 are measured. Constructor identity is `package.Type.Type`; the annotation is in
 the constructor range. Both switch forms produce depth 1 and complexity 3 for
-two non-default executable arms. Java lambdas are opaque and reset/exclude their
-body from the owner.
+two non-default executable arms. Java lambdas are independently measured and
+reset/exclude their body from the owner.
 
 ### JavaScript
 
 Function declarations, class constructors/methods, object methods,
 variable-assigned arrows/function expressions, and named local expressions have
 stable lexical identities. Deep/wide flow, else-if, loops, catch, switch,
-ternary, and short-circuit expressions are measured. Optional chaining and `??`
-are deliberately excluded. Map/Promise callbacks receive independent
+and ternary expressions are measured. Short circuits, optional chaining, and
+`??` are deliberately excluded. Map/Promise callbacks receive independent
 source-coordinate identities, preventing parent double counting or blind spots.
 
 ### TypeScript
@@ -188,13 +186,13 @@ source-coordinate identities, preventing parent double counting or blind spots.
 Type annotations, generic functions/methods, optional parameters, decorators,
 arrows, and function expressions preserve callable ranges and measurements.
 Interface methods and function types produce no findings. Optional chaining and
-nullish coalescing do not increment complexity; ordinary if/boolean/ternary
-syntax does.
+nullish coalescing and short circuits do not increment complexity; ordinary
+conditions and ternaries do.
 
 ### JSX and TSX / React syntax
 
 Declaration and arrow components are ordinary JS-family callables. JSX
-short-circuit rendering and ternaries count as normal expressions. Nested
+short-circuit rendering adds zero while ternaries count normally. Nested
 `div/section/article` markup remains depth 0. Event and map callbacks receive
 independent coordinate identities. React-specific framework policy is absent.
 
@@ -271,7 +269,7 @@ No production REVIEW or FAIL threshold is introduced.
 - Identities are lexical and do not resolve overloads, aliases, or dynamic
   property assignments; path and range remain the authoritative locator.
 - Anonymous JS-family callback identities shift with their source coordinates.
-- Java and Phase A lambdas remain unmeasured as independent callables.
+- Python lambdas are expression-only; statement controls cannot occur in them.
 - Simple variable assignment is proven; destructuring, computed property targets,
   assignment expressions, and class-field arrows need separate evidence.
 - Vue external scripts are unsupported, and the container grammar does not
@@ -290,11 +288,11 @@ derived only from immutable `AnalysisFacts`.
 
 | Language | Callable and closure policy | Control/decision mapping | Provider result and limitations |
 | --- | --- | --- | --- |
-| C++ | Free functions, methods, constructors, destructors, operators, templates, and nested-class methods are named. Assigned lambdas use the declaration target; callbacks use source coordinates. | Conditions, loops, switch, try/catch, ternary, and short-circuit operators map directly. Preprocessor directives add no runtime decisions. | `.cpp/.cc/.cxx/.hpp/.hh/.hxx` parse deterministically. `.h` remains excluded. `#define`, `#ifdef`, and `#if` structure is lexical potential code: no macro expansion, configuration selection, or claim that a reported callable is compiled. Error nodes reject the whole file; a future specialized backend is not justified by this evidence. |
+| C++ | Free functions, methods, constructors, destructors, operators, templates, and nested-class methods are named. Assigned lambdas use the declaration target; callbacks use source coordinates. | Conditions, loops, switch, try/catch, and ternary map directly; short circuits add zero. Preprocessor directives add no runtime decisions. | `.cpp/.cc/.cxx/.hpp/.hh/.hxx` parse deterministically. `.h` remains excluded. `#define`, `#ifdef`, and `#if` structure is lexical potential code: no macro expansion, configuration selection, or claim that a reported callable is compiled. Error nodes reject the whole file; a future specialized backend is not justified by this evidence. |
 | Rust | Free, trait-default, and impl functions are named. Bound closures use the binding; callbacks use coordinates. | `if let` is a condition and `while let` a loop; patterns add zero. Non-wildcard `match` arms count, explicit guards add `pattern_guard`, and expression-oriented controls use the same facts. | The grammar exposes stable ranges and distinct pattern/guard nodes. No Rust toolchain is required. |
-| PHP | Functions, methods, constructors, bound arrows/closures, and anonymous callbacks are independent callables. | `if/elseif`, loops, switch/match arms, catches, ternary, and short-circuit booleans count. `??` remains a non-decision fallback. | One whole-file PHP region preserves original `.php` bytes/path across multiple PHP islands; HTML `text` nodes emit no executable facts. This avoids breaking valid PHP spanning tags and requires one executable parse. |
+| PHP | Functions, methods, constructors, bound arrows/closures, and anonymous callbacks are independent callables. | `if/elseif`, loops, switch/match arms, catches, and ternary count. Short circuits and `??` add zero. | One whole-file PHP region preserves original `.php` bytes/path across multiple PHP islands; HTML `text` nodes emit no executable facts. This avoids breaking valid PHP spanning tags and requires one executable parse. |
 | Swift | Functions, methods, initializers, extension/protocol executable defaults, bound closures, and callbacks are represented. | `guard` is a condition: only its failure body nests. Loops/switch/do-catch map normally; non-default patterns and `where` guards count. Optional syntax alone does not. | Stable lexical ranges are available. Protocol bodies require a small adapter join for the grammar's adjacent declaration/body shape; the common facts remain unchanged. |
-| Dart | Top-level, async, method, constructor, local functions, bound closures, and callbacks are represented. | Conditions, loops, switch cases, catches, ternary, and short-circuit booleans count. Null-aware access and `??` do not. | Stable ranges are available. A small adapter joins the grammar's adjacent signature/body nodes and preserves one parse/fact pass; Flutter semantics are out of scope. |
+| Dart | Top-level, async, method, constructor, local functions, bound closures, and callbacks are represented. | Conditions, loops, switch cases, catches, and ternary count. Short circuits, null-aware access, and `??` do not. | Stable ranges are available. A small adapter joins the grammar's adjacent signature/body nodes and preserves one parse/fact pass; Flutter semantics are out of scope. |
 
 The architecture **survived with small, evidence-driven adapter extensions**.
 No `AnalysisFacts` field changed. Callable LOC strengthens Outcome B while

@@ -69,9 +69,6 @@ def _structural_facts(callable_node, callable_key: CallableKey, region: Executab
                 decisions.append(DecisionFact(
                     callable_key.identity, callable_key, DECISION_CATEGORIES.get(child.type, child.type), child.type, child_range,
                 ))
-            if child.type in {"boolean_operator", "conjunction_expression", "disjunction_expression", "logical_and_expression", "logical_or_expression", "binary_expression"}:
-                for _ in range(_short_circuit_count(child, region.source)):
-                    decisions.append(DecisionFact(callable_key.identity, callable_key, "short_circuit_boolean", child.type, child_range))
             for arm_range in _extra_switch_arm_ranges(child, language, region):
                 decisions.append(DecisionFact(callable_key.identity, callable_key, "switch_arm", child.type, arm_range))
             guard = _pattern_guard(child, language)
@@ -162,6 +159,8 @@ def _identity(node, region: ExecutableRegion) -> str:
         return _javascript_identity(node, region)
     if region.language in {"cpp", "rust", "php", "swift", "dart"}:
         return _second_wave_identity(node, region)
+    if node.type in MAINSTREAM_LAMBDA_TYPES[region.language]:
+        return _mainstream_lambda_identity(node, region)
     source, language = region.source, region.language
     parts = [_name(node, language, source)]
     owner_types = {
@@ -365,9 +364,36 @@ def _callback_name(node, region: ExecutableRegion) -> str:
     return f"<callback@{point.line}:{point.byte_column}>"
 
 
+MAINSTREAM_LAMBDA_TYPES = {
+    "python": {"lambda"}, "go": {"func_literal"},
+    "kotlin": {"lambda_literal", "anonymous_function"},
+    "csharp": {"lambda_expression", "anonymous_method_expression"},
+    "java": {"lambda_expression"},
+}
+
+
+def _mainstream_lambda_identity(node, region: ExecutableRegion) -> str:
+    parts = [_callback_name(node, region)]
+    for current in _ancestors(node):
+        if current.type in MAINSTREAM_LAMBDA_TYPES[region.language]:
+            parts.append(_callback_name(current, region))
+        elif current.type in CALLABLE_TYPES[region.language]:
+            name = _name_node(current, region.language)
+            if name is not None:
+                parts.append(_text(name, region.source))
+        elif current.type in {"class_definition", "class_declaration", "object_declaration", "struct_declaration", "record_declaration", "enum_declaration"}:
+            name = _name_node(current, region.language)
+            if name is not None:
+                parts.append(_text(name, region.source))
+    parts.append(region.original_path.stem if region.language == "python" else _package_or_namespace(node, region.language, region.source))
+    return ".".join(reversed([part for part in parts if part]))
+
+
 def _is_anonymous_callable(node, region: ExecutableRegion) -> bool:
     if region.language in {"javascript", "typescript", "tsx"}:
         return _javascript_lexical_name(node, region.source) is None
+    if node.type in MAINSTREAM_LAMBDA_TYPES.get(region.language, set()):
+        return True
     return _is_closure(node, region.language) and _second_wave_name(node, region.language, region.source) is None
 
 
@@ -417,10 +443,6 @@ def _is_else_if(node, language: str) -> bool:
 
 def _is_default_branch(node, source: bytes) -> bool:
     return _text(node, source).lstrip().startswith(("default", "else", "case _", "case var _", "_ ->", "_ =>"))
-
-
-def _short_circuit_count(node, source: bytes) -> int:
-    return sum(_text(child, source) in {"and", "or", "&&", "||"} for child in node.children)
 
 
 def _control_category(provider_kind: str, language: str) -> str:

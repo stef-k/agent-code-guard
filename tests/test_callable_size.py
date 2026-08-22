@@ -46,6 +46,19 @@ class CallableSizeConfigTests(unittest.TestCase):
 
 
 class CallableSizeEvaluationTests(unittest.TestCase):
+    def test_mainstream_lambda_range_is_an_independent_callable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "owner.kt"
+            source.write_text(
+                "fun owner(values: List<Int>) {\n  values.map { value ->\n    if (value > 0) value else 0\n  }\n}\n",
+                encoding="utf-8",
+            )
+            result = callable_size.run(root, callable_size.Config(True, 99), analyze_files([source]))
+            by_name = {finding.callable: finding for finding in result.findings}
+            callback = next(finding for name, finding in by_name.items() if "<callback@" in name)
+            self.assertEqual((by_name["owner"].measured, callback.measured), (5, 3))
+
     def test_javascript_assignment_and_anonymous_callback_are_independent(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

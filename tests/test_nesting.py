@@ -86,6 +86,22 @@ class NestingEvaluationTests(unittest.TestCase):
         callback = next(value for name, value in javascript.items() if "<callback@" in name)
         self.assertEqual(callback.measured, 1)
 
+    def test_mainstream_lambda_controls_reset_without_polluting_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "owner.cs"
+            source.write_text(
+                "class Sample { void Owner(int[] values) { if (values.Length > 0) {\n"
+                "System.Action callback = () => { if (values.Length > 1) { while (true) { break; } } };\n"
+                "} } }\n",
+                encoding="utf-8",
+            )
+            facts = analyze_files([source])
+            result = nesting.run(root, nesting.Config(True, 99), facts)
+            by_name = {finding.callable: finding for finding in result.findings}
+            callback = next(finding for name, finding in by_name.items() if "<callback@" in name)
+            self.assertEqual((by_name["Sample.Owner"].measured, callback.measured), (1, 2))
+
     def test_jsx_markup_does_not_count(self) -> None:
         _, findings = self.findings("jsx/components.jsx")
         self.assertTrue(findings)

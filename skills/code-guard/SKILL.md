@@ -63,16 +63,17 @@ Do not create a manifest or temporary scope file. Specific positional files mean
 
 When all guards return `PASS`, no detailed policy file needs to be loaded.
 
-When a guard returns `REVIEW` or `FAIL`, read only the policy file named by that finding. The eventual runner must return the required policy identifiers/files in both human-readable and JSON output.
+When a guard returns `REVIEW` or `FAIL`, read only the policy file named by that finding. The runner returns required policy identifiers/files in both human-readable and JSON output.
 
 Policy references:
 
 - file LOC: `references/loc-policy.md`
 - callable size: `references/callable-size-policy.md`
 - nesting depth: `references/nesting-policy.md`
-- cyclomatic complexity: `references/complexity-policy.md`
 
 Do not load unrelated guard policies merely because they exist.
+`references/complexity-policy.md` records accepted future policy only; do not
+load it until a production guard can emit `complexity` in `requiredPolicies`.
 
 ## Scope
 
@@ -84,7 +85,7 @@ Guards:
 - source/container and syntax facts (production infrastructure, not a guard);
 - callable LOC (implemented; opt-in with a required project `reviewAt`);
 - structural nesting (implemented; opt-in with a required project `reviewAt`);
-- cyclomatic complexity (reserved and disabled).
+- cyclomatic complexity (accepted configurable-only, not implemented or routable).
 
 Callable LOC has no universal review threshold. When a project enables
 `guards.callableSize`, it must supply a positive JSON integer `reviewAt`.

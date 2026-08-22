@@ -24,16 +24,37 @@ class ComplexitySampleTests(unittest.TestCase):
 
         self.assertEqual(result["supportedFiles"], 1)
         self.assertEqual(result["summary"]["python"]["callables"], 1)
-        self.assertEqual(result["callables"][0]["complexity"], 3)
+        self.assertEqual(result["callables"][0]["complexity"], 2)
         self.assertEqual(
             result["callables"][0]["decisions"],
-            {"condition": 1, "short_circuit_boolean": 1},
+            {"condition": 1},
         )
 
     def test_nearest_rank_is_deterministic_for_small_samples(self) -> None:
         values = [1, 2, 3, 4]
         self.assertEqual(_nearest_rank(values, 0.75), 3)
         self.assertEqual(_nearest_rank(values, 0.95), 4)
+
+    def test_research_only_exclusion_omits_selected_decision_category(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "sample.py"
+            source.write_text(
+                "def choose(left, right):\n"
+                "    if left and right:\n"
+                "        return left\n"
+                "    return right\n",
+                encoding="utf-8",
+            )
+
+            result = measure(
+                [str(source)], root,
+                excluded_decisions=("condition",),
+            )
+
+        self.assertEqual(result["callables"][0]["complexity"], 1)
+        self.assertEqual(result["callables"][0]["decisions"], {})
+        self.assertEqual(result["excludedDecisions"], ["condition"])
 
 
 if __name__ == "__main__":

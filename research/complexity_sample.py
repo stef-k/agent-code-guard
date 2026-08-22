@@ -22,13 +22,20 @@ class _Selection:
     base_ref: str | None = None
 
 
-def measure(paths: list[str], start: Path, excludes: tuple[str, ...] = ()) -> dict:
+def measure(
+    paths: list[str],
+    start: Path,
+    excludes: tuple[str, ...] = (),
+    excluded_decisions: tuple[str, ...] = (),
+) -> dict:
     """Resolve explicit scope and aggregate existing production facts."""
     scope = resolve_scope(_Selection(paths), start)
     files = tuple(path for path in scope.files if is_applicable(path) and not _excluded(path, scope.root, excludes))
     facts = analyze_files(files)
     decisions = defaultdict(Counter)
     for decision in facts.decisions:
+        if decision.category in excluded_decisions:
+            continue
         decisions[decision.callable_key][decision.category] += 1
 
     rows = []
@@ -49,6 +56,7 @@ def measure(paths: list[str], start: Path, excludes: tuple[str, ...] = ()) -> di
         "root": str(scope.root),
         "supportedFiles": len(facts.files),
         "parseFailures": 0,
+        "excludedDecisions": sorted(set(excluded_decisions)),
         "summary": _summaries(rows),
         "callables": rows,
     }
@@ -101,9 +109,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="+", help="Explicit production source roots/files")
     parser.add_argument("--exclude", action="append", default=[], help="Root-relative glob to exclude")
+    parser.add_argument(
+        "--exclude-decision", action="append", default=[],
+        help="Research-only DecisionFact category to omit from the comparison",
+    )
     parser.add_argument("--output", type=Path, help="Write JSON to this path instead of stdout")
     args = parser.parse_args()
-    result = measure(args.paths, Path.cwd(), tuple(args.exclude))
+    result = measure(args.paths, Path.cwd(), tuple(args.exclude), tuple(args.exclude_decision))
     encoded = json.dumps(result, indent=2) + "\n"
     if args.output:
         args.output.write_text(encoded, encoding="utf-8")

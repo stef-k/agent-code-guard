@@ -31,7 +31,8 @@ The first design targets four cross-language measurements:
 
 File LOC has mature default policy thresholds. Callable size and structural
 nesting are active syntax guards, but neither has a universal review threshold:
-projects opt in by supplying `reviewAt`. Complexity remains disabled.
+projects opt in by supplying `reviewAt`. Complexity is accepted as
+configurable-only evidence but remains unimplemented and disabled.
 
 ## Adding new guards
 
@@ -100,7 +101,7 @@ The machine-readable result exposes required policy identifiers only for actiona
 ```json
 {
   "overall": "review",
-  "requiredPolicies": ["complexity"]
+  "requiredPolicies": ["nesting"]
 }
 ```
 
@@ -309,7 +310,8 @@ Normal exits are 0 for PASS, 1 for REVIEW, 2 for FAIL, and 3 for configuration/r
 
 File LOC is enabled by default. Callable LOC and structural nesting are
 production-ready and opt-in with project-supplied review thresholds. Cyclomatic
-complexity remains disabled and has no production threshold.
+complexity is accepted for a later configurable-only vertical slice, but remains
+unimplemented, disabled, and absent from `requiredPolicies`.
 
 ## License
 

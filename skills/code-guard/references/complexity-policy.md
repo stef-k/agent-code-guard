@@ -6,12 +6,12 @@ This guard exists because a callable can be short and only lightly nested while 
 
 ## Status
 
-Universal default thresholds are not finalized yet. They must be validated against representative code in multiple languages before becoming defaults.
-
-Issue #14 retained Outcome C: production complexity remains disabled while
-short-circuit normalization and opaque lambda ownership are unsettled. During
-research, values are `REVIEW` anchors only; no universal or FAIL threshold is
-authorized.
+Issue #25 accepted complexity as configurable-only after zero short-circuit
+weighting preserved strong review signals and removed boolean-expression noise.
+The guard is not implemented yet, so this policy is research-only and cannot be
+requested through current `requiredPolicies`. A future opt-in guard must require
+a project-supplied positive `reviewAt`, provide PASS/REVIEW only, and have no
+universal or per-language default.
 
 ## On REVIEW
 
