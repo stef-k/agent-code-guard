@@ -83,7 +83,16 @@ class ComplexityEvaluationTests(unittest.TestCase):
         result = complexity.run(Path.cwd(), complexity.Config(True, 3), facts(["ternary", "condition", "loop", "condition"]))
         finding = result.findings[0]
         self.assertEqual(finding.details, {"boundaryKind": "declaration", "decisions": {"condition": 2, "loop": 1, "ternary": 1}})
-        self.assertEqual(finding.to_json()["details"], finding.details)
+        self.assertEqual(finding.to_json(), {
+            "path": "src/example.py",
+            "callable": "module.run",
+            "range": {"startLine": 10, "endLine": 80},
+            "measured": 5,
+            "state": "review",
+            "thresholds": {"reviewAt": 3},
+            "details": {"boundaryKind": "declaration", "decisions": {"condition": 2, "loop": 1, "ternary": 1}},
+            "embeddedLanguage": "python",
+        })
         self.assertEqual(result.required_policies, ["complexity"])
 
     def test_callable_key_ownership_resets_child_baseline(self) -> None:

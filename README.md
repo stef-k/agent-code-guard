@@ -197,8 +197,8 @@ that can legally span close/reopen tags. HTML does not emit executable facts.
 
 Zero-config execution uses this syntax pipeline because all three syntax guards
 are active by default. Supported malformed syntax or an unavailable
-required provider therefore produces deterministic exit 3. When both syntax
-guards and complexity are explicitly disabled, the public runner does not import
+required provider therefore produces deterministic exit 3. When callable size,
+nesting, and complexity are all explicitly disabled, the public runner does not import
 or construct the pipeline: Tree-sitter remains dormant and execution is LOC-only.
 
 ## Callable size
@@ -295,6 +295,9 @@ uses 15. A positive JSON integer `reviewAt` is an authorized project override.
 `enabled: false` disables the guard and wins even if an invalid `reviewAt` is
 also present. Exactly the effective threshold passes; greater values review;
 complexity never fails.
+
+The example configuration's value 20 only demonstrates override syntax; the
+built-in remains 15 and the example is not a recommendation.
 
 The language-neutral guard computes `1 +` the number of normalized
 `DecisionFact` values owned by each `CallableKey`. Categories include normalized
