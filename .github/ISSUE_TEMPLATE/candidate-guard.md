@@ -1,7 +1,6 @@
 ---
 name: Candidate guard evaluation
 about: Evaluate whether a proposed deterministic guard belongs in Agent Code Guard
-labels: candidate-guard
 ---
 
 # Candidate guard: <name>
