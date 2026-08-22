@@ -90,6 +90,39 @@ class ProductionParityTests(unittest.TestCase):
         self.assertNotIn("jsx_element", {item.provider_kind for item in facts.controls})
         self.assertTrue({"ternary", "short_circuit_boolean"} & {item.category for item in facts.decisions})
 
+    def test_callable_keys_disambiguate_duplicate_vue_lexical_identities(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "Duplicate.vue"
+            path.write_text(
+                "<script>const run = () => { if (true) return 1; };</script>\n"
+                "<script>const run = () => { if (false) return 2; };</script>\n",
+                encoding="utf-8",
+            )
+            facts = analyze_files([path])
+            self.assertEqual([item.identity for item in facts.callables], ["Duplicate.run", "Duplicate.run"])
+            self.assertEqual(len({item.key for item in facts.callables}), 2)
+            self.assertEqual({item.callable_key for item in facts.controls}, {item.key for item in facts.callables})
+
+    def test_structural_facts_preserve_elif_and_each_non_default_switch_label(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            python_path = Path(temp) / "branches.py"
+            python_path.write_text(
+                "def choose(x):\n    if x == 1:\n        return 1\n    elif x == 2:\n        return 2\n",
+                encoding="utf-8",
+            )
+            controls = analyze_files([python_path]).controls
+            elif_fact = next(item for item in controls if item.provider_kind == "elif_clause")
+            self.assertFalse(elif_fact.increases_nesting)
+            self.assertIsNotNone(elif_fact.parent_control_range)
+
+            js_path = Path(temp) / "switches.js"
+            js_path.write_text(
+                "function choose(x) { switch (x) { case 1: case 2: break; case 3: default: break; } }",
+                encoding="utf-8",
+            )
+            arms = [item for item in analyze_files([js_path]).decisions if item.category == "switch_arm"]
+            self.assertEqual(len(arms), 3)
+
 
 class RegionAndVueTests(unittest.TestCase):
     def test_ordinary_region_is_identity_mapped(self) -> None:

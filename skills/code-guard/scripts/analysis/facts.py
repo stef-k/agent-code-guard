@@ -36,6 +36,14 @@ class SourceRange:
 
 
 @dataclass(frozen=True)
+class CallableKey:
+    path: Path
+    embedded_language: str
+    identity: str
+    source_range: SourceRange
+
+
+@dataclass(frozen=True)
 class CallableFact:
     path: Path
     embedded_language: str
@@ -43,11 +51,14 @@ class CallableFact:
     source_range: SourceRange
     parent_callable: str | None
     boundary_kind: str
+    key: CallableKey
+    parent_key: CallableKey | None
 
 
 @dataclass(frozen=True)
 class ControlFlowFact:
     callable_identity: str
+    callable_key: CallableKey
     category: str
     provider_kind: str
     source_range: SourceRange
@@ -58,6 +69,7 @@ class ControlFlowFact:
 @dataclass(frozen=True)
 class DecisionFact:
     callable_identity: str
+    callable_key: CallableKey
     category: str
     provider_kind: str
     source_range: SourceRange

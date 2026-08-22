@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Iterator
 
-from .facts import CallableFact, ControlFlowFact, DecisionFact, SourceRange
+from .facts import CallableFact, CallableKey, ControlFlowFact, DecisionFact, SourceRange
 from .regions import ExecutableRegion
 
 CALLABLE_TYPES = {
@@ -36,7 +36,7 @@ CONTROL_CATEGORIES = {
 }
 
 CONTROL_TYPES = {
-    "python": {"if_statement", "for_statement", "while_statement", "match_statement", "try_statement"},
+    "python": {"if_statement", "elif_clause", "for_statement", "while_statement", "match_statement", "try_statement"},
     "go": {"if_statement", "for_statement", "expression_switch_statement", "type_switch_statement", "select_statement"},
     "kotlin": {"if_expression", "for_statement", "while_statement", "do_while_statement", "when_expression", "try_expression"},
     "csharp": {"if_statement", "for_statement", "foreach_statement", "while_statement", "do_statement", "switch_statement", "try_statement"},
@@ -73,28 +73,39 @@ DECISION_TYPES = {
 def extract_facts(root, region: ExecutableRegion) -> tuple[tuple[CallableFact, ...], tuple[ControlFlowFact, ...], tuple[DecisionFact, ...]]:
     nodes = [node for node in _walk(root) if node.type in CALLABLE_TYPES[region.language] and _has_body(node, region.language)]
     identities = {_node_key(node): _identity(node, region) for node in nodes}
+    ranges = {
+        _node_key(node): SourceRange(
+            region.original_point(_range_start_node(node, region.language).start_point.row,
+                                  _range_start_node(node, region.language).start_point.column),
+            region.original_point(node.end_point.row, node.end_point.column),
+        ) for node in nodes
+    }
+    keys = {
+        node_key: CallableKey(region.original_path, region.language, identity, ranges[node_key])
+        for node_key, identity in identities.items()
+    }
     callables: list[CallableFact] = []
     controls: list[ControlFlowFact] = []
     decisions: list[DecisionFact] = []
     for node in nodes:
         identity = identities[_node_key(node)]
         parent_node = next((ancestor for ancestor in _ancestors(node) if _node_key(ancestor) in identities), None)
-        start_node = _range_start_node(node, region.language)
+        node_key = _node_key(node)
+        parent_key = keys.get(_node_key(parent_node)) if parent_node is not None else None
         callables.append(CallableFact(
-            region.original_path, region.language, identity,
-            SourceRange(region.original_point(start_node.start_point.row, start_node.start_point.column),
-                        region.original_point(node.end_point.row, node.end_point.column)),
+            region.original_path, region.language, identity, ranges[node_key],
             identities.get(_node_key(parent_node)) if parent_node is not None else None,
             "callback" if _is_anonymous_js_callable(node, region) else ("nested" if parent_node else "callable"),
+            keys[node_key], parent_key,
         ))
-        extracted_controls, extracted_decisions = _structural_facts(node, identity, region)
+        extracted_controls, extracted_decisions = _structural_facts(node, keys[node_key], region)
         controls.extend(extracted_controls)
         decisions.extend(extracted_decisions)
     key = lambda fact: (fact.source_range.start.byte_offset, fact.source_range.end.byte_offset)
     return tuple(sorted(callables, key=key)), tuple(sorted(controls, key=key)), tuple(sorted(decisions, key=key))
 
 
-def _structural_facts(callable_node, identity: str, region: ExecutableRegion):
+def _structural_facts(callable_node, callable_key: CallableKey, region: ExecutableRegion):
     controls: list[ControlFlowFact] = []
     decisions: list[DecisionFact] = []
     language = region.language
@@ -108,20 +119,20 @@ def _structural_facts(callable_node, identity: str, region: ExecutableRegion):
             if child.type in CONTROL_TYPES[language]:
                 increases = not (child.type == "elif_clause" or _is_else_if(child, language))
                 controls.append(ControlFlowFact(
-                    identity, CONTROL_CATEGORIES.get(child.type, child.type), child.type,
+                    callable_key.identity, callable_key, CONTROL_CATEGORIES.get(child.type, child.type), child.type,
                     child_range, parent_control, increases,
                 ))
                 if increases:
                     next_parent = child_range
             if child.type in DECISION_TYPES[language] and not _is_default_branch(child, region.source):
                 decisions.append(DecisionFact(
-                    identity, DECISION_CATEGORIES.get(child.type, child.type), child.type, child_range,
+                    callable_key.identity, callable_key, DECISION_CATEGORIES.get(child.type, child.type), child.type, child_range,
                 ))
             if child.type in {"boolean_operator", "conjunction_expression", "disjunction_expression", "binary_expression"}:
                 for _ in range(_short_circuit_count(child, region.source)):
-                    decisions.append(DecisionFact(identity, "short_circuit_boolean", child.type, child_range))
-            if _is_extra_switch_arm(child, language, region.source):
-                decisions.append(DecisionFact(identity, "switch_arm", child.type, child_range))
+                    decisions.append(DecisionFact(callable_key.identity, callable_key, "short_circuit_boolean", child.type, child_range))
+            for arm_range in _extra_switch_arm_ranges(child, language, region):
+                decisions.append(DecisionFact(callable_key.identity, callable_key, "switch_arm", child.type, arm_range))
             visit(child, next_parent)
 
     visit(callable_node, None)
@@ -311,10 +322,17 @@ def _short_circuit_count(node, source: bytes) -> int:
     return sum(_text(child, source) in {"and", "or", "&&", "||"} for child in node.children if not child.is_named)
 
 
-def _is_extra_switch_arm(node, language: str, source: bytes) -> bool:
-    text = _text(node, source).strip()
-    if language == "csharp" and node.type == "switch_section":
-        return text.startswith("case ") and not text.endswith(":") and not _is_default_branch(node, source)
-    if language == "java" and node.type in {"switch_block_statement_group", "switch_rule"}:
-        return text.startswith("case ") and not text.endswith(":")
-    return language in {"javascript", "typescript", "tsx"} and node.type == "switch_case" and not text.endswith(":")
+def _extra_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> tuple[SourceRange, ...]:
+    eligible = (
+        (language == "csharp" and node.type == "switch_section")
+        or (language == "java" and node.type in {"switch_block_statement_group", "switch_rule"})
+        or (language in {"javascript", "typescript", "tsx"} and node.type == "switch_case")
+    )
+    if not eligible:
+        return ()
+    labels = [child for child in node.named_children if child.type in {
+        "case_switch_label", "case_pattern_switch_label", "switch_label", "case",
+    }]
+    if labels:
+        return tuple(region.original_range(label) for label in labels if not _is_default_branch(label, region.source))
+    return () if _is_default_branch(node, region.source) else (region.original_range(node),)

@@ -223,7 +223,9 @@ once with provider-owned parsers cached by embedded language, and extracts one
 immutable `AnalysisFacts` value. Future callable LOC, nesting, and complexity
 guards share that value. Facts contain callable ownership/ranges, structural
 control relationships, and categorized decisions rather than public findings or
-precomputed metric totals. Tree-sitter nodes never cross the extraction boundary.
+precomputed metric totals. A range-qualified immutable callable key disambiguates
+duplicate lexical display identities across regions and anchors parent, control,
+and decision relationships. Tree-sitter nodes never cross the extraction boundary.
 
 Tree-sitter 0.26.0 and tree-sitter-language-pack 1.14.3 are the pinned initial
 provider. Python 3.10+ and a compatible platform wheel/native build are required
