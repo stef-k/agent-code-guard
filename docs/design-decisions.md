@@ -153,3 +153,35 @@ The first technical milestone must prototype at least Python, Go, Kotlin, and C#
 - ease of packaging as an agent skill.
 
 Technology should be selected from that evidence.
+
+## D18 — Callable analysis uses a provider-neutral language adapter
+
+Issue #4 demonstrated deterministic named-callable ranges and syntax metrics for
+Python, Go, Kotlin, and C# using one Tree-sitter parse per file. Production should
+use a small language-adapter boundary, initially backed by pinned Tree-sitter
+grammars, while retaining language-specific facts and allowing a native backend
+where later evidence justifies it. Raw parser nodes must not become guard APIs.
+
+The research dependency is not yet a shipped Code Guard dependency. Packaging
+and cross-platform wheel verification are a separate production slice.
+
+## D19 — Callable measurement semantics are range- and scope-based
+
+Callable physical LOC is the inclusive physical source range from attached
+decorator/annotation/attribute through the final callable token. It includes
+signature, blank, comment, brace, and nested-declaration lines. This is distinct
+from canonical file LOC.
+
+Nesting is maximum active meaningful control-flow depth, not indentation or
+brace depth. Cyclomatic complexity is one plus documented syntactic decisions.
+Named local callables reset control metrics; lambdas are excluded pending a
+separate policy decision. See `analyzer-feasibility.md` for the exact prototype
+construct mapping and limitations.
+
+## D20 — No new universal thresholds are established
+
+The fixture corpus supports configurable callable LOC and nesting review points,
+but does not justify universal defaults. Complexity needs language-specific
+interpretation for constructs such as Python comprehensions and Kotlin/C#
+fallback expressions. No production REVIEW or FAIL threshold is enabled by the
+feasibility prototype.
