@@ -13,6 +13,13 @@ from agent_code_guard.file_selection import resolve_scope
 
 
 class ResultContractTests(CodeGuardTestCase):
+    def test_zero_config_json_contains_all_default_guards(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "sample.py").write_text("def sample():\n    return 1\n", encoding="utf-8")
+            result = self.run_guard(root, ".", "--json")
+            self.assertEqual((result.returncode, list(self.read_json(result)["guards"])), (0, ["loc", "callableSize", "nesting"]))
+
     def test_pass_review_fail_and_policy_routing(self) -> None:
         cases = [(2, "pass", "ok", 0, []), (4, "review", "warn", 1, ["loc"]), (7, "fail", "fail", 2, ["loc"])]
         for lines, overall, native, code, policies in cases:
@@ -53,16 +60,28 @@ class ResultContractTests(CodeGuardTestCase):
             write_lines(root / "large.py", 700)
             config = write_config(root, {"enabled": False})
             result = self.run_guard(root, ".", "--config", str(config), "--json")
-            self.assertEqual(self.read_json(result), {"overall": "pass", "requiredPolicies": [], "guards": {"loc": {"state": "pass", "findings": []}}})
+            self.assertEqual(self.read_json(result), {"overall": "pass", "requiredPolicies": [], "guards": {
+                "loc": {"state": "pass", "findings": []},
+                "callableSize": {"state": "pass", "findings": []},
+                "nesting": {"state": "pass", "findings": []},
+            }})
 
 
 class LocParityTests(CodeGuardTestCase):
-    def test_loc_only_does_not_parse_malformed_supported_syntax(self) -> None:
+    def test_default_parses_malformed_source_but_explicit_syntax_disable_is_loc_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "broken.py").write_text("def broken(:\n", encoding="utf-8")
             result = subprocess.run(
                 [sys.executable, str(CODE_GUARD), "broken.py", "--json"],
+                cwd=root, text=True, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 3, result.stderr)
+            config = write_config(root, {}, guards={
+                "loc": {}, "callableSize": {"enabled": False}, "nesting": {"enabled": False},
+            })
+            result = subprocess.run(
+                [sys.executable, str(CODE_GUARD), "broken.py", "--config", str(config), "--json"],
                 cwd=root, text=True, capture_output=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)

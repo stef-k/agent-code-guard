@@ -14,6 +14,8 @@ from ..result_model import CallableFinding, GuardResult
 if TYPE_CHECKING:
     from ..analysis.facts import AnalysisFacts, CallableFact
 
+DEFAULT_REVIEW_AT = 80
+
 
 @dataclass(frozen=True)
 class Config:
@@ -39,15 +41,15 @@ def load_config(args: argparse.Namespace) -> Config:
         raise ValueError("guards must be an object")
     data = guards.get("callableSize")
     if data is None:
-        return Config(False)
+        return Config(True, DEFAULT_REVIEW_AT)
     if not isinstance(data, dict):
         raise ValueError("guards.callableSize must be an object")
-    enabled = data.get("enabled", False)
+    enabled = data.get("enabled", True)
     if not isinstance(enabled, bool):
         raise ValueError("guards.callableSize.enabled must be a boolean")
     if not enabled:
         return Config(False)
-    review_at = data.get("reviewAt")
+    review_at = data.get("reviewAt", DEFAULT_REVIEW_AT)
     if isinstance(review_at, bool) or not isinstance(review_at, int) or review_at <= 0:
         raise ValueError("guards.callableSize.reviewAt must be a positive integer")
     return Config(True, review_at)

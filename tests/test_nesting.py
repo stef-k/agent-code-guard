@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+import io
 import json
+import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,7 +15,7 @@ from helpers import CodeGuardTestCase, write_config
 
 from agent_code_guard.analysis import analyze_files
 from agent_code_guard.analysis.errors import ProviderUnavailableError
-from agent_code_guard.code_guard import run_guards
+from agent_code_guard.code_guard import main, run_guards
 from agent_code_guard.file_selection import ResolvedScope
 from agent_code_guard.guards import nesting
 
@@ -34,26 +38,48 @@ class NestingConfigTests(unittest.TestCase):
         path.write_text(json.dumps({"guards": {"nesting": value}}), encoding="utf-8")
         return path
 
-    def test_omitted_and_explicit_false_are_disabled(self) -> None:
+    def test_omitted_empty_override_and_disable_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            omitted = root / "omitted.json"
-            omitted.write_text("{}", encoding="utf-8")
-            self.assertFalse(nesting.load_config(args(omitted)).enabled)
-            self.assertFalse(nesting.load_config(args(self.write_document(root, {"enabled": False}))).enabled)
+            cases = [
+                ({}, (True, 4)),
+                ({"guards": {}}, (True, 4)),
+                ({"guards": {"nesting": {}}}, (True, 4)),
+                ({"guards": {"nesting": {"enabled": True}}}, (True, 4)),
+                ({"guards": {"nesting": {"reviewAt": 6}}}, (True, 6)),
+                ({"guards": {"nesting": {"enabled": True, "reviewAt": 8}}}, (True, 8)),
+                ({"guards": {"nesting": {"enabled": False}}}, (False, None)),
+                ({"guards": {"nesting": {"enabled": False, "reviewAt": "ignored"}}}, (False, None)),
+            ]
+            for index, (document, expected) in enumerate(cases):
+                path = root / f"config-{index}.json"
+                path.write_text(json.dumps(document), encoding="utf-8")
+                config = nesting.load_config(args(path))
+                self.assertEqual((config.enabled, config.review_at), expected)
 
-    def test_enabled_requires_positive_json_integer_review_at(self) -> None:
-        invalid = [None, True, 1.5, "4", 0, -1]
+    def test_no_discovered_config_uses_builtin_default(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            previous = Path.cwd()
+            try:
+                os.chdir(temp)
+                config = nesting.load_config(args())
+            finally:
+                os.chdir(previous)
+            self.assertEqual((config.enabled, config.review_at), (True, nesting.DEFAULT_REVIEW_AT))
+
+    def test_present_enabled_must_be_boolean(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            for value in invalid:
-                section = {"enabled": True}
-                if value is not None:
-                    section["reviewAt"] = value
-                with self.subTest(value=value), self.assertRaisesRegex(
-                    ValueError, "guards.nesting.reviewAt must be a positive integer"
-                ):
-                    nesting.load_config(args(self.write_document(root, section)))
+            for value in [None, 1, 0, "true", [], {}]:
+                with self.subTest(value=value), self.assertRaisesRegex(ValueError, "guards.nesting.enabled must be a boolean"):
+                    nesting.load_config(args(self.write_document(root, {"enabled": value})))
+
+    def test_explicit_review_at_requires_positive_json_integer_while_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for value in [None, True, False, 1.5, "4", 0, -1]:
+                with self.subTest(value=value), self.assertRaisesRegex(ValueError, "guards.nesting.reviewAt must be a positive integer"):
+                    nesting.load_config(args(self.write_document(root, {"reviewAt": value})))
 
 
 class NestingEvaluationTests(unittest.TestCase):
@@ -73,6 +99,19 @@ class NestingEvaluationTests(unittest.TestCase):
         result, by_name = self.findings("javascript/decisions.js", 3)
         self.assertEqual((by_name["decisions.deeplyNested"].state, result.state), ("review", "review"))
         self.assertNotIn("fail", {finding.state for finding in result.findings})
+
+    def test_builtin_threshold_4_passes_and_5_reviews(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            exact = root / "exact.py"
+            exact.write_text("def exact():\n    if True:\n        while True:\n            for x in []:\n                if x:\n                    return x\n", encoding="utf-8")
+            over = root / "over.py"
+            over.write_text("def over():\n    if True:\n        while True:\n            for x in []:\n                if x:\n                    try:\n                        return x\n                    except Exception:\n                        return None\n", encoding="utf-8")
+            result = nesting.run(root, nesting.Config(True, nesting.DEFAULT_REVIEW_AT), analyze_files([exact, over]))
+            by_name = {item.callable: item for item in result.findings}
+            self.assertEqual((by_name["exact.exact"].measured, by_name["exact.exact"].state), (4, "pass"))
+            self.assertEqual((by_name["over.over"].measured, by_name["over.over"].state), (5, "review"))
+            self.assertNotIn("fail", {item.state for item in result.findings})
 
     def test_else_if_switch_and_try_families_use_normalized_fact_relationships(self) -> None:
         _, javascript = self.findings("javascript/decisions.js")
@@ -142,9 +181,10 @@ class NestingOrchestrationTests(unittest.TestCase):
             source.write_text("def sample():\n    if True:\n        return 1\n", encoding="utf-8")
             scope = ResolvedScope(root, (source,))
             configurations = [
-                ({}, 0, ["loc"]),
-                ({"callableSize": {"enabled": True, "reviewAt": 3}}, 1, ["loc", "callableSize"]),
-                ({"nesting": {"enabled": True, "reviewAt": 1}}, 1, ["loc", "nesting"]),
+                ({}, 1, ["loc", "callableSize", "nesting"]),
+                ({"callableSize": {"enabled": False}}, 1, ["loc", "nesting"]),
+                ({"nesting": {"enabled": False}}, 1, ["loc", "callableSize"]),
+                ({"callableSize": {"enabled": False}, "nesting": {"enabled": False}}, 0, ["loc"]),
                 ({
                     "callableSize": {"enabled": True, "reviewAt": 3},
                     "nesting": {"enabled": True, "reviewAt": 1},
@@ -165,7 +205,9 @@ class NestingOrchestrationTests(unittest.TestCase):
             source = root / "broken.py"
             source.write_text("def broken(:\n    pass\n", encoding="utf-8")
             scope = ResolvedScope(root, (source,))
-            config = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20})
+            config = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={
+                "callableSize": {"enabled": False}, "nesting": {"enabled": False},
+            })
             with patch("agent_code_guard.code_guard.import_module") as loader:
                 results = run_guards(scope, args(config))
                 loader.assert_not_called()
@@ -183,6 +225,19 @@ class NestingOrchestrationTests(unittest.TestCase):
                 side_effect=ProviderUnavailableError("provider unavailable"),
             ), self.assertRaisesRegex(ProviderUnavailableError, "provider unavailable"):
                 run_guards(scope, args(config))
+
+    def test_default_provider_failure_is_cli_exit_three(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            source = Path(temp) / "sample.py"
+            source.write_text("def sample():\n    pass\n", encoding="utf-8")
+            output = io.StringIO()
+            with patch.object(sys, "argv", ["code-guard", str(source), "--json"]), patch(
+                "agent_code_guard.analysis.pipeline.analyze_files",
+                side_effect=ProviderUnavailableError("provider unavailable"),
+            ), redirect_stdout(output):
+                result = main()
+            self.assertEqual(result, 3)
+            self.assertEqual(json.loads(output.getvalue()), {"error": "provider unavailable"})
 
 
 class NestingRunnerTests(CodeGuardTestCase):
@@ -265,7 +320,9 @@ class NestingRunnerTests(CodeGuardTestCase):
             self.assertEqual(result.returncode, 3)
             self.assertIn("syntax tree contains errors", self.read_json(result)["error"])
 
-            disabled = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={"nesting": {"enabled": False}})
+            disabled = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={
+                "callableSize": {"enabled": False}, "nesting": {"enabled": False},
+            })
             result = self.run_guard(root, str(source), "--config", str(disabled), "--json")
             self.assertEqual((result.returncode, list(self.read_json(result)["guards"])), (0, ["loc"]))
 

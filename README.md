@@ -30,9 +30,9 @@ The first design targets four cross-language measurements:
 4. **Cyclomatic complexity** — deterministic execution-path complexity.
 
 File LOC has mature default policy thresholds. Callable size and structural
-nesting are active syntax guards, but neither has a universal review threshold:
-projects opt in by supplying `reviewAt`. Complexity is accepted as
-configurable-only evidence but remains unimplemented and disabled.
+nesting are enabled by default with calibrated REVIEW thresholds of 80 physical
+LOC and depth 4. Complexity is accepted for a future default threshold of 15,
+but remains unimplemented and inactive until issue #27.
 
 ## Adding new guards
 
@@ -195,30 +195,36 @@ grammar exposes PHP declarations alongside inert HTML `text` nodes, so mixed
 files retain exact original bytes and paths without copying or splitting PHP
 that can legally span close/reopen tags. HTML does not emit executable facts.
 
-The public runner deliberately does not import or construct this pipeline while
-only LOC is enabled. Tree-sitter is installed as an ordinary dependency but
-remains dormant until a syntax guard requests analysis facts.
+Zero-config execution now uses this syntax pipeline because callable size and
+nesting are active by default. Supported malformed syntax or an unavailable
+required provider therefore produces deterministic exit 3. When both syntax
+guards are explicitly disabled, the public runner deliberately does not import
+or construct the pipeline: Tree-sitter remains dormant and execution is LOC-only.
 
 ## Callable size
 
-Enable callable physical LOC explicitly:
+Callable physical LOC is enabled by default at REVIEW greater than 80. A project
+may concisely override the threshold:
 
 ```json
 {
   "guards": {
     "callableSize": {
-      "enabled": true,
-      "reviewAt": 80
+      "reviewAt": 100
     }
   }
 }
 ```
 
-An omitted section or `"enabled": false` disables the guard. When enabled,
-`reviewAt` is required and must be a positive JSON integer; booleans, floats,
-numeric strings, zero, and negative values are rejected. A callable measuring
-exactly `reviewAt` passes, while `reviewAt + 1` reviews. There is no default,
-FAIL threshold, override, or per-language threshold.
+The example value demonstrates override syntax; it is not a recommendation.
+
+An omitted section, an empty object, or `"enabled": true` uses the built-in 80.
+A threshold-only object enables the guard with that override. Explicit
+`"enabled": false` disables it and is authoritative even if `reviewAt` is also
+present. While enabled, an explicit `reviewAt` must be a positive JSON integer;
+booleans, floats, numeric strings, null, zero, and negative values are rejected.
+Exactly `reviewAt` passes and `reviewAt + 1` reviews. There is no FAIL or
+per-language threshold.
 
 The runner resolves scope once, runs LOC directly, then builds one shared
 `AnalysisFacts` value only if an enabled syntax guard requires it. Callable size
@@ -239,30 +245,30 @@ PASS and REVIEW findings; human output prints REVIEW findings only:
 ```
 
 Only a REVIEW result adds `callableSize` to `requiredPolicies`. Callable size
-never fails. Enabling it makes syntax analysis authoritative, so malformed
-applicable syntax or unavailable parser dependencies produce exit 3. When it is
-disabled, LOC-only execution performs no analysis import, parser construction,
-or syntax validation.
+never fails. Because it is enabled by default, syntax analysis is normally
+authoritative. LOC-only execution requires both callable size and nesting to be
+explicitly disabled.
 
 ## Structural nesting
 
-Enable executable control-flow nesting explicitly:
+Structural nesting is enabled by default at REVIEW greater than depth 4. It may
+be disabled explicitly:
 
 ```json
 {
   "guards": {
     "nesting": {
-      "enabled": true,
-      "reviewAt": 4
+      "enabled": false
     }
   }
 }
 ```
 
-An omitted section or `"enabled": false` disables the guard. When enabled,
-`reviewAt` is required and must be a positive JSON integer. Exactly the
-threshold passes and a greater depth reviews. There is no default, FAIL
-threshold, override, or per-language threshold.
+An omitted section, an empty object, or `"enabled": true` uses the built-in 4.
+A threshold-only object enables the guard with that override. Explicit
+`"enabled": false` wins even when `reviewAt` is present. While enabled, an
+explicit threshold must be a positive JSON integer. Exactly the threshold passes
+and a greater depth reviews. There is no FAIL or per-language threshold.
 
 Structural nesting is maximum active executable control-flow depth inside each
 callable. It follows the normalized `ControlFlowFact` parent relationships from
@@ -308,10 +314,10 @@ Normal exits are 0 for PASS, 1 for REVIEW, 2 for FAIL, and 3 for configuration/r
 
 ## Status
 
-File LOC is enabled by default. Callable LOC and structural nesting are
-production-ready and opt-in with project-supplied review thresholds. Cyclomatic
-complexity is accepted for a later configurable-only vertical slice, but remains
-unimplemented, disabled, and absent from `requiredPolicies`.
+File LOC, callable LOC at 80, and structural nesting at 4 are enabled by default.
+The syntax guards are REVIEW-only and support authorized project overrides or
+explicit disablement. Cyclomatic complexity remains unimplemented, inactive,
+and absent from `requiredPolicies` until issue #27 adds its D30 default of 15.
 
 ## License
 

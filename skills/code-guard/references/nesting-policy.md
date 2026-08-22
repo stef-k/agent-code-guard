@@ -6,8 +6,10 @@ This guard exists because deeply nested code can be difficult to reason about ev
 
 ## Status
 
-Nesting is opt-in with a project-supplied `guards.nesting.reviewAt`; the guard
-has no universal default and no FAIL threshold.
+The calibrated universal default is REVIEW above structural depth 4. Exactly 4
+passes. Authorized project/user configuration may supply a positive
+`guards.nesting.reviewAt` override or explicitly disable the guard. The guard
+has no FAIL threshold.
 
 ## On REVIEW
 
@@ -30,5 +32,6 @@ Do not flatten code merely to reduce the measured depth if the result becomes ha
 Do not hide nested decisions behind meaningless helper calls or obscure boolean expressions. Do not replace clear structured control flow with clever expressions, compressed conditionals, exception tricks, or other forms whose primary purpose is lowering the metric.
 
 Do not change or disable the configured threshold merely to silence a finding.
+Only respect such a change when the project or user has authorized it.
 
 The preferred outcome is clearer control flow, not a smaller number at any cost.

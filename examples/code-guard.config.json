@@ -26,8 +26,7 @@
       "allowedLargeFiles": [],
       "overrides": []
     },
-    "callableSize": { "enabled": false },
-    "nesting": { "enabled": false, "reviewAt": 4 },
-    "cyclomaticComplexity": { "enabled": false }
+    "callableSize": { "reviewAt": 100 },
+    "nesting": { "enabled": false }
   }
 }
