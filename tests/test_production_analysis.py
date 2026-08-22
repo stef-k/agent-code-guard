@@ -66,6 +66,7 @@ class ProductionParityTests(unittest.TestCase):
             path = Path(temp) / "owners.ts"
             path.write_text(
                 "const first = (x: number) => x;\n"
+                "let secondArrow = (x: number) => x;\n"
                 "let second = function (x: number) { return x; };\n"
                 "var third = function (x: number) { return x; };\n"
                 "function owner() { return [1].map((x) => x + 1); }\n"
@@ -75,11 +76,11 @@ class ProductionParityTests(unittest.TestCase):
             )
             facts = analyze_files([path])
             by_identity = {item.identity: item for item in facts.callables}
-            self.assertEqual({"owners.first", "owners.second", "owners.third"} - set(by_identity), set())
+            self.assertEqual({"owners.first", "owners.secondArrow", "owners.second", "owners.third"} - set(by_identity), set())
             self.assertEqual([by_identity[name].source_range.start_line for name in (
-                "owners.first", "owners.second", "owners.third",
-            )], [1, 2, 3])
-            callback = next(item for item in facts.callables if "<callback@4:" in item.identity)
+                "owners.first", "owners.secondArrow", "owners.second", "owners.third",
+            )], [1, 2, 3, 4])
+            callback = next(item for item in facts.callables if "<callback@5:" in item.identity)
             self.assertEqual((callback.parent_callable, callback.boundary_kind), ("owners.owner", "callback"))
             self.assertNotIn("run", {item.identity.rsplit(".", 1)[-1] for item in facts.callables})
             self.assertEqual(facts, analyze_files([path]))
@@ -137,6 +138,13 @@ class RegionAndVueTests(unittest.TestCase):
                 with self.subTest(message=message), self.assertRaisesRegex(SyntaxAnalysisError, message):
                     analyze_files([path])
 
+    def test_malformed_ordinary_source_fails_without_partial_facts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "broken.py"
+            path.write_text("def broken(:\n    pass\n", encoding="utf-8")
+            with self.assertRaisesRegex(SyntaxAnalysisError, "embedded python syntax tree contains errors"):
+                analyze_files([path])
+
 
 class ProviderContractTests(unittest.TestCase):
     def test_provider_caches_parser_instances_by_language(self) -> None:
@@ -173,7 +181,7 @@ class ProviderContractTests(unittest.TestCase):
         def unavailable(language: str):
             raise LookupError(f"missing {language}")
 
-        with self.assertRaisesRegex(ProviderUnavailableError, "supported language 'python'.*missing python"):
+        with self.assertRaisesRegex(ProviderUnavailableError, "supported language 'python'.*requirements-analysis.txt"):
             analyze_files([FIXTURES / "python" / "callables.py"], TreeSitterProvider(unavailable))
 
 

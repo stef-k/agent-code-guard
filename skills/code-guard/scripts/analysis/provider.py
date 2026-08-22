@@ -32,12 +32,14 @@ class TreeSitterProvider:
                 parser = self._parser_factory(language)
             except (ImportError, LookupError, OSError, RuntimeError) as exc:
                 raise ProviderUnavailableError(
-                    f"syntax provider unavailable for supported language {language!r}: {exc}"
+                    f"syntax provider unavailable for supported language {language!r}: {exc}; "
+                    "install skills/code-guard/requirements-analysis.txt"
                 ) from exc
             self._parsers[language] = parser
         try:
             return parser.parse(source)
         except Exception as exc:
             raise ProviderUnavailableError(
-                f"syntax provider failed for supported language {language!r}: {exc}"
+                f"syntax provider failed for supported language {language!r}: {exc}; "
+                "verify skills/code-guard/requirements-analysis.txt"
             ) from exc

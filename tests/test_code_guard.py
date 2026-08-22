@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -57,6 +58,17 @@ class ResultContractTests(CodeGuardTestCase):
 
 
 class LocParityTests(CodeGuardTestCase):
+    def test_loc_only_does_not_parse_malformed_supported_syntax_or_require_provider(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "broken.py").write_text("def broken(:\n", encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, "-S", str(CODE_GUARD), "broken.py", "--json"],
+                cwd=root, text=True, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["guards"]["loc"]["findings"][0]["countedLoc"], 1)
+
     def test_extensions_comments_php_attribute_and_unknown_extension(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
