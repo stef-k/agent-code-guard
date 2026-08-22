@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "scope": {
+    "normalMode": "changed-only",
+    "includeUntracked": true
+  },
+  "guards": {
+    "loc": {
+      "enabled": true,
+      "warnAt": 400,
+      "failAt": 600,
+      "countBlankLines": false,
+      "countCommentLines": true
+    },
+    "callableSize": {
+      "enabled": false
+    },
+    "nesting": {
+      "enabled": false
+    },
+    "cyclomaticComplexity": {
+      "enabled": false
+    }
+  },
+  "exclude": [
+    "**/.git/**",
+    "**/node_modules/**",
+    "**/bin/**",
+    "**/obj/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/generated/**",
+    "**/vendor/**"
+  ],
+  "exceptions": []
+}
