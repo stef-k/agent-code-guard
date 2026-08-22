@@ -46,3 +46,8 @@ export function localOwner(value) {
     };
     return local(localExpression(value));
 }
+
+export var
+    legacy = function (value) {
+        return value;
+    };

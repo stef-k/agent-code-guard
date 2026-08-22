@@ -129,7 +129,8 @@ def _range_start_node(node: Node, language: str) -> Node:
     if language in {"javascript", "typescript", "tsx"} and node.type in {"arrow_function", "function_expression"}:
         declarator = _ancestor(node, "variable_declarator")
         if declarator and declarator.child_by_field_name("value") == node:
-            return declarator.parent if declarator.parent and declarator.parent.type == "lexical_declaration" else declarator
+            declaration_types = {"lexical_declaration", "variable_declaration"}
+            return declarator.parent if declarator.parent and declarator.parent.type in declaration_types else declarator
     if language in {"typescript", "tsx"} and node.type == "method_definition":
         previous = node.prev_named_sibling
         first = node

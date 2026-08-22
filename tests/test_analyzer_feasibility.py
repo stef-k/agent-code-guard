@@ -110,6 +110,7 @@ EXPECTED = {
         ("callables.localOwner", 42, 48, 7, 0, 1),
         ("callables.localOwner.local", 43, 43, 1, 0, 1),
         ("callables.localOwner.localExpression", 44, 46, 3, 0, 1),
+        ("callables.legacy", 50, 53, 4, 0, 1),
     ],
     "javascript/decisions.js": [
         ("decisions.deeplyNested", 1, 14, 14, 4, 5),
@@ -239,6 +240,30 @@ class FixtureMeasurementTests(unittest.TestCase):
             path = Path(temp) / "Attributes.vue"
             path.write_text('<script data-lang="ts">const inline = () => 1;</script>\n', encoding="utf-8")
             self.assertEqual(analyze_file(path)[0].language, "javascript")
+
+    def test_vue_script_language_aliases_are_explicit(self) -> None:
+        cases = [(None, "javascript"), ("js", "javascript"), ("javascript", "javascript"),
+                 ("ts", "typescript"), ("typescript", "typescript")]
+        with tempfile.TemporaryDirectory() as temp:
+            for index, (lang, expected) in enumerate(cases):
+                with self.subTest(lang=lang):
+                    attribute = "" if lang is None else f' lang="{lang}"'
+                    path = Path(temp) / f"Alias{index}.vue"
+                    path.write_text(f"<script{attribute}>const inline = () => 1;</script>\n", encoding="utf-8")
+                    self.assertEqual(analyze_file(path)[0].language, expected)
+
+    def test_vue_rejects_unsupported_language_and_empty_external_script(self) -> None:
+        cases = [
+            ('<script lang="coffee">const brew = () => 1;</script>\n', "unsupported Vue script language: coffee"),
+            ('<script src="./external.ts"></script>\n', "external Vue script regions are unsupported"),
+        ]
+        with tempfile.TemporaryDirectory() as temp:
+            for index, (source, message) in enumerate(cases):
+                with self.subTest(message=message):
+                    path = Path(temp) / f"Rejected{index}.vue"
+                    path.write_text(source, encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, message):
+                        analyze_file(path)
 
 
 class CallableResultCompatibilityTests(unittest.TestCase):

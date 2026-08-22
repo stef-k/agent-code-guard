@@ -162,7 +162,7 @@ TypeScript as its embedded language.
 ## Phase B results
 
 Eighteen fixture files now assert exact identity, original 1-based inclusive
-range, physical LOC, nesting, and complexity for 95 callables across both phases.
+range, physical LOC, nesting, and complexity for 96 callables across both phases.
 
 ### Java
 
@@ -201,9 +201,11 @@ independent coordinate identities. React-specific framework policy is absent.
 ### Vue SFC
 
 The Vue container parser locates `script_element` regions and ignores template
-and style elements. A missing `lang` delegates to JavaScript; `lang="ts"` in
-normal or setup scripts delegates to TypeScript. `setup` affects component
-semantics, not parser selection.
+and style elements. Missing `lang`, `js`, and `javascript` delegate to JavaScript;
+`ts` and `typescript` delegate to TypeScript. Other language values are rejected
+rather than silently parsed as JavaScript. Script attributes are validated before
+empty content is skipped, so an empty external `src` region still errors.
+`setup` affects component semantics, not parser selection.
 
 Each executable region stores original path, embedded language, exact raw bytes,
 and its starting byte offset. Parser points map through the original UTF-8 bytes,
@@ -245,8 +247,8 @@ test serializes `src/Foo.vue`, original lines 21–35, and `typescript`.
 
 Recordings use Windows, Python 3.14.2, Tree-sitter 0.26.0, and language-pack
 1.14.3. These are workflow sanity observations, not benchmarks. Phase B records
-cold import at 44 ms, first analysis of 18 files/95 callables at 102 ms, 1,800
-warm file analyses at 1,302 ms (about 0.72 ms/file), and 200 warm Vue
+cold import at 45 ms, first analysis of 18 files/96 callables at 104 ms, 1,800
+warm file analyses at 1,520 ms (about 0.84 ms/file), and 200 warm Vue
 container-plus-region analyses at 59 ms (about 0.30 ms/file). Production should
 cache parsers and retain separate container/executable parse telemetry.
 

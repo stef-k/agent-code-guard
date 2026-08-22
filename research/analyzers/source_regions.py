@@ -52,13 +52,13 @@ def _vue_regions(path: Path, source: bytes) -> list[ExecutableRegion]:
         if element.type != "script_element":
             continue
         start_tag = next(child for child in element.named_children if child.type == "start_tag")
-        raw_text = next((child for child in element.named_children if child.type == "raw_text"), None)
-        if raw_text is None:
-            continue
         attributes = _attributes(start_tag, source)
         if "src" in attributes:
             raise ValueError(f"unable to analyze {path}: external Vue script regions are unsupported")
-        language = "typescript" if attributes.get("lang") in {"ts", "typescript"} else "javascript"
+        language = _script_language(path, attributes.get("lang"))
+        raw_text = next((child for child in element.named_children if child.type == "raw_text"), None)
+        if raw_text is None:
+            continue
         regions.append(ExecutableRegion(
             path, language, source[raw_text.start_byte:raw_text.end_byte], source, raw_text.start_byte,
         ))
@@ -86,3 +86,11 @@ def _attributes(start_tag: Node, source: bytes) -> dict[str, str | None]:
             value = source[value_node.start_byte:value_node.end_byte].decode("utf-8")[1:-1].lower()
         values[name] = value
     return values
+
+
+def _script_language(path: Path, value: str | None) -> str:
+    if value in {None, "js", "javascript"}:
+        return "javascript"
+    if value in {"ts", "typescript"}:
+        return "typescript"
+    raise ValueError(f"unable to analyze {path}: unsupported Vue script language: {value}")
