@@ -202,8 +202,11 @@ class NestingRunnerTests(CodeGuardTestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             source = root / "sample.py"
-            source.write_text("def sample():\n    if True:\n        return 1\n", encoding="utf-8")
-            pass_config = write_config(root, {"enabled": False}, guards={"nesting": {"enabled": True, "reviewAt": 1}})
+            source.write_text(
+                "def sample():\n    if True:\n        while True:\n            return 1\n",
+                encoding="utf-8",
+            )
+            pass_config = write_config(root, {"enabled": False}, guards={"nesting": {"enabled": True, "reviewAt": 2}})
             passed = self.run_guard(root, str(source), "--config", str(pass_config), "--json")
             self.assertEqual((passed.returncode, self.read_json(passed)["requiredPolicies"]), (0, []))
 
@@ -212,18 +215,18 @@ class NestingRunnerTests(CodeGuardTestCase):
                 "nesting": {"enabled": True, "reviewAt": 0 + 1},
             })
             reviewed = self.run_guard(root, str(source), "--config", str(review_config), "--json")
-            self.assertEqual(self.read_json(reviewed)["requiredPolicies"], ["callableSize"])
+            self.assertEqual(self.read_json(reviewed)["requiredPolicies"], ["callableSize", "nesting"])
 
     def test_loc_fail_dominates_nesting_review(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             source = root / "sample.py"
             source.write_text("def sample():\n    if True:\n        while True:\n            return 1\n", encoding="utf-8")
-            config = write_config(
-                root,
-                {"enabled": True, "warnAt": 1, "failAt": 2},
-                guards={"nesting": {"enabled": True, "reviewAt": 1}},
-            )
+            config = root / "code-guard.config.json"
+            config.write_text(json.dumps({"version": 1, "guards": {
+                "loc": {"enabled": True, "warnAt": 1, "failAt": 2},
+                "nesting": {"enabled": True, "reviewAt": 1},
+            }}), encoding="utf-8")
             result = self.run_guard(root, str(source), "--config", str(config), "--json", "--ci")
             data = self.read_json(result)
             self.assertEqual((result.returncode, data["overall"]), (2, "fail"))
