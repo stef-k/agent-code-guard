@@ -117,6 +117,28 @@ class LocParityTests(CodeGuardTestCase):
 
 
 class ConfigurationValidationTests(CodeGuardTestCase):
+    def test_global_thresholds_require_positive_json_integers(self) -> None:
+        invalid_values = ["3", True, 3.0]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for field in ["warnAt", "failAt"]:
+                for value in invalid_values:
+                    with self.subTest(field=field, value=value):
+                        loc = {"warnAt": 3, "failAt": 6, field: value}
+                        config = write_config(root, loc)
+                        result = self.run_guard(root, ".", "--config", str(config), "--json")
+                        self.assertEqual(result.returncode, 3)
+                        self.assertIn(f"guards.loc.{field} must be a positive integer", self.read_json(result)["error"])
+
+    def test_positive_integer_global_thresholds_are_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            write_lines(root / "sample.py", 4)
+            config = write_config(root, {"warnAt": 3, "failAt": 6})
+            result = self.run_guard(root, ".", "--config", str(config), "--json")
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertEqual(self.findings(result)[0]["nativeStatus"], "warn")
+
     def test_malformed_exemptions_are_errors(self) -> None:
         entries = [None, {}, {"path": ""}, {"path": "x.py", "reason": ""}]
         with tempfile.TemporaryDirectory() as temp:
@@ -146,6 +168,43 @@ class ConfigurationValidationTests(CodeGuardTestCase):
 
 
 class GitSelectionTests(CodeGuardTestCase):
+    def test_disabled_loc_does_not_bypass_conflicting_selection_modes(self) -> None:
+        combinations = [
+            ("--changed-only", "--staged"),
+            ("--changed-only", "--base-ref", "HEAD"),
+            ("--staged", "--base-ref", "HEAD"),
+        ]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = write_config(root, {"enabled": False})
+            for arguments in combinations:
+                with self.subTest(arguments=arguments):
+                    result = self.run_guard(root, ".", *arguments, "--config", str(config), "--json")
+                    self.assertEqual(result.returncode, 3)
+                    self.assertIn("use only one file-selection mode", self.read_json(result)["error"])
+
+    def test_disabled_loc_does_not_bypass_empty_base_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = write_config(root, {"enabled": False})
+            for base_ref in ["", "   "]:
+                with self.subTest(base_ref=base_ref):
+                    result = self.run_guard(root, ".", "--base-ref", base_ref, "--config", str(config), "--json")
+                    self.assertEqual(result.returncode, 3)
+                    self.assertIn("--base-ref must not be empty", self.read_json(result)["error"])
+
+    def test_disabled_loc_does_not_bypass_unresolvable_base_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            init_git(root)
+            write_lines(root / "sample.py", 1)
+            git(root, "add", ".")
+            git(root, "commit", "-m", "baseline")
+            config = write_config(root, {"enabled": False})
+            result = self.run_guard(root, ".", "--base-ref", "missing-ref", "--config", str(config), "--json")
+            self.assertEqual(result.returncode, 3)
+            self.assertIn("unable to compare base ref 'missing-ref' with HEAD", self.read_json(result)["error"])
+
     def test_changed_only_includes_staged_unstaged_untracked_and_ignores_deleted(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

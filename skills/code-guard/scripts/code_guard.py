@@ -8,7 +8,7 @@ import json
 import sys
 from pathlib import Path
 
-from file_selection import find_repo_root
+from file_selection import find_repo_root, validate_selection_args
 from guards import loc
 from result_model import GuardResult, aggregate_state, required_policies
 
@@ -69,6 +69,7 @@ def main() -> int:
     args = parser().parse_args()
     try:
         root = find_repo_root(Path.cwd())
+        validate_selection_args(args, root)
         result = loc.run(args, root, loc.load_config(args))
         data = payload([result])
         if args.json:

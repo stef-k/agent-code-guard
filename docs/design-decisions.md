@@ -124,6 +124,14 @@ LOC maps `ok` to `PASS`, `warn` to `REVIEW`, `fail` to `FAIL`, and `exempt` to `
 
 Configuration is one Code Guard document with mature LOC fields under `guards.loc`. Disabled future guard entries are declarative placeholders only; no generic rule engine or analyzer behavior is implied.
 
+## D16 — Scope validity is runner-owned
+
+File-selection arguments are part of the public Code Guard contract. The runner validates mutually exclusive modes, non-empty base refs, and base-ref resolvability before invoking any guard, so disabling LOC cannot turn an invalid invocation into `PASS`.
+
+## D17 — Global LOC thresholds use strict JSON integers
+
+Code Guard intentionally tightens global LOC threshold configuration to require positive JSON integers rather than preserving Agent LOC Guard's historical coercion. Numeric strings, booleans, and floats are rejected; threshold overrides retain their existing strict integer semantics. This compatibility tightening keeps the unified configuration explicit and deterministic.
+
 ## D13 — New thresholds require evidence
 
 No universal thresholds for callable size, nesting, or cyclomatic complexity are considered settled.

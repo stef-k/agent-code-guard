@@ -26,12 +26,31 @@ def find_repo_root(start: Path) -> Path:
         return start.resolve()
 
 
-def collect_candidates(args: SelectionArgs, root: Path) -> list[Path]:
+def validate_selection_args(args: SelectionArgs, root: Path) -> None:
+    """Validate the runner-level scope independently of enabled guards."""
     has_base_ref = args.base_ref is not None
     if sum((args.changed_only, args.staged, has_base_ref)) > 1:
         raise ValueError("use only one file-selection mode: --changed-only, --staged, or --base-ref")
     if has_base_ref and not args.base_ref.strip():
         raise ValueError("--base-ref must not be empty")
+    if has_base_ref:
+        validate_base_ref(root, args.base_ref)
+
+
+def validate_base_ref(root: Path, base_ref: str) -> None:
+    try:
+        subprocess.run(
+            ["git", "merge-base", base_ref, "HEAD"], cwd=root, check=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        detail = os.fsdecode(exc.stderr).strip()
+        message = f"unable to compare base ref {base_ref!r} with HEAD"
+        raise RuntimeError(f"{message}: {detail}" if detail else message) from exc
+
+
+def collect_candidates(args: SelectionArgs, root: Path) -> list[Path]:
+    has_base_ref = args.base_ref is not None
     if has_base_ref:
         return git_base_files(root, args.base_ref)
     if args.changed_only or args.staged:
