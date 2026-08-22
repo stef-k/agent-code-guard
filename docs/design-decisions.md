@@ -259,3 +259,16 @@ null-aware/coalescing remain non-decisions, consistent with the settled fallback
 policy. These qualifications strengthen callable LOC and nesting Outcome B and
 strengthen while further qualifying complexity Outcome C. No syntax guard or
 threshold is enabled.
+
+## D24 — One standard installation with lazy syntax activation
+
+Agent Code Guard has one Python 3.10+ installation and one capability set.
+`pyproject.toml` canonically owns the runtime dependency pins, including
+Tree-sitter and the language pack, and `python -m pip install .` installs the
+complete product. There are no analysis/full/minimal editions or runtime grammar
+downloads.
+
+Unified installation does not imply eager activation. LOC-only execution does
+not import the analysis package, load Tree-sitter, construct parsers, or parse
+source. Syntax dependencies remain dormant until a syntax guard requests
+`AnalysisFacts`.

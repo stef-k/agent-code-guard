@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 import dataclasses
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 from helpers import REPO_ROOT
 
-sys.path.insert(0, str(REPO_ROOT / "skills" / "code-guard" / "scripts"))
-
-from analysis import (  # noqa: E402
+from agent_code_guard.analysis import (
     ProviderUnavailableError, SyntaxAnalysisError, TreeSitterProvider, analyze_files,
 )
-from analysis.regions import executable_regions  # noqa: E402
+from agent_code_guard.analysis.regions import executable_regions
 
 
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "analyzers"
@@ -230,7 +227,7 @@ class ProviderContractTests(unittest.TestCase):
         def unavailable(language: str):
             raise LookupError(f"missing {language}")
 
-        with self.assertRaisesRegex(ProviderUnavailableError, "supported language 'python'.*requirements-analysis.txt"):
+        with self.assertRaisesRegex(ProviderUnavailableError, "supported language 'python'.*reinstall Agent Code Guard"):
             analyze_files([FIXTURES / "python" / "callables.py"], TreeSitterProvider(unavailable))
 
 

@@ -104,6 +104,15 @@ These apply to every guard:
 
 ## Scope modes
 
+Install Agent Code Guard and all of its runtime dependencies once from a checkout:
+
+```bash
+python -m pip install .
+```
+
+For editable development, `python -m pip install -e .` provides the same
+dependency set and command. The normal installed command is `code-guard`.
+
 Code Guard keeps three scope sources distinct:
 
 - Git-derived current work: `--changed-only`, `--staged`, or `--base-ref <ref>` asks Git for scope and requires a Git repository.
@@ -113,13 +122,13 @@ Code Guard keeps three scope sources distinct:
 With Git, normal agent use evaluates the complete current change set relative to `HEAD`:
 
 ```bash
-python3 skills/code-guard/scripts/code_guard.py . --changed-only
+code-guard . --changed-only
 ```
 
 Without Git or another VCS, the coding agent must pass exactly the files it created or modified:
 
 ```bash
-python3 skills/code-guard/scripts/code_guard.py src/Foo.py src/Bar.ts tests/FooTests.cs
+code-guard src/Foo.py src/Bar.ts tests/FooTests.cs
 ```
 
 No manifest or intermediate file list is needed. A missing explicit path is a scope error (exit 3), while unsupported existing artifacts remain valid scope and are simply ignored by guards that do not apply. Git-derived deleted files remain ignored under ACMR selection.
@@ -127,7 +136,7 @@ No manifest or intermediate file list is needed. A missing explicit path is a sc
 Full-directory analysis remains a separate deliberate audit mode:
 
 ```bash
-python3 skills/code-guard/scripts/code_guard.py .
+code-guard .
 ```
 
 Pull-request CI should evaluate files added or modified by the PR relative to its base rather than unrelated pre-existing oversized files.
@@ -155,14 +164,9 @@ are not syntax errors. Supported malformed syntax, unsupported explicit Vue
 script languages, external Vue scripts, or a missing required grammar fail
 deterministically instead of returning partial facts.
 
-Install the independently callable syntax infrastructure with Python 3.10 or newer:
-
-```bash
-python -m pip install -r skills/code-guard/requirements-analysis.txt
-```
-
-The exact production pins are `tree-sitter==0.26.0` and
-`tree-sitter-language-pack==1.14.3`. Both include native components. Published
+The standard Python 3.10+ installation includes the syntax infrastructure.
+`pyproject.toml` is the single canonical declaration for the exact production
+pins `tree-sitter==0.26.0` and `tree-sitter-language-pack==1.14.3`. Both include native components. Published
 wheels cover CPython 3.10+ on mainstream Windows, macOS, and Linux platforms;
 unsupported platforms may require a local native build and are not silently
 downgraded to regex analysis. The language pack wheel is about 2–2.4 MB before
@@ -175,16 +179,16 @@ grammar exposes PHP declarations alongside inert HTML `text` nodes, so mixed
 files retain exact original bytes and paths without copying or splitting PHP
 that can legally span close/reopen tags. HTML does not emit executable facts.
 
-The public runner deliberately does not construct this pipeline while only LOC
-is enabled. Installing these dependencies is therefore optional for ordinary
-LOC-only use today.
+The public runner deliberately does not import or construct this pipeline while
+only LOC is enabled. Tree-sitter is installed as an ordinary dependency but
+remains dormant until a syntax guard requests analysis facts.
 
 ## Canonical LOC implementation
 
 Agent Code Guard owns LOC behavior. The unified runner supports explicit files/directories, full audit, and the `--changed-only`, `--staged`, `--base-ref <ref>`, `--json`, and `--ci` modes:
 
 ```bash
-python3 skills/code-guard/scripts/code_guard.py . --changed-only
+code-guard . --changed-only
 ```
 
 Agent LOC Guard is the completed prototype/reference whose mature behavior at commit `75ab39d261dbc65f78815836fac90add16d265d1` was migrated here, including:

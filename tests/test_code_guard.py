@@ -9,8 +9,7 @@ from types import SimpleNamespace
 
 from helpers import CODE_GUARD, CodeGuardTestCase, git, init_git, write_config, write_lines
 
-sys.path.insert(0, str(CODE_GUARD.parent))
-from file_selection import resolve_scope
+from agent_code_guard.file_selection import resolve_scope
 
 
 class ResultContractTests(CodeGuardTestCase):
@@ -58,12 +57,12 @@ class ResultContractTests(CodeGuardTestCase):
 
 
 class LocParityTests(CodeGuardTestCase):
-    def test_loc_only_does_not_parse_malformed_supported_syntax_or_require_provider(self) -> None:
+    def test_loc_only_does_not_parse_malformed_supported_syntax(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "broken.py").write_text("def broken(:\n", encoding="utf-8")
             result = subprocess.run(
-                [sys.executable, "-S", str(CODE_GUARD), "broken.py", "--json"],
+                [sys.executable, str(CODE_GUARD), "broken.py", "--json"],
                 cwd=root, text=True, capture_output=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)

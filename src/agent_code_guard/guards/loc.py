@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from result_model import Finding, GuardResult
+from ..result_model import Finding, GuardResult
 
 DEFAULT_WARN_AT = 400
 DEFAULT_FAIL_AT = 600

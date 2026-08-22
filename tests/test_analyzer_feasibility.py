@@ -13,9 +13,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from research.analyzers.tree_sitter_analyzer import analyze_file  # noqa: E402
 
-sys.path.insert(0, str(REPO_ROOT / "skills" / "code-guard" / "scripts"))
-
-from result_model import CallableFinding, GuardResult  # noqa: E402
+from agent_code_guard.result_model import CallableFinding, GuardResult
 
 
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "analyzers"

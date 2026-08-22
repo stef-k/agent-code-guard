@@ -33,7 +33,7 @@ class TreeSitterProvider:
             except (ImportError, LookupError, OSError, RuntimeError) as exc:
                 raise ProviderUnavailableError(
                     f"syntax provider unavailable for supported language {language!r}: {exc}; "
-                    "install skills/code-guard/requirements-analysis.txt"
+                    "reinstall Agent Code Guard"
                 ) from exc
             self._parsers[language] = parser
         try:
@@ -41,5 +41,5 @@ class TreeSitterProvider:
         except Exception as exc:
             raise ProviderUnavailableError(
                 f"syntax provider failed for supported language {language!r}: {exc}; "
-                "verify skills/code-guard/requirements-analysis.txt"
+                "verify the Agent Code Guard installation"
             ) from exc

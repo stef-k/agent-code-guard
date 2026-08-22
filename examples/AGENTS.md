@@ -9,13 +9,13 @@ Normal development should check the current changed source files rather than unr
 With Git, use:
 
 ```bash
-python3 .agent-tools/code_guard.py . --changed-only --config .agent-tools/code-guard.config.json
+code-guard . --changed-only --config .agent-tools/code-guard.config.json
 ```
 
 Without Git/VCS, pass exactly the files you created or modified; you are responsible for supplying the complete edited-file set:
 
 ```bash
-python3 .agent-tools/code_guard.py src/Foo.py src/Bar.ts tests/FooTests.cs --config .agent-tools/code-guard.config.json
+code-guard src/Foo.py src/Bar.ts tests/FooTests.cs --config .agent-tools/code-guard.config.json
 ```
 
 Do not create a manifest. Specific files inspect those artifacts, a directory or `.` is a deliberate recursive audit, and `--changed-only` requires Git.

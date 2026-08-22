@@ -29,34 +29,34 @@ Code Guard provides deterministic measurements that act as anchors for agent jud
 
 ## Workflow
 
-With Git, run the project-local Code Guard command after source edits when available:
+With Git, run the installed Code Guard command after source edits:
 
 ```bash
-python3 .agent-tools/code_guard.py . --changed-only --config .agent-tools/code-guard.config.json
+code-guard . --changed-only --config .agent-tools/code-guard.config.json
 ```
 
-Run the canonical repository runner directly when it is installed as a skill:
+The normal packaged workflow installs Code Guard and its syntax dependencies in
+one step, then uses the installed command:
+
+```bash
+python -m pip install .
+code-guard . --changed-only --config examples/code-guard.config.json
+```
+
+The compatibility runner remains available directly from a repository checkout:
 
 ```bash
 python3 skills/code-guard/scripts/code_guard.py . --changed-only --config examples/code-guard.config.json
 ```
 
-The enabled LOC guard has no third-party runtime dependency. The shipped but
-currently dormant syntax-fact infrastructure requires Python 3.10+ and can be
-installed for development/future syntax guards with:
-
-```bash
-python -m pip install -r skills/code-guard/requirements-analysis.txt
-```
-
-Its production pins are `tree-sitter==0.26.0` and
-`tree-sitter-language-pack==1.14.3`; failure to load a required provider or
+`pyproject.toml` canonically owns the production pins. Tree-sitter remains
+dormant during LOC-only execution; failure to load a required provider or
 grammar is a deterministic tool error when syntax analysis is requested.
 
 Without Git or another VCS that can provide changed scope, pass exactly the files you created or modified. You are responsible for supplying the complete edited-file set:
 
 ```bash
-python3 skills/code-guard/scripts/code_guard.py src/Foo.py src/Bar.ts tests/FooTests.cs
+code-guard src/Foo.py src/Bar.ts tests/FooTests.cs
 ```
 
 Do not create a manifest or temporary scope file. Specific positional files mean “inspect these artifacts.” A directory or `.` means a deliberate recursive audit of that scope. `--changed-only` means “ask Git for current work” and fails outside a Git repository; it never falls back to an audit.
