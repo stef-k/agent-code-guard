@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from argparse import ArgumentTypeError
 from pathlib import Path
 
 from agent_code_guard.analysis.facts import (
@@ -13,10 +14,16 @@ from agent_code_guard.analysis.facts import (
     SourcePoint,
     SourceRange,
 )
-from research.default_threshold_sample import summarize
+from research.default_threshold_sample import _candidate, summarize
 
 
 class DefaultThresholdSampleTests(unittest.TestCase):
+    def test_candidate_parser_requires_known_metric_and_positive_integer(self) -> None:
+        self.assertEqual(_candidate("complexity=15"), ("complexity", 15))
+        for value in ("unknown=15", "complexity", "complexity=true", "complexity=0", "complexity=-1"):
+            with self.subTest(value=value), self.assertRaises(ArgumentTypeError):
+                _candidate(value)
+
     def test_summarizes_all_metrics_and_strict_candidate_rates(self) -> None:
         path = Path("sample.py")
         def source_range(start_line: int, end_line: int, start: int, end: int) -> SourceRange:

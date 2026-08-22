@@ -55,13 +55,9 @@ choose it mechanically, and rates are not normalized by language.
 The durable sampler is `research/default_threshold_sample.py`. A representative
 invocation is:
 
-```text
-python -m research.default_threshold_sample <production-roots> \
-  --candidate callableSize=60 --candidate callableSize=80 \
-  --candidate callableSize=100 --candidate callableSize=120 \
-  --candidate nesting=4 --candidate nesting=5 --candidate nesting=6 \
-  --candidate complexity=10 --candidate complexity=12 \
-  --candidate complexity=15 --candidate complexity=20
+```powershell
+$env:PYTHONPATH='<agent-code-guard>;<agent-code-guard>\src'
+python <agent-code-guard>\research\default_threshold_sample.py <production-roots> --candidate callableSize=60 --candidate callableSize=80 --candidate callableSize=100 --candidate callableSize=120 --candidate nesting=4 --candidate nesting=5 --candidate nesting=6 --candidate complexity=10 --candidate complexity=12 --candidate complexity=15 --candidate complexity=20 --output <outside-repository.json>
 ```
 
 Production roots excluded tests, benchmarks, generated migrations/fixtures,
@@ -85,6 +81,18 @@ by #26, but current extraction produced 1,237 callables rather than the earlier
 1,197. The 40-callable difference is retained as a reproducibility qualification,
 not hidden. It is confined to the low tail: no added callable exceeds nesting 4
 or complexity 10, and it changes only the callable-size denominator slightly.
+
+Run the command above from each pinned clone root with these exact middle
+arguments (the common candidate suffix remains unchanged):
+
+| Project | Roots and exclusions |
+|---|---|
+| Wayfarer | `. --exclude 'tests/**' --exclude 'Migrations/**' --exclude 'tools/**' --exclude 'coverage/**' --exclude 'wwwroot/lib/**' --exclude '**/*.min.js' --exclude '**/bin/**' --exclude '**/obj/**' --exclude 'Parsers/WayfarerKmlParser.cs'` |
+| CogniRelay | `app cognirelay setup.py --exclude '**/tests/**' --exclude '**/test/**' --exclude 'tools/**' --exclude '**/.agent-tools/**' --exclude '**/.claude/**'` |
+| xrplnsapi | `. --exclude '**/*_test.go'` |
+| WayfarerMobile | `src --exclude '**/Resources/Raw/quill/**' --exclude 'src/WayfarerMobile/MauiProgram.cs' --exclude 'src/WayfarerMobile/Handlers/CustomWebViewHandler.cs' --exclude '**/bin/**' --exclude '**/obj/**'` |
+| ripgrep | `crates build.rs --exclude '**/tests/**' --exclude '**/test/**' --exclude '**/benches/**' --exclude '**/bench/**' --exclude '**/fuzz/**'` |
+| nowinandroid | `app app-nia-catalog core feature sync --exclude '**/src/test/**' --exclude '**/src/androidTest/**' --exclude '**/src/testFixtures/**' --exclude '**/benchmark/**' --exclude '**/benchmarks/**' --exclude 'core/designsystem/**' --exclude 'core/screenshot-testing/**'` |
 
 ## 5. External-tool precedent
 
@@ -146,20 +154,21 @@ Rust 1.52 / 0.59 / 0.25 / 0.12%; and nowinandroid Kotlin 2.18 / 0.97 /
 
 ## 8. Callable-size boundary inspection
 
-- Around 80, Wayfarer `Areas/User/Controllers/TripController.cs:108`
-  `TripController.Create` (81) combines authorization,
-  persistence, and shadow-region flow and is worth inspection.
-- CogniRelay `app/coordination/shared_service.py:168`
-  `shared_create_service` (82) is coherent validation plus persistence;
-  REVIEW is useful, but splitting it is not automatically warranted.
-- WayfarerMobile `src/WayfarerMobile.Core/Helpers/SegmentAnchorResolver.cs:44`
-  `SegmentAnchorResolver.Resolve` (81) is coherent but carries
-  many sequential validation responsibilities.
-- ripgrep `crates/cli/src/lib.rs:170` `is_readable_stdin` (81) is readable platform/error-handling code and
-  is a useful noise boundary: inspection can reasonably conclude “keep.”
-- Major outliers such as CogniRelay `tool_catalog` (890), ripgrep
-  `HiArgs::from_low_args` (220), nowinandroid `NiaCatalog` (316), and a Wayfarer
-  JavaScript page callback (1,740) clearly deserve inspection.
+| Candidate | Below | At/around | Moderately above | Major outlier |
+|---:|---|---|---|---|
+| 60 | nowinandroid `ForYouScreen.kt:258 onboarding` 59 | CogniRelay `app/context/service.py:551 _raw_scan_recent_relevant` 60 | Wayfarer `SettingsController.cs:462 NormalizeTileProviderSettings` 75 | Wayfarer `Trip/Index.js:10 <callback>` 1,740 |
+| 80 | ripgrep `literal.rs:895 queries` 79 | nowinandroid `MainActivity.kt:78 onCreate` 80 | Wayfarer `GroupsController.cs:100 Latest` 95 | CogniRelay `app/discovery/service.py:193 tool_catalog` 890 |
+| 100 | Wayfarer `segmentRouteProposalState.ts:28 createSegmentRouteProposalStore` 99 | Wayfarer `Program.cs:674 ConfigureMiddleware` 100 | Wayfarer `TileCacheService.cs:1880 PurgeLRUCacheAsync` 115 | nowinandroid `Catalog.kt:58 NiaCatalog` 316 |
+| 120 | Wayfarer `Timeline/Index.js:647 generateStatsModalContent` 119 | WayfarerMobile `SseClient.cs:324 ConnectAndStreamAsync` 120 | Wayfarer `BulkEditNotes.js:4 <callback>` 139 | ripgrep `hiargs.rs:114 HiArgs::from_low_args` 220 |
+
+At the selected boundary, additional 81–82-line examples were Wayfarer
+`TripController.Create` (authorization, persistence, and shadow-region flow),
+CogniRelay `shared_create_service` (coherent validation and persistence),
+WayfarerMobile `SegmentAnchorResolver.Resolve` (many sequential validations),
+and ripgrep `is_readable_stdin` (readable platform/error handling). The last is
+a useful noise example: inspection can reasonably conclude “keep.” At 60,
+ordinary coherent units appear too often; at 100 and 120, already costly units
+such as `Latest` and `PurgeLRUCacheAsync` escape review.
 
 ## 9. Callable-size final decision
 
@@ -197,20 +206,18 @@ Python 2.27 / 0.91 / 0.30%; WayfarerMobile C# 0.10 / 0 / 0%; ripgrep Rust
 
 ## 12. Nesting boundary inspection
 
-Depth 4 passes. Examples include Wayfarer
-`Areas/Admin/Controllers/LogsController.cs:174` and xrplnsapi
-`controllers/resolve_user.go:50` `ResolveUser`; their inner paths are involved
-but remain tolerable. At depth 5, Wayfarer
-`Areas/Api/Controllers/TripsController.cs:427` `CalculateTripBoundingBox`,
-CogniRelay `app/artifact_lifecycle/service.py:1681`
-`artifact_lifecycle_maintenance_service`, and WayfarerMobile
-`src/WayfarerMobile/Services/GroupsService.cs:324`
-`ParseLatestLocationsResponse` require several region/type/error contexts to be
-held simultaneously and merit inspection. ripgrep
-`crates/ignore/src/walk.rs:1190` `Walk.next` at depth 5 is a
-coherent iterator state machine and an important “inspect but probably keep”
-example. Guard clauses or extraction sometimes help; the metric must not force
-them when the nesting expresses an inherent state machine or traversal.
+| Candidate | Below | At/around | Moderately above | Major outlier |
+|---:|---|---|---|---|
+| 4 | CogniRelay `artifact_lifecycle/service.py:538 externalize_superseded_shared` 3 | xrplnsapi `resolve_user.go:50 ResolveUser` 4 | WayfarerMobile `GroupsService.cs:324 ParseLatestLocationsResponse` 5 | CogniRelay `maintenance/service.py:1691 _validate_segment_history` 8 |
+| 5 | Wayfarer `LogsController.cs:174 ReadLastLinesWithPositionAsync` 4 | ripgrep `walk.rs:1190 Walk.next` 5 | CogniRelay `shared_service.py:403 shared_update_service` 6 | same depth-8 outlier |
+| 6 | CogniRelay `artifact_lifecycle/service.py:1681 artifact_lifecycle_maintenance_service` 5 | CogniRelay `query_index.py:201 CoordinationQueryIndex.rebuild_shared` 6 | CogniRelay `segment_history/service.py:1163 segment_history_maintenance_service` 7 | same depth-8 outlier |
+
+Depth-5 `CalculateTripBoundingBox`, `artifact_lifecycle_maintenance_service`, and
+`ParseLatestLocationsResponse` require several region/type/error contexts and
+merit inspection. `Walk.next` is a coherent iterator state machine and an
+important “inspect but probably keep” example. Guard clauses or extraction can
+help, but the metric must not force them for inherent state machines or
+traversals. Candidates 5 and 6 omit useful depth-5 findings.
 
 ## 13. Nesting final decision
 
@@ -256,10 +263,16 @@ WayfarerMobile C# 1.37 / 0.82 / 0.41 / 0.17%; ripgrep Rust 1.37 / 0.78 /
 
 ## 16. Complexity boundary inspection
 
-Values of exactly 15 pass: Wayfarer `UpdateRegion`, CogniRelay
-`_assemble_mixed_retrieval_bundle`, WayfarerMobile
-`ParseLatestLocationsResponse`, and ripgrep `SearcherTester.configs` are useful
-upper-bound references. Just above it:
+| Candidate | Below | At/around | Moderately above | Major outlier |
+|---:|---|---|---|---|
+| 10 | xrplnsapi `xrpl_account.go:35 GetAccountUsers` 9 | xrplnsapi `resolve_user.go:50 ResolveUser` 10 | WayfarerMobile `OsmLiveTileCacheClient.cs:64 FetchAsync` 13 | CogniRelay `service.py:1264 invoke_tool_by_name` 86 |
+| 12 | CogniRelay `config.py:360 _validate_segment_history_settings` 11 | CogniRelay `validation.py:71 _upgrade_legacy_structured_entry_timestamps` 12 | Wayfarer `TripsController.cs:1013 UpdateRegion` 15 | same 86 outlier |
+| 15 | ripgrep `glob.rs:901 Parser.parse_star` 14 | WayfarerMobile `GroupsService.cs:324 ParseLatestLocationsResponse` 15 | CogniRelay `compare.py:16 _compare_values` 18 | same 86 outlier |
+| 20 | ripgrep `fish.rs:13 generate` 16 | Wayfarer `leafletAdapter.ts:386 focusActiveEntity` 20 | ripgrep `hiargs.rs:114 HiArgs::from_low_args` 24 | same 86 outlier |
+
+Values of exactly 15 pass. Additional examples were Wayfarer `UpdateRegion`,
+CogniRelay `_assemble_mixed_retrieval_bundle`, and ripgrep
+`SearcherTester.configs`. Just above the selected boundary:
 
 - Wayfarer `Areas/Api/Controllers/GroupsController.cs:197`
   `GroupsController.Query` (16) mixes authorization, filtering, and
