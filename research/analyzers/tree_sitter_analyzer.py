@@ -14,14 +14,17 @@ from typing import Iterator
 from tree_sitter import Node
 from tree_sitter_language_pack import get_parser
 
-
-LANGUAGE_BY_SUFFIX = {".py": "python", ".go": "go", ".kt": "kotlin", ".cs": "csharp"}
+from research.analyzers.source_regions import ExecutableRegion, executable_regions
 
 CALLABLE_TYPES = {
     "python": {"function_definition"},
     "go": {"function_declaration", "method_declaration"},
     "kotlin": {"function_declaration", "secondary_constructor"},
     "csharp": {"method_declaration", "constructor_declaration", "local_function_statement"},
+    "java": {"method_declaration", "constructor_declaration"},
+    "javascript": {"function_declaration", "method_definition", "arrow_function", "function_expression"},
+    "typescript": {"function_declaration", "method_definition", "arrow_function", "function_expression"},
+    "tsx": {"function_declaration", "method_definition", "arrow_function", "function_expression"},
 }
 
 LAMBDA_TYPES = {
@@ -29,6 +32,10 @@ LAMBDA_TYPES = {
     "go": {"func_literal"},
     "kotlin": {"lambda_literal", "anonymous_function"},
     "csharp": {"lambda_expression", "anonymous_method_expression"},
+    "java": {"lambda_expression"},
+    "javascript": set(),
+    "typescript": set(),
+    "tsx": set(),
 }
 
 CONTROL_TYPES = {
@@ -36,6 +43,10 @@ CONTROL_TYPES = {
     "go": {"if_statement", "for_statement", "expression_switch_statement", "type_switch_statement", "select_statement"},
     "kotlin": {"if_expression", "for_statement", "while_statement", "do_while_statement", "when_expression", "try_expression"},
     "csharp": {"if_statement", "for_statement", "foreach_statement", "while_statement", "do_statement", "switch_statement", "try_statement"},
+    "java": {"if_statement", "for_statement", "enhanced_for_statement", "while_statement", "do_statement", "switch_expression", "try_statement"},
+    "javascript": {"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "switch_statement", "try_statement"},
+    "typescript": {"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "switch_statement", "try_statement"},
+    "tsx": {"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "switch_statement", "try_statement"},
 }
 
 DECISION_TYPES = {
@@ -43,6 +54,10 @@ DECISION_TYPES = {
     "go": {"if_statement", "for_statement", "expression_case", "type_case", "communication_case"},
     "kotlin": {"if_expression", "for_statement", "while_statement", "do_while_statement", "catch_block", "when_entry"},
     "csharp": {"if_statement", "for_statement", "foreach_statement", "while_statement", "do_statement", "catch_clause", "conditional_expression", "switch_expression_arm"},
+    "java": {"if_statement", "for_statement", "enhanced_for_statement", "while_statement", "do_statement", "catch_clause", "ternary_expression"},
+    "javascript": {"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "catch_clause", "ternary_expression"},
+    "typescript": {"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "catch_clause", "ternary_expression"},
+    "tsx": {"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "catch_clause", "ternary_expression"},
 }
 
 
@@ -54,6 +69,7 @@ class SourceRange:
 
 @dataclass(frozen=True)
 class CallableMeasurement:
+    path: str
     language: str
     identity: str
     range: SourceRange
@@ -71,14 +87,13 @@ class CallableMeasurement:
 
 
 def analyze_file(path: Path) -> list[CallableMeasurement]:
-    language = LANGUAGE_BY_SUFFIX.get(path.suffix.lower())
-    if language is None:
-        raise ValueError(f"unsupported prototype language: {path.suffix}")
-    source = path.read_bytes()
-    tree = get_parser(language).parse(source)
-    if tree.root_node.has_error:
-        raise ValueError(f"unable to parse {path}: syntax tree contains errors")
-    return [_measure(node, language, source, path) for node in _callable_nodes(tree.root_node, language)]
+    measurements: list[CallableMeasurement] = []
+    for region in executable_regions(path):
+        tree = get_parser(region.language).parse(region.source)
+        if tree.root_node.has_error:
+            raise ValueError(f"unable to parse {path}: embedded {region.language} syntax tree contains errors")
+        measurements.extend(_measure(node, region) for node in _callable_nodes(tree.root_node, region.language))
+    return sorted(measurements, key=lambda value: (value.range.start_line, value.range.end_line, value.identity))
 
 
 def _walk(node: Node) -> Iterator[Node]:
@@ -91,23 +106,34 @@ def _callable_nodes(root: Node, language: str) -> list[Node]:
     return [node for node in _walk(root) if node.type in CALLABLE_TYPES[language]]
 
 
-def _measure(node: Node, language: str, source: bytes, path: Path) -> CallableMeasurement:
-    start_node = _range_start_node(node, language)
-    start_line = start_node.start_point.row + 1
-    end_line = node.end_point.row + 1
+def _measure(node: Node, region: ExecutableRegion) -> CallableMeasurement:
+    start_node = _range_start_node(node, region.language)
+    start_row, _ = region.original_point(start_node.start_point.row, start_node.start_point.column)
+    end_row, _ = region.original_point(node.end_point.row, node.end_point.column)
+    start_line = start_row + 1
+    end_line = end_row + (1 if node.end_point.column > 0 else 0)
     return CallableMeasurement(
-        language=language,
-        identity=_identity(node, language, source, path),
+        path=region.original_path.as_posix(),
+        language=region.language,
+        identity=_identity(node, region),
         range=SourceRange(start_line, end_line),
         physical_loc=end_line - start_line + 1,
-        nesting_depth=_nesting(node, language),
-        cyclomatic_complexity=1 + _decision_count(node, language, source),
+        nesting_depth=_nesting(node, region.language),
+        cyclomatic_complexity=1 + _decision_count(node, region.language, region.source),
     )
 
 
 def _range_start_node(node: Node, language: str) -> Node:
     if language == "python" and node.parent and node.parent.type == "decorated_definition":
         return node.parent
+    if language in {"javascript", "typescript", "tsx"} and node.type in {"arrow_function", "function_expression"}:
+        declarator = _ancestor(node, "variable_declarator")
+        if declarator and declarator.child_by_field_name("value") == node:
+            return declarator.parent if declarator.parent and declarator.parent.type == "lexical_declaration" else declarator
+    if language in {"typescript", "tsx"} and node.type == "method_definition":
+        previous = node.prev_named_sibling
+        if previous and previous.type == "decorator":
+            return previous
     return node
 
 
@@ -123,7 +149,7 @@ def _name(node: Node, language: str, source: bytes) -> str:
         for child in node.named_children:
             if child.type == "simple_identifier":
                 return _text(child, source)
-    if language in {"kotlin", "csharp"} and "constructor" in node.type:
+    if language in {"kotlin", "csharp", "java"} and "constructor" in node.type:
         owner = _nearest_named_owner(node, language, source)
         return owner or "<constructor>"
     return "<anonymous>"
@@ -135,6 +161,10 @@ def _nearest_named_owner(node: Node, language: str, source: bytes) -> str | None
         "go": {"type_declaration", "type_spec"},
         "kotlin": {"class_declaration", "object_declaration"},
         "csharp": {"class_declaration", "struct_declaration", "record_declaration", "namespace_declaration", "file_scoped_namespace_declaration"},
+        "java": {"class_declaration", "record_declaration", "enum_declaration"},
+        "javascript": {"class_declaration"},
+        "typescript": {"class_declaration"},
+        "tsx": {"class_declaration"},
     }[language]
     current = node.parent
     while current:
@@ -148,7 +178,12 @@ def _nearest_named_owner(node: Node, language: str, source: bytes) -> str | None
     return None
 
 
-def _identity(node: Node, language: str, source: bytes, path: Path) -> str:
+def _identity(node: Node, region: ExecutableRegion) -> str:
+    language = region.language
+    source = region.source
+    path = region.original_path
+    if language in {"javascript", "typescript", "tsx"}:
+        return _javascript_identity(node, region)
     parts = [_name(node, language, source)]
     current = node.parent
     owner_types = {
@@ -156,6 +191,7 @@ def _identity(node: Node, language: str, source: bytes, path: Path) -> str:
         "go": set(),
         "kotlin": {"class_declaration", "object_declaration", "function_declaration"},
         "csharp": {"namespace_declaration", "file_scoped_namespace_declaration", "class_declaration", "struct_declaration", "record_declaration", "method_declaration", "constructor_declaration", "local_function_statement"},
+        "java": {"class_declaration", "record_declaration", "enum_declaration", "method_declaration", "constructor_declaration"},
     }[language]
     while current:
         if current.type in owner_types:
@@ -183,12 +219,87 @@ def _package_or_namespace(node: Node, language: str, source: bytes) -> str:
         "go": {"package_clause"},
         "kotlin": {"package_header"},
         "csharp": {"file_scoped_namespace_declaration"},
+        "java": {"package_declaration"},
     }.get(language, set())
     for child in root.named_children:
         if child.type in candidates:
             text = _text(child, source).replace("package", "", 1).replace("namespace", "", 1)
             return text.strip().rstrip(";")
     return ""
+
+
+def _javascript_identity(node: Node, region: ExecutableRegion) -> str:
+    source = region.source
+    name = node.child_by_field_name("name")
+    if node.type in {"arrow_function", "function_expression"}:
+        declarator = _ancestor(node, "variable_declarator")
+        if declarator and declarator.child_by_field_name("value") == node:
+            name = declarator.child_by_field_name("name")
+    parts = [_text(name, source) if name else _callback_name(node, region)]
+    current = node.parent
+    while current:
+        if current.type == "class_declaration":
+            owner = current.child_by_field_name("name")
+            if owner:
+                parts.append(_text(owner, source))
+        elif current.type == "method_definition" and current is not node:
+            owner = current.child_by_field_name("name")
+            if owner:
+                parts.append(_text(owner, source))
+        elif current.type in {"function_declaration", "arrow_function", "function_expression"} and current is not node:
+            owner = _javascript_lexical_name(current, source)
+            if owner:
+                parts.append(owner)
+        current = current.parent
+    if node.type == "method_definition" and not any(current.type == "class_declaration" for current in _ancestors(node)):
+        object_name = _object_assignment_name(node, source)
+        if object_name:
+            parts.append(object_name)
+    parts.append(region.original_path.stem)
+    return ".".join(reversed(parts))
+
+
+def _javascript_lexical_name(node: Node, source: bytes) -> str | None:
+    name = node.child_by_field_name("name")
+    if name:
+        return _text(name, source)
+    declarator = _ancestor(node, "variable_declarator")
+    if declarator and declarator.child_by_field_name("value") == node:
+        target = declarator.child_by_field_name("name")
+        if target and target.type in {"identifier", "property_identifier"}:
+            return _text(target, source)
+    return None
+
+
+def _callback_name(node: Node, region: ExecutableRegion) -> str:
+    row, column = region.original_point(node.start_point.row, node.start_point.column)
+    return f"<callback@{row + 1}:{column + 1}>"
+
+
+def _object_assignment_name(node: Node, source: bytes) -> str | None:
+    object_node = _ancestor(node, "object")
+    declarator = _ancestor(object_node, "variable_declarator") if object_node else None
+    if declarator:
+        target = declarator.child_by_field_name("name")
+        if target and target.type == "identifier":
+            return _text(target, source)
+    return None
+
+
+def _ancestor(node: Node | None, node_type: str) -> Node | None:
+    current = node.parent if node else None
+    while current:
+        if current.type == node_type:
+            return current
+        current = current.parent
+    return None
+
+
+def _ancestors(node: Node) -> Iterator[Node]:
+    current = node.parent
+    while current:
+        yield current
+        current = current.parent
 
 
 def _nesting(callable_node: Node, language: str) -> int:
@@ -217,6 +328,11 @@ def _decision_count(callable_node: Node, language: str, source: bytes) -> int:
         if language == "csharp" and node.type == "switch_section":
             text = _text(node, source).strip()
             count += int(text.startswith("case ") and not text.endswith(":") and not _is_default_branch(node, source))
+        if language == "java" and node.type in {"switch_block_statement_group", "switch_rule"}:
+            text = _text(node, source).strip()
+            count += int(text.startswith("case ") and not text.endswith(":"))
+        if language in {"javascript", "typescript", "tsx"} and node.type == "switch_case":
+            count += int(not _text(node, source).strip().endswith(":"))
     return count
 
 
@@ -226,6 +342,8 @@ def _is_else_if(node: Node, language: str) -> bool:
     parent = node.parent
     if language == "kotlin":
         return bool(parent and parent.type == "control_structure_body" and parent.parent and parent.parent.type == "if_expression")
+    if language in {"javascript", "typescript", "tsx"}:
+        return bool(parent and parent.type == "else_clause")
     return bool(parent and parent.type == "if_statement" and parent.child_by_field_name("alternative") == node)
 
 

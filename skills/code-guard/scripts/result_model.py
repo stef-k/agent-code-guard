@@ -46,9 +46,10 @@ class CallableFinding:
     state: str
     thresholds: dict[str, int] | None = None
     details: dict[str, int] | None = None
+    embedded_language: str | None = None
 
     def to_json(self) -> dict[str, Any]:
-        return {
+        value = {
             "path": self.path,
             "callable": self.callable,
             "range": {"startLine": self.start_line, "endLine": self.end_line},
@@ -57,6 +58,9 @@ class CallableFinding:
             "thresholds": self.thresholds,
             "details": self.details,
         }
+        if self.embedded_language is not None:
+            value["embeddedLanguage"] = self.embedded_language
+        return value
 
 
 @dataclass(frozen=True)

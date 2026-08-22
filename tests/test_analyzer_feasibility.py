@@ -84,6 +84,72 @@ EXPECTED = {
         ("Sample.Decisions.Exceptions", 63, 72, 10, 2, 4),
         ("Sample.Decisions.WildcardSwitch", 74, 81, 8, 1, 2),
     ],
+    "java/Callables.java": [
+        ("sample.Callables.simple", 4, 6, 3, 0, 1),
+        ("sample.Callables.longLinear", 8, 16, 9, 0, 1),
+        ("sample.Callables.Callables", 18, 26, 9, 0, 1),
+    ],
+    "java/Decisions.java": [
+        ("sample.Decisions.deeplyNested", 4, 17, 14, 4, 5),
+        ("sample.Decisions.branching", 19, 26, 8, 1, 5),
+        ("sample.Decisions.elseIf", 28, 32, 5, 1, 3),
+        ("sample.Decisions.expressions", 34, 36, 3, 0, 4),
+        ("sample.Decisions.exceptions", 38, 47, 10, 2, 4),
+        ("sample.Decisions.statementSwitch", 49, 56, 8, 1, 3),
+        ("sample.Decisions.expressionSwitch", 58, 64, 7, 1, 3),
+    ],
+    "javascript/callables.js": [
+        ("callables.simple", 1, 3, 3, 0, 1),
+        ("callables.longLinear", 5, 13, 9, 0, 1),
+        ("callables.arrow", 15, 20, 6, 0, 1),
+        ("callables.expression", 22, 24, 3, 0, 1),
+        ("callables.helpers.method", 27, 29, 3, 0, 1),
+        ("callables.Worker.constructor", 33, 35, 3, 0, 1),
+        ("callables.Worker.method", 37, 39, 3, 0, 1),
+        ("callables.localOwner", 42, 45, 4, 0, 1),
+        ("callables.localOwner.local", 43, 43, 1, 0, 1),
+    ],
+    "javascript/decisions.js": [
+        ("decisions.deeplyNested", 1, 14, 14, 4, 5),
+        ("decisions.branching", 16, 23, 8, 1, 5),
+        ("decisions.elseIf", 25, 29, 5, 1, 3),
+        ("decisions.expressions", 31, 34, 4, 0, 4),
+        ("decisions.choices", 36, 43, 8, 1, 3),
+        ("decisions.callbackOwner", 45, 52, 8, 0, 1),
+        ("decisions.callbackOwner.<callback@46:30>", 46, 49, 4, 1, 2),
+        ("decisions.callbackOwner.<callback@50:18>", 50, 50, 1, 0, 2),
+        ("decisions.exceptions", 54, 61, 8, 2, 3),
+    ],
+    "typescript/callables.ts": [
+        ("callables.generic", 7, 12, 6, 0, 2),
+        ("callables.arrow", 14, 16, 3, 0, 1),
+        ("callables.expression", 18, 20, 3, 0, 1),
+        ("callables.Worker.constructor", 23, 23, 1, 0, 1),
+        ("callables.Worker.method", 25, 28, 4, 0, 2),
+    ],
+    "typescript/decisions.ts": [
+        ("decisions.typedDecisions", 1, 7, 7, 1, 3),
+        ("decisions.callbackOwner", 9, 16, 8, 0, 1),
+        ("decisions.callbackOwner.<callback@10:31>", 10, 13, 4, 1, 2),
+        ("decisions.callbackOwner.<callback@14:18>", 14, 14, 1, 0, 2),
+    ],
+    "jsx/components.jsx": [
+        ("components.Card", 1, 13, 13, 0, 3),
+        ("components.Card.<callback@8:32>", 8, 8, 1, 0, 2),
+    ],
+    "tsx/components.tsx": [
+        ("components.UserCard", 6, 17, 12, 0, 2),
+        ("components.UserCard.click", 7, 7, 1, 0, 2),
+        ("components.UserCard.<callback@9:23>", 9, 9, 1, 0, 2),
+        ("components.UserCard.<callback@11:30>", 11, 14, 4, 1, 2),
+    ],
+    "vue/Options.vue": [
+        ("Options.calculate", 8, 13, 6, 1, 2),
+    ],
+    "vue/Setup.vue": [
+        ("Setup.calculate", 8, 13, 6, 1, 2),
+        ("Setup.normalize", 17, 19, 3, 0, 2),
+    ],
 }
 
 
@@ -139,6 +205,25 @@ class FixtureMeasurementTests(unittest.TestCase):
         self.assertEqual((documented.lineno, documented.end_lineno), (16, 22))
         self.assertEqual(documented.decorator_list[0].lineno, 15)
 
+    def test_typescript_bodyless_declarations_are_not_callables(self) -> None:
+        measurements = analyze_file(FIXTURES / "typescript" / "callables.ts")
+        self.assertNotIn("calculate", {value.identity.rsplit(".", 1)[-1] for value in measurements})
+        self.assertEqual(len(measurements), 5)
+
+    def test_jsx_markup_depth_does_not_increase_control_nesting(self) -> None:
+        card = analyze_file(FIXTURES / "jsx" / "components.jsx")[0]
+        self.assertEqual((card.nesting_depth, card.cyclomatic_complexity), (0, 3))
+
+    def test_vue_regions_preserve_original_path_ranges_and_embedded_language(self) -> None:
+        options = analyze_file(FIXTURES / "vue" / "Options.vue")
+        setup = analyze_file(FIXTURES / "vue" / "Setup.vue")
+        self.assertEqual((Path(options[0].path).name, options[0].language, options[0].range), (
+            "Options.vue", "javascript", type(options[0].range)(8, 13),
+        ))
+        self.assertEqual([(value.language, value.range.start_line, value.range.end_line) for value in setup], [
+            ("typescript", 8, 13), ("typescript", 17, 19),
+        ])
+
 
 class CallableResultCompatibilityTests(unittest.TestCase):
     def test_callable_finding_is_additive_and_json_serializable(self) -> None:
@@ -155,6 +240,16 @@ class CallableResultCompatibilityTests(unittest.TestCase):
             "range": {"startLine": 20, "endLine": 48}, "measured": 5,
             "state": "review", "thresholds": {"reviewAt": 4}, "details": {"conditional": 3, "loop": 2},
         })
+
+    def test_vue_finding_keeps_container_path_range_and_embedded_language(self) -> None:
+        finding = CallableFinding(
+            path="src/Foo.vue", callable="Foo.calculate", start_line=21, end_line=35,
+            measured=4, state="review", embedded_language="typescript",
+        )
+        value = finding.to_json()
+        self.assertEqual(value["path"], "src/Foo.vue")
+        self.assertEqual(value["range"], {"startLine": 21, "endLine": 35})
+        self.assertEqual(value["embeddedLanguage"], "typescript")
 
 
 if __name__ == "__main__":
