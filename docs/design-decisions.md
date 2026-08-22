@@ -102,7 +102,7 @@ Build, test, lint, formatting, security, dependency, and framework-specific tool
 
 Agent Code Guard may integrate with such tools later, but they are not part of the universal deterministic guard set merely to make the project resemble an IDE.
 
-## D12 — Agent LOC Guard is the prototype/reference
+## D12 — Agent Code Guard owns canonical LOC behavior
 
 Agent LOC Guard established important behavior around:
 
@@ -114,9 +114,15 @@ Agent LOC Guard established important behavior around:
 - anti-gaming policy;
 - warning interpretation.
 
-Agent Code Guard should reuse these lessons and avoid a long-term fork of two divergent LOC implementations.
+The mature implementation from Agent LOC Guard commit `75ab39d261dbc65f78815836fac90add16d265d1` was migrated into the internal LOC guard. Agent LOC Guard is the completed prototype/reference, not a runtime dependency or parallel implementation. Its retirement is tracked separately in issue #3.
 
-Whether Agent LOC Guard remains a standalone subset/compatibility package is intentionally undecided.
+The public runner owns aggregation and output. LOC owns its configuration, measurement, matching, thresholds, exemptions, and native statuses. Repository discovery and file selection are separate because the runner establishes repository context and LOC consumes selected candidates today; further sharing waits for evidence from issue #4.
+
+## D15 — Normalized LOC result preserves native context
+
+LOC maps `ok` to `PASS`, `warn` to `REVIEW`, `fail` to `FAIL`, and `exempt` to `PASS`. Each finding retains counted LOC, effective thresholds, override index, native status, and exemption reason. Only REVIEW or FAIL routes the `loc` policy.
+
+Configuration is one Code Guard document with mature LOC fields under `guards.loc`. Disabled future guard entries are declarative placeholders only; no generic rule engine or analyzer behavior is implied.
 
 ## D13 — New thresholds require evidence
 

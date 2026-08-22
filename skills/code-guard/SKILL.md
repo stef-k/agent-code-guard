@@ -35,7 +35,11 @@ Run the project-local Code Guard command after source edits when available:
 python3 .agent-tools/code_guard.py . --changed-only --config .agent-tools/code-guard.config.json
 ```
 
-The implementation is still in design/bootstrap. Until the unified runner exists, use the available guard providers documented by the project.
+Run the canonical repository runner directly when it is installed as a skill:
+
+```bash
+python3 skills/code-guard/scripts/code_guard.py . --changed-only --config examples/code-guard.config.json
+```
 
 When all guards return `PASS`, no detailed policy file needs to be loaded.
 
@@ -54,11 +58,13 @@ Do not load unrelated guard policies merely because they exist.
 
 Code Guard is intentionally limited to deterministic concerns that are broadly applicable across conventional programming languages.
 
-Initial guards:
+Guards:
 
-- file LOC;
-- callable LOC;
-- nesting depth;
-- cyclomatic complexity.
+- file LOC (implemented and enabled by default);
+- callable LOC (reserved, disabled, and unimplemented);
+- nesting depth (reserved, disabled, and unimplemented);
+- cyclomatic complexity (reserved, disabled, and unimplemented).
+
+Agent Code Guard is the canonical LOC implementation. Agent LOC Guard is the completed prototype/reference whose mature behavior was migrated from commit `75ab39d261dbc65f78815836fac90add16d265d1`.
 
 Project-specific architecture rules, framework-specific checks, arbitrary style preferences, security scanners, and dependency auditing are outside the universal core.

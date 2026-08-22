@@ -1,37 +1,33 @@
 {
   "version": 1,
-  "scope": {
-    "normalMode": "changed-only",
-    "includeUntracked": true
-  },
   "guards": {
     "loc": {
       "enabled": true,
       "warnAt": 400,
       "failAt": 600,
       "countBlankLines": false,
-      "countCommentLines": true
+      "countCommentLines": true,
+      "includeExtensions": [
+        ".cs", ".cshtml", ".razor", ".js", ".jsx", ".ts", ".tsx", ".py",
+        ".java", ".kt", ".kts", ".scala", ".go", ".rs", ".swift", ".dart",
+        ".zig", ".cpp", ".c", ".h", ".hpp", ".m", ".mm", ".fs", ".fsx",
+        ".vb", ".css", ".scss", ".html", ".vue", ".php", ".rb", ".ex",
+        ".exs", ".erl", ".hrl", ".clj", ".cljs", ".cljc", ".lua", ".sql",
+        ".sh", ".ps1"
+      ],
+      "exclude": [
+        "**/.git/**", "**/.vs/**", "**/.idea/**", "**/.vscode/**", "**/bin/**",
+        "**/obj/**", "**/node_modules/**", "**/dist/**", "**/build/**",
+        "**/coverage/**", "**/generated/**", "**/Generated/**", "**/vendor/**",
+        "**/Vendor/**", "**/Migrations/**", "**/*.g.cs", "**/*.generated.cs",
+        "**/*.Designer.cs", "**/*.designer.cs", "**/*.min.js", "**/*.min.css",
+        "**/package-lock.json", "**/pnpm-lock.yaml", "**/yarn.lock"
+      ],
+      "allowedLargeFiles": [],
+      "overrides": []
     },
-    "callableSize": {
-      "enabled": false
-    },
-    "nesting": {
-      "enabled": false
-    },
-    "cyclomaticComplexity": {
-      "enabled": false
-    }
-  },
-  "exclude": [
-    "**/.git/**",
-    "**/node_modules/**",
-    "**/bin/**",
-    "**/obj/**",
-    "**/dist/**",
-    "**/build/**",
-    "**/coverage/**",
-    "**/generated/**",
-    "**/vendor/**"
-  ],
-  "exceptions": []
+    "callableSize": { "enabled": false },
+    "nesting": { "enabled": false },
+    "cyclomaticComplexity": { "enabled": false }
+  }
 }
