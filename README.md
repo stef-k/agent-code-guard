@@ -1,6 +1,6 @@
 # Agent Code Guard
 
-Agent Code Guard is a planned portable set of deterministic guardrails for agent-assisted software development.
+Agent Code Guard is a portable set of deterministic guardrails for agent-assisted software development. It is now the canonical implementation of LOC Guard behavior.
 
 It grows out of the lessons learned from [Agent LOC Guard](https://github.com/stef-k/agent-loc-guard): deterministic measurements are useful to coding agents when they act as objective anchors for review, while the agent still applies judgment instead of blindly optimizing a metric.
 
@@ -45,7 +45,7 @@ Project-specific architecture boundaries, framework-specific rules, arbitrary st
 
 ## Agent-facing architecture
 
-The intended experience is one skill and one command, backed by modular deterministic providers:
+The experience is one skill and one public command, backed by modular internal guards:
 
 ```text
 one skill
@@ -80,7 +80,7 @@ load only policy files named by triggered findings
 apply judgment without gaming metrics
 ```
 
-The eventual machine-readable result should expose required policy identifiers, for example:
+The machine-readable result exposes required policy identifiers only for actionable guards, for example:
 
 ```json
 {
@@ -127,9 +127,15 @@ Initial feasibility work should prove the common result model across at least:
 
 Java and JavaScript/TypeScript are also expected targets. Parser/provider technology should be selected only after the feasibility work; Tree-sitter or language-specific adapters are implementation options, not assumptions.
 
-## Relationship to Agent LOC Guard
+## Canonical LOC implementation
 
-Agent LOC Guard remains the reference prototype while its current hardening work is completed. Agent Code Guard should reuse its lessons around:
+Agent Code Guard owns LOC behavior. The unified runner supports full audit and the `--changed-only`, `--staged`, `--base-ref <ref>`, `--json`, and `--ci` modes:
+
+```bash
+python3 skills/code-guard/scripts/code_guard.py . --changed-only
+```
+
+Agent LOC Guard is the completed prototype/reference whose mature behavior at commit `75ab39d261dbc65f78815836fac90add16d265d1` was migrated here, including:
 
 - warning versus hard-failure semantics;
 - changed-file scope;
@@ -139,27 +145,17 @@ Agent LOC Guard remains the reference prototype while its current hardening work
 - anti-gaming policy;
 - agent reasoning around cohesion and meaningful refactoring.
 
-The long-term design should avoid maintaining divergent LOC implementations in both projects. Whether Agent LOC Guard remains a standalone subset or becomes a compatibility package can be decided later.
+There is no runtime dependency, synchronization layer, or second LOC implementation. Retirement of the prototype repository remains issue #3.
 
-## First milestone
+## Result and exit contract
 
-The first milestone is specification and feasibility, not immediate implementation of every analyzer.
+Native LOC states normalize as `ok -> PASS`, `warn -> REVIEW`, `fail -> FAIL`, and `exempt -> PASS` with the exemption reason retained. Only REVIEW and FAIL add `loc` to `requiredPolicies`.
 
-It should establish:
-
-1. the compact `SKILL.md` dispatcher contract;
-2. the `PASS / REVIEW / FAIL` result schema;
-3. JSON output including `requiredPolicies`;
-4. configuration and source-language discovery rules;
-5. LOC-provider integration based on Agent LOC Guard;
-6. a cross-language prototype for callable discovery, nesting, and cyclomatic complexity;
-7. representative fixtures in Python, Go, Kotlin, and C#;
-8. evidence-based thresholds for new guards, or a decision to leave them configurable until sufficient evidence exists;
-9. parser/provider technology based on prototype results rather than assumption.
+Normal exits are 0 for PASS, 1 for REVIEW, 2 for FAIL, and 3 for configuration/runtime errors. `--ci` changes REVIEW to exit 0; FAIL and errors remain 2 and 3.
 
 ## Status
 
-Design/bootstrap phase. No complexity thresholds or parser technology are considered final yet.
+LOC migration complete. Callable size, nesting, complexity, and parser research remain deliberately unimplemented for later issues.
 
 ## License
 
