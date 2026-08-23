@@ -52,8 +52,8 @@ python3 skills/code-guard/scripts/code_guard.py . --changed-only --config exampl
 `pyproject.toml` canonically owns the production pins. Tree-sitter remains
 dormant during LOC-only execution; failure to load a required provider or
 grammar is a deterministic tool error during normal zero-config syntax analysis.
-Only an authorized configuration that explicitly disables every syntax guard
-preserves the lazy LOC-only path.
+Disabling every syntax guard preserves the lazy no-Tree-sitter path. A strictly
+LOC-only result also requires both Markdown guards to be explicitly disabled.
 
 Without Git or another VCS that can provide changed scope, pass exactly the files you created or modified. You are responsible for supplying the complete edited-file set:
 
@@ -80,6 +80,7 @@ Policy references:
 - callable size: `references/callable-size-policy.md`
 - nesting depth: `references/nesting-policy.md`
 - cyclomatic complexity: `references/complexity-policy.md`
+- Markdown document/section size: `references/markdown-size-policy.md`
 
 Do not load unrelated guard policies merely because they exist.
 
@@ -94,6 +95,8 @@ Guards:
 - callable LOC (implemented and enabled by default; REVIEW greater than 80);
 - structural nesting (implemented and enabled by default; REVIEW greater than 4);
 - cyclomatic complexity (implemented and enabled by default; REVIEW greater than 15).
+- Markdown document physical size (implemented for `.md` and enabled by default; REVIEW greater than 800);
+- Markdown direct-section physical size (implemented for `.md` and enabled by default; REVIEW greater than 200).
 
 Callable LOC needs no invented configuration to activate it. Omission or
 `enabled: true` uses 80; an authorized positive-integer `reviewAt` overrides it,
@@ -116,7 +119,15 @@ are independent. Exactly the effective threshold passes; greater complexity
 reviews and never fails. Load `references/complexity-policy.md` only when
 `complexity` appears in `requiredPolicies`.
 
-Do not invent configuration, disable a syntax guard, or raise its threshold
+Markdown document and direct-section size count all physical lines. Sections
+run from a supported heading through the line before the next heading of any
+level, or EOF. Exact effective thresholds pass; greater measurements review and
+never fail. Load `references/markdown-size-policy.md` when either
+`markdownDocumentSize` or `markdownSectionSize` appears in `requiredPolicies`.
+Review navigation and responsibility without mechanically splitting coherent
+specifications or gaming headings/formatting.
+
+Do not invent configuration, disable a guard, or raise its threshold
 merely to silence a finding. Respect built-ins and only project/user-authorized overrides.
 REVIEW requires inspection and justification, not mandatory refactoring.
 

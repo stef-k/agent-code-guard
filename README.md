@@ -22,17 +22,21 @@ The tool detects. The policy interprets. The agent must not game the metric.
 
 ## Initial universal guards
 
-The first design targets four cross-language measurements:
+The production design has six deterministic measurements:
 
 1. **File LOC** — physical source-file size, using Agent LOC Guard as the reference implementation and policy prototype.
 2. **Callable size** — physical LOC for functions/methods/callables.
 3. **Nesting depth** — maximum structural nesting inside a callable.
 4. **Cyclomatic complexity** — deterministic execution-path complexity.
+5. **Markdown document size** — all physical lines in an `.md` document.
+6. **Markdown direct-section size** — physical span from a supported heading to the next heading or EOF.
 
-All four guards are production defaults: file LOC reviews above 400 and fails
+All six guards are production defaults: file LOC reviews above 400 and fails
 above 600; callable size reviews above 80 physical LOC; structural nesting
-reviews above depth 4; and cyclomatic complexity reviews above 15. The three
-syntax guards are REVIEW-only. Only file LOC can FAIL.
+reviews above depth 4; cyclomatic complexity reviews above 15; Markdown
+documents review above 800 physical lines; and Markdown direct sections review
+above 200 physical lines. The syntax and Markdown guards are REVIEW-only. Only
+file LOC can FAIL.
 
 ## Adding new guards
 
@@ -79,7 +83,8 @@ skills/code-guard/
     ├── loc-policy.md
     ├── callable-size-policy.md
     ├── nesting-policy.md
-    └── complexity-policy.md
+    ├── complexity-policy.md
+    └── markdown-size-policy.md
 ```
 
 Expected workflow:
@@ -199,7 +204,8 @@ Zero-config execution uses this syntax pipeline because all three syntax guards
 are active by default. Supported malformed syntax or an unavailable
 required provider therefore produces deterministic exit 3. When callable size,
 nesting, and complexity are all explicitly disabled, the public runner does not import
-or construct the pipeline: Tree-sitter remains dormant and execution is LOC-only.
+or construct the pipeline: Tree-sitter remains dormant. A strictly LOC-only
+result set also requires both Markdown guards to be explicitly disabled.
 
 ## Callable size
 
@@ -246,8 +252,46 @@ PASS and REVIEW findings; human output prints REVIEW findings only:
 
 Only a REVIEW result adds `callableSize` to `requiredPolicies`. Callable size
 never fails. Because it is enabled by default, syntax analysis is normally
-authoritative. LOC-only execution requires callable size, nesting, and
-cyclomatic complexity to be explicitly disabled.
+authoritative. LOC-only execution requires callable size, nesting, cyclomatic
+complexity, Markdown document size, and Markdown section size to be explicitly
+disabled.
+
+## Markdown size
+
+Two independently configurable Markdown guards are enabled by default. The
+`markdownDocumentSize` guard reviews `.md` documents above 800 physical lines;
+the `markdownSectionSize` guard reviews heading-delimited direct sections above
+200 physical lines. Exact thresholds pass and neither guard can fail. Both use
+the established configuration contract: omission, `{}`, or `enabled: true`
+uses the built-in default; a positive JSON integer `reviewAt` overrides it; and
+`enabled: false` wins even when `reviewAt` is present.
+
+```json
+{
+  "guards": {
+    "markdownDocumentSize": {"reviewAt": 800},
+    "markdownSectionSize": {"reviewAt": 200}
+  }
+}
+```
+
+Applicability is initially `.md` only; `.markdown` is not enabled. Document
+size counts every physical line. A direct section begins at an ATX or bounded
+Setext heading and ends immediately before the next heading of any level, or at
+EOF. Heading lines, blank lines, lists, tables, and fenced code all count.
+Headings inside backtick or tilde fences do not create sections. The bounded
+standard-library scanner is CommonMark-informed rather than a full parser; raw
+HTML headings, container-nested headings, and multiline Setext titles are
+outside this first contract.
+
+The runner filters only the final common scope, then performs one lazy Markdown
+scan shared by both guards. If both are disabled, or the resolved scope has no
+`.md` file, the scanner is not imported or called. Markdown facts and executable
+`AnalysisFacts` are independent. Markdown is not part of LOC, so
+`guards.loc.exclude` does not hide it from these guards; common `scope.exclude`
+does. JSON retains deterministic PASS and REVIEW findings, while human output
+prints REVIEW findings only. Every oversized direct section is emitted in
+path/start-line order, including repeated headings distinguished by range.
 
 ## Structural nesting
 
@@ -369,16 +413,17 @@ they express no useful policy.
 
 ## Result and exit contract
 
-Native LOC states normalize as `ok -> PASS`, `warn -> REVIEW`, `fail -> FAIL`, and `exempt -> PASS` with the exemption reason retained. Only REVIEW and FAIL add `loc` to `requiredPolicies`. Callable size, nesting, and complexity contribute only PASS or REVIEW and route their stable guard IDs only on REVIEW.
+Native LOC states normalize as `ok -> PASS`, `warn -> REVIEW`, `fail -> FAIL`, and `exempt -> PASS` with the exemption reason retained. Only REVIEW and FAIL add `loc` to `requiredPolicies`. Callable size, nesting, complexity, Markdown document size, and Markdown section size contribute only PASS or REVIEW and route their stable guard IDs only on REVIEW.
 
 Normal exits are 0 for PASS, 1 for REVIEW, 2 for FAIL, and 3 for configuration/runtime errors. `--ci` changes REVIEW to exit 0; FAIL and errors remain 2 and 3.
 
 ## Status
 
-File LOC at 400/600, callable LOC at 80, structural nesting at 4, and cyclomatic
-complexity at 15 are enabled by default. Syntax guards are REVIEW-only and
-support authorized project overrides or explicit disablement. One shared syntax
-analysis pass serves every enabled syntax guard.
+File LOC at 400/600, callable LOC at 80, structural nesting at 4, cyclomatic
+complexity at 15, Markdown document size at 800, and Markdown direct-section
+size at 200 are enabled by default. Only LOC can fail. One shared syntax
+analysis pass serves enabled syntax guards, and one independently lazy Markdown
+scan serves enabled Markdown guards.
 
 ## License
 

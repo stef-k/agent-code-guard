@@ -156,7 +156,7 @@ class CallableSizeOrchestrationTests(unittest.TestCase):
             with patch("agent_code_guard.analysis.pipeline.analyze_files", wraps=analyze_files) as analyze:
                 results = run_guards(scope, enabled_args)
                 self.assertEqual(analyze.call_count, 1)
-                self.assertEqual(results[-1].guard_id, "callableSize")
+                self.assertIn("callableSize", [result.guard_id for result in results])
 
 
 class CallableSizeRunnerTests(CodeGuardTestCase):
@@ -198,6 +198,7 @@ class CallableSizeRunnerTests(CodeGuardTestCase):
             source.write_text("def broken(:\n    pass\n", encoding="utf-8")
             config = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={
                 "callableSize": {"enabled": False}, "nesting": {"enabled": False}, "cyclomaticComplexity": {"enabled": False},
+                "markdownDocumentSize": {"enabled": False}, "markdownSectionSize": {"enabled": False},
             })
             result = self.run_guard(root, str(source), "--config", str(config), "--json")
             self.assertEqual((result.returncode, self.read_json(result)["requiredPolicies"]), (0, []))

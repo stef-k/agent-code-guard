@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from .file_selection import resolve_scope
-from .guards import callable_size, complexity, loc, nesting
+from .guards import callable_size, complexity, loc, markdown_document_size, markdown_section_size, nesting
 from .result_model import GuardResult, aggregate_state, required_policies
 
 
@@ -50,6 +50,8 @@ def run_guards(scope, args: argparse.Namespace) -> list[GuardResult]:
     callable_size_config = callable_size.load_config(args)
     nesting_config = nesting.load_config(args)
     complexity_config = complexity.load_config(args)
+    markdown_document_config = markdown_document_size.load_config(args)
+    markdown_section_config = markdown_section_size.load_config(args)
     results = [loc.run(scope.root, loc_config, scope.files)]
     needs_analysis = callable_size_config.enabled or nesting_config.enabled or complexity_config.enabled
     if needs_analysis:
@@ -61,7 +63,27 @@ def run_guards(scope, args: argparse.Namespace) -> list[GuardResult]:
             results.append(nesting.run(scope.root, nesting_config, facts))
         if complexity_config.enabled:
             results.append(complexity.run(scope.root, complexity_config, facts))
+    needs_markdown = markdown_document_config.enabled or markdown_section_config.enabled
+    markdown_files = tuple(path for path in scope.files if path.suffix.lower() == ".md") if needs_markdown else ()
+    if markdown_files:
+        markdown = import_module("agent_code_guard.markdown")
+        markdown_facts = markdown.analyze_files(markdown_files)
+        if markdown_document_config.enabled:
+            results.append(markdown_document_size.run(scope.root, markdown_document_config, markdown_facts))
+        if markdown_section_config.enabled:
+            results.append(markdown_section_size.run(scope.root, markdown_section_config, markdown_facts))
+    else:
+        if markdown_document_config.enabled:
+            results.append(markdown_document_size.run(scope.root, markdown_document_config, _empty_markdown_facts()))
+        if markdown_section_config.enabled:
+            results.append(markdown_section_size.run(scope.root, markdown_section_config, _empty_markdown_facts()))
     return results
+
+
+def _empty_markdown_facts():
+    """Avoid importing the scanner family for scopes with no applicable files."""
+    from types import SimpleNamespace
+    return SimpleNamespace(documents=())
 
 
 def print_text(data: dict[str, object]) -> None:
@@ -108,10 +130,33 @@ def print_text(data: dict[str, object]) -> None:
                 f"— {finding['callable']} complexity {finding['measured']} "
                 f"(review {finding['thresholds']['reviewAt']})"
             )
+    _print_markdown_findings(data)
     policies = data["requiredPolicies"]
     if policies:
         print(f"Required policies: {', '.join(policies)}")
         print("Required action: inspect each actionable finding using its policy guidance.")
+
+
+def _print_markdown_findings(data: dict[str, object]) -> None:
+    markdown_document_result = data["guards"].get("markdownDocumentSize")
+    if markdown_document_result:
+        for finding in markdown_document_result["findings"]:
+            if finding["state"] != "review":
+                continue
+            print(
+                f"REVIEW: {finding['path']} — Markdown document is {finding['measured']} lines "
+                f"(review {finding['thresholds']['reviewAt']})"
+            )
+    markdown_section_result = data["guards"].get("markdownSectionSize")
+    if markdown_section_result:
+        for finding in markdown_section_result["findings"]:
+            if finding["state"] != "review":
+                continue
+            print(
+                f"REVIEW: {finding['path']}:{finding['range']['startLine']}-{finding['range']['endLine']} "
+                f"— section {json.dumps(finding['heading'], ensure_ascii=False)} is {finding['measured']} lines "
+                f"(review {finding['thresholds']['reviewAt']})"
+            )
 
 
 def exit_code(overall: str, ci: bool) -> int:

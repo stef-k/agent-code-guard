@@ -33,6 +33,8 @@
     },
     "callableSize": { "reviewAt": 100 },
     "nesting": { "enabled": false },
-    "cyclomaticComplexity": { "reviewAt": 20 }
+    "cyclomaticComplexity": { "reviewAt": 20 },
+    "markdownDocumentSize": { "reviewAt": 800 },
+    "markdownSectionSize": { "reviewAt": 200 }
   }
 }

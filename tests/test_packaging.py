@@ -33,7 +33,7 @@ with tempfile.TemporaryDirectory() as temp:
     path = Path(temp) / "sample.py"
     path.write_text("value = 1\\n", encoding="utf-8")
     config = Path(temp) / "config.json"
-    config.write_text('{"guards":{"callableSize":{"enabled":false},"nesting":{"enabled":false},"cyclomaticComplexity":{"enabled":false}}}', encoding="utf-8")
+    config.write_text('{"guards":{"callableSize":{"enabled":false},"nesting":{"enabled":false},"cyclomaticComplexity":{"enabled":false},"markdownDocumentSize":{"enabled":false},"markdownSectionSize":{"enabled":false}}}', encoding="utf-8")
     with patch.object(sys, "argv", ["code-guard", str(path), "--config", str(config), "--json"]):
         result = main()
 
@@ -61,6 +61,24 @@ print(json.dumps({"result": result, "loaded": loaded}))
                 [sys.executable, "-c", script, str(path)], text=True, capture_output=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_installed_package_exposes_production_markdown_without_research_imports(self) -> None:
+        script = """
+import json
+import sys
+from pathlib import Path
+from agent_code_guard.guards import markdown_document_size, markdown_section_size
+from agent_code_guard.markdown import analyze_files
+facts = analyze_files([Path(sys.argv[1])])
+print(json.dumps({"lines": facts.documents[0].physical_lines,
+                  "research": sorted(name for name in sys.modules if name.startswith("research"))}))
+"""
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "sample.md"
+            path.write_text("# Heading\nbody\n", encoding="utf-8")
+            result = subprocess.run([sys.executable, "-c", script, str(path)], text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout), {"lines": 2, "research": []})
 
     def test_checkout_compatibility_launcher_finds_source_package(self) -> None:
         result = subprocess.run(

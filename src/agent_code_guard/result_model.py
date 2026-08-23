@@ -65,10 +65,49 @@ class CallableFinding:
 
 
 @dataclass(frozen=True)
+class MarkdownDocumentFinding:
+    path: str
+    measured: int
+    state: str
+    thresholds: dict[str, int]
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "path": self.path,
+            "measured": self.measured,
+            "state": self.state,
+            "thresholds": self.thresholds,
+        }
+
+
+@dataclass(frozen=True)
+class MarkdownSectionFinding:
+    path: str
+    heading: str
+    level: int
+    start_line: int
+    end_line: int
+    measured: int
+    state: str
+    thresholds: dict[str, int]
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "path": self.path,
+            "heading": self.heading,
+            "level": self.level,
+            "range": {"startLine": self.start_line, "endLine": self.end_line},
+            "measured": self.measured,
+            "state": self.state,
+            "thresholds": self.thresholds,
+        }
+
+
+@dataclass(frozen=True)
 class GuardResult:
     guard_id: str
     state: str
-    findings: list[Finding | CallableFinding]
+    findings: list[Finding | CallableFinding | MarkdownDocumentFinding | MarkdownSectionFinding]
 
     @property
     def required_policies(self) -> list[str]:
