@@ -303,13 +303,16 @@ class SymlinkScopeTests(CodeGuardTestCase):
             self.assertEqual(explicit.returncode, 3)
             self.assertIn("explicit path does not exist: audit/broken.py", self.read_json(explicit)["error"])
 
-    def test_git_backed_recursive_external_file_symlink_is_skipped(self) -> None:
+    def test_git_backed_recursive_symlinks_are_skipped(self) -> None:
         with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside_temp:
             root = Path(temp); init_git(root)
             outside = Path(outside_temp) / "outside.py"
             write_lines(outside, 7)
             write_lines(root / "audit" / "normal.py", 4)
+            write_lines(root / "other-dir" / "other.py", 7)
+            self.make_symlink(root / "audit" / "internal.py", Path("normal.py"))
             self.make_symlink(root / "audit" / "external.py", outside)
+            self.make_symlink(root / "audit" / "linked-dir", Path("../other-dir"), target_is_directory=True)
             git(root, "add", "."); git(root, "commit", "-m", "tracked symlink fixture")
 
             result = self.run_guard(root, "audit", "--warn", "3", "--fail", "6", "--json")
