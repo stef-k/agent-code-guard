@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from importlib.metadata import version
+from importlib.metadata import distribution, version
+import json
 from pathlib import Path
 import shutil
-import sysconfig
+from urllib.parse import unquote, urlparse
+from urllib.request import url2pathname
 
 
 PAYLOAD_FILES = (
@@ -22,7 +24,20 @@ PAYLOAD_FILES = (
 
 def skill_path() -> Path:
     """Return the installed canonical skill payload directory."""
-    path = Path(sysconfig.get_path("data")) / "share" / "agent-code-guard" / "skill"
+    package = distribution("agent-code-guard")
+    suffix = "share/agent-code-guard/skill/SKILL.md"
+    path = next(
+        (
+            Path(package.locate_file(item)).parent
+            for item in package.files or ()
+            if str(item).replace("\\", "/").endswith(suffix)
+        ),
+        None,
+    )
+    if path is None:
+        path = _editable_skill_path(package)
+    if path is None:
+        raise ValueError("installed distribution does not contain the Code Guard skill payload")
     _validate_payload(path)
     return path.resolve()
 
@@ -59,3 +74,18 @@ def _validate_payload(path: Path) -> None:
         candidate = path / relative
         if candidate.is_symlink() or not candidate.is_file():
             raise ValueError(f"installed skill payload has an unsafe or missing file: {relative}")
+
+
+def _editable_skill_path(package) -> Path | None:
+    """Use PEP 610 metadata when setuptools omits data-files from editable wheels."""
+    direct_url = package.read_text("direct_url.json")
+    if direct_url is None:
+        return None
+    metadata = json.loads(direct_url)
+    if not metadata.get("dir_info", {}).get("editable"):
+        return None
+    parsed = urlparse(metadata.get("url", ""))
+    if parsed.scheme != "file":
+        return None
+    checkout = Path(url2pathname(unquote(parsed.path)))
+    return checkout / "skills" / "code-guard"
