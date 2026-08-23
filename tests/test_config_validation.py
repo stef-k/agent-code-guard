@@ -37,6 +37,10 @@ class ConfigurationValidationTests(CodeGuardTestCase):
                 {"guards": {"callableSize": {"enabled": False, "revieAt": 100}}},
                 "guards.callableSize.revieAt",
             ),
+            (
+                {"guards": {"nesting": {"zzz": 1}, "callableSize": {"aaa": 1}}},
+                "guards.callableSize.aaa",
+            ),
         ]
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -100,6 +104,18 @@ class ConfigurationValidationTests(CodeGuardTestCase):
                     result = self.run_guard(root, source, "--config", str(config), "--json")
                     self.assertEqual(result.returncode, 3)
                     self.assertEqual(self.read_json(result), expected)
+
+    def test_scope_typo_precedes_source_analysis(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = self.write_config(root, {"scope": {"exlcude": ["malformed.py"]}})
+            (root / "malformed.py").write_text("def broken(:\n", encoding="utf-8")
+            result = self.run_guard(root, "malformed.py", "--config", str(config), "--json")
+            self.assertEqual(result.returncode, 3)
+            self.assertEqual(
+                self.read_json(result),
+                {"error": "unknown configuration property: scope.exlcude"},
+            )
 
     def test_human_unknown_key_error_uses_existing_error_channel(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

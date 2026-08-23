@@ -16,6 +16,13 @@ GUARD_KEYS = {
     "markdownDocumentSize",
     "markdownSectionSize",
 }
+REVIEW_GUARD_NAMES = (
+    "callableSize",
+    "nesting",
+    "cyclomaticComplexity",
+    "markdownDocumentSize",
+    "markdownSectionSize",
+)
 REVIEW_GUARD_KEYS = {"enabled", "reviewAt"}
 LOC_KEYS = {
     "enabled",
@@ -49,7 +56,7 @@ def validate_configuration(config: str | None, start: Path) -> None:
     if not isinstance(guards, dict):
         return
     _reject_unknown(guards, GUARD_KEYS, "guards")
-    for guard_name in GUARD_KEYS - {"loc"}:
+    for guard_name in REVIEW_GUARD_NAMES:
         _validate_object_keys(guards.get(guard_name), REVIEW_GUARD_KEYS, f"guards.{guard_name}")
     loc = guards.get("loc")
     if not isinstance(loc, dict):
