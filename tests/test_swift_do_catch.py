@@ -73,10 +73,19 @@ class SwiftDoCatchFactTests(unittest.TestCase):
             self.assertEqual(owned(nested_facts, "decisions", nested_facts.callables[0]), [])
 
     def test_single_and_multiple_catches_emit_one_exception_control_and_authored_decisions(self) -> None:
-        cases = ((SINGLE_CATCH, 1), (MULTIPLE_CATCHES, 2))
+        cases = (
+            (SINGLE_CATCH, (
+                b"catch {\n        recover()\n    }",
+            )),
+            (MULTIPLE_CATCHES, (
+                b"catch Error.one {\n        recoverOne()\n    }",
+                b"catch Error.two {\n        recoverTwo()\n    }",
+            )),
+        )
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            for index, (source, catch_count) in enumerate(cases):
+            for index, (source, catch_texts) in enumerate(cases):
+                catch_count = len(catch_texts)
                 with self.subTest(catch_count=catch_count):
                     path = write_source(root, f"caught-{index}.swift", source)
                     facts = analyze_files([path])
@@ -90,13 +99,24 @@ class SwiftDoCatchFactTests(unittest.TestCase):
                          control.parent_control_range),
                         ("do_statement", "exception", True, None),
                     )
-                    self.assertTrue(authored(path, control.source_range).startswith(b"do {"))
-                    self.assertEqual(authored(path, control.source_range).count(b"catch"), catch_count)
+                    source_bytes = path.read_bytes()
+                    newline = b"\r\n" if b"\r\n" in source_bytes else b"\n"
+                    expected_control = source_bytes[source_bytes.index(b"do {"):source_bytes.rindex(newline + b"}")]
+                    catch_texts = tuple(text.replace(b"\n", newline) for text in catch_texts)
+                    self.assertEqual(authored(path, control.source_range), expected_control)
+                    self.assertEqual(
+                        (control.source_range.start.byte_offset, control.source_range.end.byte_offset),
+                        (source_bytes.index(expected_control), source_bytes.index(expected_control) + len(expected_control)),
+                    )
                     decisions = owned(facts, "decisions", callable_fact)
                     catches = [item for item in decisions if item.category == "catch"]
                     self.assertEqual(len(catches), catch_count)
                     self.assertEqual([item.provider_kind for item in catches], ["catch_block"] * catch_count)
-                    self.assertTrue(all(authored(path, item.source_range).startswith(b"catch") for item in catches))
+                    self.assertEqual([authored(path, item.source_range) for item in catches], list(catch_texts))
+                    self.assertEqual(
+                        [(item.source_range.start.byte_offset, item.source_range.end.byte_offset) for item in catches],
+                        [(source_bytes.index(text), source_bytes.index(text) + len(text)) for text in catch_texts],
+                    )
                     starts = [item.source_range.start.byte_offset for item in decisions]
                     self.assertEqual(starts, sorted(starts))
 
@@ -247,15 +267,16 @@ class SwiftDoCatchPublicTests(CodeGuardTestCase):
             for index, (source, catch_count, complexity) in enumerate(cases):
                 with self.subTest(catch_count=catch_count):
                     path = write_source(root, f"caught-{index}.swift", source)
-                    result = self.run_guard(
-                        root, str(path), "--config", str(self.config(root, 1, complexity)), "--json",
-                    )
+                    result = self.run_guard(root, str(path), "--config", str(self.config(root, 1, 1)), "--json")
                     payload = self.read_json(result)
-                    self.assertEqual(result.returncode, 0)
-                    self.assertEqual(payload["guards"]["nesting"]["findings"][0]["measured"], 1)
+                    self.assertEqual(result.returncode, 1)
+                    nesting = payload["guards"]["nesting"]
+                    self.assertEqual((nesting["state"], nesting["findings"][0]["measured"],
+                                      nesting["findings"][0]["state"]), ("pass", 1, "pass"))
                     finding = payload["guards"]["complexity"]["findings"][0]
-                    self.assertEqual((finding["measured"], finding["details"]["decisions"]),
-                                     (complexity, {"catch": catch_count}))
+                    self.assertEqual((finding["measured"], finding["state"], finding["details"]["decisions"]),
+                                     (complexity, "review", {"catch": catch_count}))
+                    self.assertEqual(payload["requiredPolicies"], ["complexity"])
 
     def test_malformed_do_catch_is_public_exit_three(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
