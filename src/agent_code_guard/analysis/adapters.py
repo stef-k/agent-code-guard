@@ -65,7 +65,7 @@ def _structural_facts(callable_node, callable_key: CallableKey, region: Executab
                 ))
                 if increases:
                     next_parent = child_range
-            if child.type in DECISION_TYPES[language] and not _is_default_branch(child, region.source):
+            if child.type in DECISION_TYPES[language] and not _is_default_branch(child, region.source, language):
                 decisions.append(DecisionFact(
                     callable_key.identity, callable_key, DECISION_CATEGORIES.get(child.type, child.type), child.type, child_range,
                 ))
@@ -445,8 +445,10 @@ def _is_else_if(node, language: str) -> bool:
     return bool(parent and parent.type == "if_statement" and parent.child_by_field_name("alternative") == node)
 
 
-def _is_default_branch(node, source: bytes) -> bool:
+def _is_default_branch(node, source: bytes, language: str | None = None) -> bool:
     if node.type == "else_if_clause":
+        return False
+    if language == "python" and node.type == "case_clause" and node.child_by_field_name("guard") is not None:
         return False
     return _text(node, source).lstrip().startswith(("default", "else", "case _", "case var _", "_ ->", "_ =>"))
 
@@ -557,6 +559,12 @@ def _php_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> tup
 
 
 def _pattern_guard(node, language: str):
+    if language == "python" and node.type == "case_clause":
+        guard = node.child_by_field_name("guard")
+        return guard.named_children[0] if guard is not None and guard.named_children else None
+    if language == "csharp" and node.type == "switch_expression_arm":
+        clause = next((child for child in node.named_children if child.type == "when_clause"), None)
+        return clause.named_children[0] if clause is not None and clause.named_children else None
     if language == "rust" and node.type == "match_arm":
         pattern = node.child_by_field_name("pattern")
         return pattern.child_by_field_name("condition") if pattern is not None else None
