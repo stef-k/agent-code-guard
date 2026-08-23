@@ -56,7 +56,7 @@ def scan_bytes(source: bytes, format_name: str) -> dict:
             start_line=start_line,
             end_line=end_line,
             physical_lines=end_line - start_line + 1,
-            direct_children=sum(child.type == "element" for child in _element_children(node)),
+            direct_children=sum(child.type in _ELEMENT_TYPES for child in _element_children(node)),
             is_root=ancestors == 0,
         ))
     return {
