@@ -18,11 +18,11 @@ CLASSIC_EQUIVALENTS = {
 }
 
 PROVIDER_KINDS = {
-    ".cpp": "compound_statement",
-    ".cs": "switch_body",
-    ".java": "switch_block",
-    ".js": "switch_body",
-    ".ts": "switch_body",
+    ".cpp": "case_statement",
+    ".cs": "switch_section",
+    ".java": "switch_block_statement_group",
+    ".js": "switch_case",
+    ".ts": "switch_case",
 }
 
 

@@ -69,8 +69,8 @@ def _structural_facts(callable_node, callable_key: CallableKey, region: Executab
                 decisions.append(DecisionFact(
                     callable_key.identity, callable_key, DECISION_CATEGORIES.get(child.type, child.type), child.type, child_range,
                 ))
-            for arm_range in _extra_switch_arm_ranges(child, language, region):
-                decisions.append(DecisionFact(callable_key.identity, callable_key, "switch_arm", child.type, arm_range))
+            for provider_kind, arm_range in _extra_switch_arm_ranges(child, language, region):
+                decisions.append(DecisionFact(callable_key.identity, callable_key, "switch_arm", provider_kind, arm_range))
             for arm_range in _php_switch_arm_ranges(child, language, region):
                 decisions.append(DecisionFact(
                     callable_key.identity, callable_key, "switch_arm", "case_statement", arm_range,
@@ -457,19 +457,24 @@ def _control_category(provider_kind: str, language: str) -> str:
     return CONTROL_CATEGORIES.get(provider_kind, provider_kind)
 
 
-def _extra_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> tuple[SourceRange, ...]:
+def _extra_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> tuple[tuple[str, SourceRange], ...]:
     if language == "java" and node.type == "switch_rule":
-        return () if _is_default_branch(node, region.source) else (region.original_range(node),)
+        return () if _is_default_branch(node, region.source) else ((node.type, region.original_range(node)),)
 
     clause_types: set[str]
+    provider_kind: str
     if language == "cpp" and node.type == "compound_statement" and node.parent.type == "switch_statement":
         clause_types = {"case_statement"}
+        provider_kind = "case_statement"
     elif language == "csharp" and node.type == "switch_body":
         clause_types = {"switch_section"}
+        provider_kind = "switch_section"
     elif language == "java" and node.type == "switch_block":
         clause_types = {"switch_block_statement_group"}
+        provider_kind = "switch_block_statement_group"
     elif language in {"javascript", "typescript", "tsx"} and node.type == "switch_body":
         clause_types = {"switch_case", "switch_default"}
+        provider_kind = "switch_case"
     else:
         return ()
 
@@ -486,7 +491,7 @@ def _extra_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> t
         if representative is not None:
             ranges.append(region.original_range(representative))
         pending_case = None
-    return tuple(ranges)
+    return tuple((provider_kind, arm_range) for arm_range in ranges)
 
 
 def _classic_switch_clause_has_body(clause) -> bool:
