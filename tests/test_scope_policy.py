@@ -45,13 +45,13 @@ class ScopePolicyTests(CodeGuardTestCase):
                 config = root / "valid.json"
                 config.write_text(json.dumps({} if scope is None else {"scope": scope}), encoding="utf-8")
                 resolved = resolve_scope(selection_args(".", config=config), root)
-                self.assertIn(root / "keep.py", resolved.files)
+                self.assertIn((root / "keep.py").resolve(), resolved.files)
             config = root / "combined.json"
             config.write_text(json.dumps({"scope": {"exclude": ["vendor/**"]}}), encoding="utf-8")
             resolved = resolve_scope(selection_args(".", config=config, scope_exclude=["generated/**"]), root)
-            self.assertIn(root / "keep.py", resolved.files)
-            self.assertNotIn(root / "vendor" / "drop.py", resolved.files)
-            self.assertNotIn(root / "generated" / "drop.py", resolved.files)
+            self.assertIn((root / "keep.py").resolve(), resolved.files)
+            self.assertNotIn((root / "vendor" / "drop.py").resolve(), resolved.files)
+            self.assertNotIn((root / "generated" / "drop.py").resolve(), resolved.files)
 
     def test_patterns_apply_to_explicit_git_and_external_files_and_can_empty_scope(self) -> None:
         with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as external_temp:
@@ -86,13 +86,13 @@ class ScopePolicyTests(CodeGuardTestCase):
             (root / "nested" / ".gitignore").write_text("ignored.py\n", encoding="utf-8")
             (root / ".git" / "info" / "exclude").write_text("info-ignored.py\n", encoding="utf-8")
             resolved = resolve_scope(selection_args("."), root)
-            relative = {path.relative_to(root).as_posix() for path in resolved.files}
+            relative = {path.relative_to(resolved.root).as_posix() for path in resolved.files}
             self.assertTrue({"tracked.py", "tracked-but-now-ignored.py", "normal.py", "sp ace/Δ.py"} <= relative)
             self.assertTrue({"ignored.py", "nested/ignored.py", "info-ignored.py"}.isdisjoint(relative))
-            self.assertEqual(resolve_scope(selection_args("ignored.py"), root).files, (root / "ignored.py",))
-            self.assertEqual(resolve_scope(selection_args("nested"), root).files, (root / "nested" / ".gitignore",))
+            self.assertEqual(resolve_scope(selection_args("ignored.py"), root).files, ((root / "ignored.py").resolve(),))
+            self.assertEqual(resolve_scope(selection_args("nested"), root).files, ((root / "nested" / ".gitignore").resolve(),))
             self.assertEqual(resolve_scope(selection_args("ignored-directory"), root).files, ())
-            self.assertEqual(resolve_scope(selection_args("sp ace"), root).files, (root / "sp ace" / "Δ.py",))
+            self.assertEqual(resolve_scope(selection_args("sp ace"), root).files, ((root / "sp ace" / "Δ.py").resolve(),))
 
     def test_scope_exclusion_applies_after_changed_staged_and_base_ref_selection(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -116,9 +116,9 @@ class ScopePolicyTests(CodeGuardTestCase):
                 write_lines(root / directory / "special.py", 1)
             write_lines(root / "normal.py", 1)
             recursive = resolve_scope(selection_args("."), root)
-            self.assertEqual(recursive.files, (root / "normal.py",))
+            self.assertEqual(recursive.files, ((root / "normal.py").resolve(),))
             explicit = resolve_scope(selection_args("bin/special.py"), root)
-            self.assertEqual(explicit.files, (root / "bin" / "special.py",))
+            self.assertEqual(explicit.files, ((root / "bin" / "special.py").resolve(),))
 
     def test_no_vcs_directory_scope_uses_walk_and_global_exclusions(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -128,8 +128,8 @@ class ScopePolicyTests(CodeGuardTestCase):
             config = root / "config.json"
             config.write_text(json.dumps({"scope": {"exclude": ["vendor/**"]}}), encoding="utf-8")
             resolved = resolve_scope(selection_args(".", config=config), root)
-            self.assertIn(root / "src" / "keep.py", resolved.files)
-            self.assertNotIn(root / "vendor" / "drop.py", resolved.files)
+            self.assertIn((root / "src" / "keep.py").resolve(), resolved.files)
+            self.assertNotIn((root / "vendor" / "drop.py").resolve(), resolved.files)
 
     def test_global_exclusion_precedes_analysis_and_loc_exclusion_remains_loc_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
