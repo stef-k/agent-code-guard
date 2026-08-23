@@ -319,6 +319,18 @@ class GitSelectionTests(CodeGuardTestCase):
             result = self.run_guard(root, "src/app", "--changed-only", "--warn", "3", "--fail", "6", "--json")
             self.assertEqual([item["path"] for item in self.findings(result)], ["src/app/a.py"])
 
+    def test_changed_only_unions_multiple_directory_bounds_before_intersection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); init_git(root)
+            for name in ["src/a.py", "tests/test_a.py", "docs/unrelated.py"]:
+                write_lines(root / name, 1)
+            git(root, "add", "."); git(root, "commit", "-m", "baseline")
+            for name in ["src/a.py", "tests/test_a.py", "docs/unrelated.py"]:
+                write_lines(root / name, 4)
+
+            result = self.run_guard(root, "src", "tests", "--changed-only", "--warn", "3", "--fail", "6", "--json")
+            self.assertEqual({item["path"] for item in self.findings(result)}, {"src/a.py", "tests/test_a.py"})
+
     def test_changed_only_validates_missing_and_does_not_broaden_external_bound(self) -> None:
         with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside_temp:
             root = Path(temp); init_git(root)
@@ -348,10 +360,10 @@ class GitSelectionTests(CodeGuardTestCase):
             git(root, "add", "."); git(root, "commit", "-m", "baseline")
             write_lines(root / "src/a.py", 4); write_lines(root / "src/b.py", 4)
             result = self.run_guard(
-                root, "src", "--changed-only", "--scope-exclude", "src/a.py",
+                root, "src/a.py", "--changed-only", "--scope-exclude", "src/a.py",
                 "--warn", "3", "--fail", "6", "--json",
             )
-            self.assertEqual([item["path"] for item in self.findings(result)], ["src/b.py"])
+            self.assertEqual((result.returncode, self.read_json(result)["overall"], self.findings(result)), (0, "pass", []))
 
     def test_staged_intersects_candidates_with_file_bounds_and_can_be_empty(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
