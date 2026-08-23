@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from research.markdown_guard_sample import _distribution, measure, scan_text
+from research.markdown_guard_sample import _distribution, _section_finding_summary, measure, scan_text
 
 
 class MarkdownScannerTests(unittest.TestCase):
@@ -122,6 +122,19 @@ class MarkdownMeasurementTests(unittest.TestCase):
         self.assertEqual(result["summary"]["totalPhysicalLines"]["median"], 2.5)
         self.assertEqual(result["summary"]["totalPhysicalLines"]["above"]["2"]["count"], 1)
         self.assertEqual(result["summary"]["maxDirectContentSectionLines"]["above"]["1"]["count"], 2)
+        finding_summary = result["summary"]["directContentSectionFindings"]
+        self.assertEqual(finding_summary["totalSections"], 2)
+        self.assertEqual(
+            finding_summary["above"]["1"],
+            {
+                "findingCount": 2,
+                "findingPercent": 100.0,
+                "affectedDocuments": 2,
+                "affectedDocumentPercent": 100.0,
+                "documentsWithMultipleFindings": 0,
+                "findingsPerDocument": {"1": 2},
+            },
+        )
 
     def test_measurement_exclusions_are_root_relative_globs(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -164,6 +177,29 @@ class MarkdownMeasurementTests(unittest.TestCase):
             second = json.dumps(measure([str(root)], root), sort_keys=True, ensure_ascii=False)
 
         self.assertEqual(first, second)
+
+    def test_section_finding_summary_counts_multiple_findings_per_document(self) -> None:
+        documents = [
+            {"directContentSections": [{"physicalLines": 3}, {"physicalLines": 2}]},
+            {"directContentSections": [{"physicalLines": 1}]},
+        ]
+
+        summary = _section_finding_summary(documents, (1, 2))
+
+        self.assertEqual(summary["totalSections"], 3)
+        self.assertEqual(
+            summary["above"]["1"],
+            {
+                "findingCount": 2,
+                "findingPercent": 66.67,
+                "affectedDocuments": 1,
+                "affectedDocumentPercent": 50.0,
+                "documentsWithMultipleFindings": 1,
+                "findingsPerDocument": {"0": 1, "2": 1},
+            },
+        )
+        self.assertEqual(summary["above"]["2"]["findingCount"], 1)
+        self.assertEqual(summary["above"]["2"]["findingsPerDocument"], {"0": 1, "1": 1})
 
 
 if __name__ == "__main__":
