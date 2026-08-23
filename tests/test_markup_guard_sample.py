@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import pytest
+import unittest
 
 from research.markup_guard_sample import MarkupMeasurementError, scan_bytes, summarize
 
@@ -50,7 +50,7 @@ def test_xml_measurement_handles_namespace_declaration_cdata_comment_and_empty_e
 
 
 def test_malformed_xml_is_a_measurement_error() -> None:
-    with pytest.raises(MarkupMeasurementError, match="syntax error"):
+    with unittest.TestCase().assertRaisesRegex(MarkupMeasurementError, "syntax error"):
         scan_bytes(b"<root><item></root>", "xml")
 
 
