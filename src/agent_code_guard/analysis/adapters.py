@@ -285,19 +285,25 @@ def _second_wave_name(node, language: str, source: bytes) -> str | None:
         signature = next((child for child in node.named_children if child.type == "function_signature"), None)
         name = signature.child_by_field_name("name") if signature is not None else _assigned_name(node, language)
     elif language == "dart" and node.type == "method_signature":
-        signature = next((child for child in node.named_children
-                          if child.type in {
-                              "function_signature", "constructor_signature", "factory_constructor_signature",
-                          }), None)
-        if signature is not None and signature.type in {"constructor_signature", "factory_constructor_signature"}:
-            return _dart_constructor_name(signature, source)
-        name = signature.child_by_field_name("name") if signature is not None else None
+        return _dart_method_name(node, source)
     elif language == "dart" and node.type == "class_definition":
         name = node.child_by_field_name("name")
     elif language == "rust" and node.type == "impl_item":
         name = node.child_by_field_name("type")
     if name is None and language == "swift" and node.type == "class_declaration":
         name = next((child for child in node.named_children if child.type in {"type_identifier", "user_type"}), None)
+    return _text(name, source).lstrip("$") if name is not None else None
+
+
+def _dart_method_name(method_signature, source: bytes) -> str | None:
+    signature = next((child for child in method_signature.named_children if child.type in {
+        "function_signature", "constructor_signature", "factory_constructor_signature",
+    }), None)
+    if signature is None:
+        return None
+    if signature.type in {"constructor_signature", "factory_constructor_signature"}:
+        return _dart_constructor_name(signature, source)
+    name = signature.child_by_field_name("name")
     return _text(name, source).lstrip("$") if name is not None else None
 
 
