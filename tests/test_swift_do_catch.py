@@ -64,6 +64,14 @@ class SwiftDoCatchFactTests(unittest.TestCase):
             self.assertEqual(owned(facts, "controls", callable_fact), [])
             self.assertEqual(owned(facts, "decisions", callable_fact), [])
 
+            nested = write_source(Path(temp), "nested.swift", '''func example() {
+    do { do { do { work() } } }
+}
+''')
+            nested_facts = analyze_files([nested])
+            self.assertEqual(owned(nested_facts, "controls", nested_facts.callables[0]), [])
+            self.assertEqual(owned(nested_facts, "decisions", nested_facts.callables[0]), [])
+
     def test_single_and_multiple_catches_emit_one_exception_control_and_authored_decisions(self) -> None:
         cases = ((SINGLE_CATCH, 1), (MULTIPLE_CATCHES, 2))
         with tempfile.TemporaryDirectory() as temp:
@@ -179,8 +187,8 @@ class SwiftDoCatchFactTests(unittest.TestCase):
                                      [] if name == "plain" else ["catch"])
 
     def test_swift_guard_switch_where_and_javascript_do_loop_regressions(self) -> None:
-        swift = '''func choose(_ x: Int?) {
-    guard let x else { return }
+        swift = '''func choose(_ x: Int?, _ retry: Bool) {
+    guard let x else { if retry { return }; return }
     switch x {
     case let n where n > 0: work()
     default: return
@@ -192,10 +200,13 @@ class SwiftDoCatchFactTests(unittest.TestCase):
             root = Path(temp)
             swift_facts = analyze_files([write_source(root, "guard.swift", swift)])
             callable_fact = swift_facts.callables[0]
-            self.assertEqual([item.provider_kind for item in owned(swift_facts, "controls", callable_fact)],
-                             ["guard_statement", "switch_statement"])
+            controls = owned(swift_facts, "controls", callable_fact)
+            self.assertEqual([item.provider_kind for item in controls],
+                             ["guard_statement", "if_statement", "switch_statement"])
+            self.assertEqual(controls[1].parent_control_range, controls[0].source_range)
+            self.assertIsNone(controls[2].parent_control_range)
             self.assertEqual([item.category for item in owned(swift_facts, "decisions", callable_fact)],
-                             ["condition", "switch_arm", "pattern_guard"])
+                             ["condition", "condition", "switch_arm", "pattern_guard"])
             js_facts = analyze_files([write_source(root, "loop.js", javascript)])
             do_loop = owned(js_facts, "controls", js_facts.callables[0])[0]
             self.assertEqual((do_loop.provider_kind, do_loop.category, do_loop.increases_nesting),
