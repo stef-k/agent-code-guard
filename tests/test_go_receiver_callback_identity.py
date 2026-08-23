@@ -29,7 +29,9 @@ type B struct{}
 func (a A) Run() {
     _ = func() {
         if ready {
-            work()
+            for i := 0; i < 1; i++ {
+                work()
+            }
         }
     }
 }
@@ -37,7 +39,9 @@ func (a A) Run() {
 func (b B) Run() {
     _ = func() {
         if ready {
-            work()
+            for i := 0; i < 1; i++ {
+                work()
+            }
         }
     }
 }
@@ -48,14 +52,18 @@ func (b B) Run() {
             self.assertEqual(facts, analyze_files([path]))
             self.assertEqual([item.identity for item in facts.callables], [
                 "sample.A.Run", "sample.A.Run.<callback@7:9>",
-                "sample.B.Run", "sample.B.Run.<callback@15:9>",
+                "sample.B.Run", "sample.B.Run.<callback@17:9>",
             ])
             authored = path.read_bytes()
             callbacks = [item for item in facts.callables if item.boundary_kind == "callback"]
             first_start = authored.index(b"func()")
             expected_starts = [first_start, authored.index(b"func()", first_start + 1)]
-            self.assertEqual([item.source_range.start.byte_offset for item in callbacks], expected_starts)
-            for callback in callbacks:
+            newline = b"\r\n" if b"\r\n" in authored else b"\n"
+            literal = newline.join((
+                b"func() {", b"        if ready {", b"            for i := 0; i < 1; i++ {",
+                b"                work()", b"            }", b"        }", b"    }",
+            ))
+            for callback, start_line, start_offset in zip(callbacks, (7, 17), expected_starts):
                 parent = next(item for item in facts.callables if item.key == callback.parent_key)
                 self.assertEqual(callback.parent_callable, parent.identity)
                 self.assertEqual(callback.key.identity, callback.identity)
@@ -63,17 +71,24 @@ func (b B) Run() {
                                  (callback.path, "go", callback.source_range))
                 self.assertEqual(callback.parent_key, parent.key)
                 self.assertEqual(callback.boundary_kind, "callback")
-                self.assertEqual(callback.source_range.physical_loc, 5)
+                self.assertEqual(callback.source_range.physical_loc, 7)
+                self.assertEqual(
+                    (callback.source_range.start.line, callback.source_range.start.byte_column,
+                     callback.source_range.start.byte_offset, callback.source_range.end.line,
+                     callback.source_range.end.byte_column, callback.source_range.end.byte_offset),
+                    (start_line, 9, start_offset, start_line + 6, 6, start_offset + len(literal)),
+                )
                 actual = authored[callback.source_range.start.byte_offset:callback.source_range.end.byte_offset]
-                self.assertTrue(actual.startswith(b"func() {"))
-                self.assertIn(b"if ready", actual)
-                self.assertTrue(actual.endswith(b"}"))
+                self.assertEqual(actual, literal)
                 self.assertEqual(owned(facts, parent, "decisions"), [])
-                self.assertEqual([item.provider_kind for item in owned(facts, callback, "decisions")],
-                                 ["if_statement"])
+                decisions = owned(facts, callback, "decisions")
+                self.assertEqual([item.provider_kind for item in decisions], ["if_statement", "for_statement"])
+                self.assertEqual(1 + len(decisions), 3)
                 controls = owned(facts, callback, "controls")
-                self.assertEqual([item.provider_kind for item in controls], ["if_statement"])
-                self.assertEqual([item.parent_control_range for item in controls], [None])
+                self.assertEqual([item.provider_kind for item in controls], ["if_statement", "for_statement"])
+                self.assertEqual([item.parent_control_range for item in controls], [None, controls[0].source_range])
+                self.assertTrue(all(item.increases_nesting for item in controls))
+                self.assertEqual(len(controls), 2)
 
     def test_receiver_normalization_package_free_function_and_callback_locations(self) -> None:
         source = '''package workers
