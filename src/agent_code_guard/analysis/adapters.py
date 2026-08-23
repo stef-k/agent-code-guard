@@ -71,6 +71,10 @@ def _structural_facts(callable_node, callable_key: CallableKey, region: Executab
                 ))
             for arm_range in _extra_switch_arm_ranges(child, language, region):
                 decisions.append(DecisionFact(callable_key.identity, callable_key, "switch_arm", child.type, arm_range))
+            for arm_range in _php_switch_arm_ranges(child, language, region):
+                decisions.append(DecisionFact(
+                    callable_key.identity, callable_key, "switch_arm", "case_statement", arm_range,
+                ))
             guard = _pattern_guard(child, language)
             if guard is not None:
                 decisions.append(DecisionFact(callable_key.identity, callable_key, "pattern_guard", guard.type,
@@ -442,6 +446,8 @@ def _is_else_if(node, language: str) -> bool:
 
 
 def _is_default_branch(node, source: bytes) -> bool:
+    if node.type == "else_if_clause":
+        return False
     return _text(node, source).lstrip().startswith(("default", "else", "case _", "case var _", "_ ->", "_ =>"))
 
 
@@ -465,6 +471,30 @@ def _extra_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> t
     if labels:
         return tuple(region.original_range(label) for label in labels if not _is_default_branch(label, region.source))
     return () if _is_default_branch(node, region.source) else (region.original_range(node),)
+
+
+def _php_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> tuple[SourceRange, ...]:
+    """Normalize PHP case-label groups into executable non-default arms."""
+    if language != "php" or node.type != "switch_block":
+        return ()
+
+    ranges: list[SourceRange] = []
+    pending_case = None
+    for clause in (child for child in node.named_children
+                   if child.type in {"case_statement", "default_statement"}):
+        value = clause.child_by_field_name("value")
+        body = [child for child in clause.named_children
+                if child != value and child.type not in {"comment", "empty_statement"}]
+        if not body:
+            if clause.type == "case_statement" and pending_case is None:
+                pending_case = clause
+            continue
+
+        representative = pending_case or (clause if clause.type == "case_statement" else None)
+        if representative is not None:
+            ranges.append(region.original_range(representative))
+        pending_case = None
+    return tuple(ranges)
 
 
 def _pattern_guard(node, language: str):

@@ -59,6 +59,10 @@ class PhpFactNormalizationTests(unittest.TestCase):
                     self.assertEqual([item.provider_kind for item in conditions], provider_kinds)
                     self.assertTrue(all(item.callable_key == callable_fact.key for item in conditions))
                     self.assertEqual([item.source_range.start_line for item in conditions], sorted(item.source_range.start_line for item in conditions))
+                    source = path.read_bytes()
+                    for condition in conditions[1:]:
+                        authored = source[condition.source_range.start.byte_offset:condition.source_range.end.byte_offset]
+                        self.assertTrue(authored.startswith(b"elseif"))
                     self.assertEqual(measurements(root, path, callable_fact.identity), (expected_complexity, expected_nesting))
 
     def test_classic_switch_emits_one_fact_per_executable_non_default_destination(self) -> None:
@@ -82,6 +86,9 @@ class PhpFactNormalizationTests(unittest.TestCase):
                     self.assertTrue(all(item.provider_kind == "case_statement" for item in switch_arms))
                     self.assertTrue(all(item.callable_key == callable_fact.key for item in switch_arms))
                     self.assertEqual(switch_arms, sorted(switch_arms, key=lambda item: item.source_range.start.byte_offset))
+                    source = path.read_bytes()
+                    self.assertTrue(all(source[item.source_range.start.byte_offset:item.source_range.end.byte_offset].startswith(b"case")
+                                        for item in switch_arms))
                     self.assertEqual(measurements(root, path, callable_fact.identity), (1 + expected_count, 1))
 
     def test_switch_composes_with_existing_controls_without_case_nesting(self) -> None:
@@ -117,7 +124,7 @@ function owner() {
 """)
             facts = analyze_files([path])
             owner, owner_decisions = callable_decisions(facts, "sample.owner")
-            callback = next(item for item in facts.callables if item.boundary_kind == "callback")
+            callback = next(item for item in facts.callables if item.parent_callable == owner.identity)
             callback_decisions = [item for item in facts.decisions if item.callable_key == callback.key]
             self.assertEqual(owner_decisions, [])
             self.assertEqual([item.category for item in callback_decisions], ["condition", "condition", "switch_arm"])
@@ -143,6 +150,7 @@ function second($x) {
 ?>
 """, "Mixed.php")
             facts = analyze_files([path])
+            self.assertEqual(facts.files[0].region_count, 1)
             by_identity = {item.identity: item for item in facts.callables}
             self.assertEqual(set(by_identity), {"Mixed.first", "Mixed.second"})
             self.assertEqual([by_identity[name].source_range.start_line for name in ("Mixed.first", "Mixed.second")], [5, 11])
@@ -162,7 +170,7 @@ function owner() {
             first = analyze_files([path])
             self.assertEqual(first, analyze_files([path]))
             owner = next(item for item in first.callables if item.identity == "sample.owner")
-            callback = next(item for item in first.callables if item.boundary_kind == "callback")
+            callback = next(item for item in first.callables if item.parent_callable == owner.identity)
             self.assertEqual([item for item in first.decisions if item.callable_key == owner.key], [])
             arms = [item for item in first.decisions if item.callable_key == callback.key and item.category == "switch_arm"]
             self.assertEqual(len(arms), 2)
@@ -214,7 +222,9 @@ class PhpPublicComplexityTests(CodeGuardTestCase):
             path = write_php(root, "<?php function broken( { elseif ($x) {}")
             result = self.run_guard(root, str(path), "--json")
             self.assertEqual(result.returncode, 3)
-            self.assertIn("syntax tree contains errors", self.read_json(result)["error"])
+            payload = self.read_json(result)
+            self.assertEqual(set(payload), {"error"})
+            self.assertIn("syntax tree contains errors", payload["error"])
 
 
 if __name__ == "__main__":
