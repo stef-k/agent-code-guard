@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -73,6 +74,7 @@ class MarkdownScannerTests(unittest.TestCase):
             "    # indented\n"
             "####### seven\n"
             "#missing-space\n"
+            "\n"
             "Title\n=======\n"
             "\nNot a title\n\n---\n",
         )
@@ -87,6 +89,22 @@ class MarkdownScannerTests(unittest.TestCase):
 
         self.assertEqual(result["headings"][0]["text"], "visible")
         self.assertFalse(result["unclosedFence"])
+
+    def test_setext_does_not_promote_other_block_constructs(self) -> None:
+        result = scan_text(
+            "- item\n---\n\n> quote\n---\n\n<div>\n---\n\n1. item\n---\n\nFoo\nBar\n---\n",
+        )
+
+        self.assertEqual(result["headings"], [])
+
+    def test_line_endings_unicode_and_fence_measurement_are_deterministic(self) -> None:
+        lf = scan_text("# Καλημέρα\n~~~\n## hidden\n~~\n```\n~~~\n")
+        crlf = scan_text("# Καλημέρα\r\n~~~\r\n## hidden\r\n~~\r\n```\r\n~~~\r\n")
+
+        self.assertEqual(lf, crlf)
+        self.assertEqual(lf["headings"][0]["text"], "Καλημέρα")
+        self.assertEqual(lf["directContentSections"][0]["physicalLines"], 6)
+        self.assertEqual(lf["directContentSections"][0]["physicalLinesExcludingFencedCode"], 1)
 
 
 class MarkdownMeasurementTests(unittest.TestCase):
@@ -129,6 +147,23 @@ class MarkdownMeasurementTests(unittest.TestCase):
         self.assertEqual(_distribution([], (100,))["median"], None)
         self.assertEqual(_distribution([1, 2, 3, 4], (2,))["p99"], 4)
         self.assertEqual(_distribution([1, 2, 3, 4], (2,))["above"]["2"]["count"], 2)
+
+    def test_selected_thresholds_pass_at_exact_value_and_review_above(self) -> None:
+        documents = _distribution([800, 801], (800,))
+        sections = _distribution([200, 201], (200,))
+
+        self.assertEqual(documents["above"]["800"]["count"], 1)
+        self.assertEqual(sections["above"]["200"]["count"], 1)
+
+    def test_repeat_measurement_serializes_identically(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "stable.md").write_text("# Stable\nbody\n", encoding="utf-8")
+
+            first = json.dumps(measure([str(root)], root), sort_keys=True, ensure_ascii=False)
+            second = json.dumps(measure([str(root)], root), sort_keys=True, ensure_ascii=False)
+
+        self.assertEqual(first, second)
 
 
 if __name__ == "__main__":

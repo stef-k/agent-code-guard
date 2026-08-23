@@ -60,7 +60,8 @@ Its explicit top-level outline contract is:
   markers, required whitespace/end after the opening marker, and optional
   whitespace-separated closing hashes;
 - Setext H1/H2 recognizes a single eligible nonblank title line followed by an
-  `=`/`-` underline with zero to three leading spaces;
+  `=`/`-` underline with zero to three leading spaces; the title must begin a
+  one-line paragraph (start of file or preceded by a blank line);
 - backtick and tilde fences require at least three identical markers, zero to
   three leading spaces, same-marker closure at least as long as the opener, and
   ignore all heading-looking content while open;
@@ -68,6 +69,8 @@ Its explicit top-level outline contract is:
 - an unclosed fence deterministically consumes to EOF and is reported, not
   treated as invalid Markdown;
 - four-space-indented and escaped heading-looking lines are not headings;
+- list-item, block-quote, and HTML-block-looking title lines are not promoted by
+  a following `---` into Setext headings;
 - repeated names stay distinct through ranges; Unicode text is preserved; and
 - undecodable UTF-8 raises a deterministic read error rather than being skipped.
 
@@ -118,6 +121,36 @@ the `.markdown` suffix. A first production slice should therefore support
 `.md`; `.markdown` remains a deterministic research input but lacks corpus
 evidence for default applicability.
 
+The compact reproduction procedure was: clone each repository with
+`gh repo clone OWNER/REPO <outside-repo-path>`, check out the recorded SHA, and
+run the research script from that clone root. The exact measurement forms were:
+
+```powershell
+python <agent-code-guard>/research/markdown_guard_sample.py . --output <scratch.json>
+python <agent-code-guard>/research/markdown_guard_sample.py . --exclude 'wwwroot/lib/**' --output <scratch.json>
+python <agent-code-guard>/research/markdown_guard_sample.py . --exclude 'CHANGELOG.md' --output <scratch.json>
+```
+
+The first form applied to Agent Code Guard and Rust RFCs, the second to
+Wayfarer, and the third to ripgrep and OpenTelemetry. Default candidate sets in
+the JSON were document `300/500/800/1200` and section `100/150/200/300`;
+the compact tables additionally calculate the nearby stated boundaries from
+the emitted per-document rows. Raw JSON was deliberately not committed.
+
+Manual inspection was role-labeled rather than used to create role thresholds:
+
+| Role | Inspected examples | Observed behavior |
+|---|---|---|
+| README / overview | Agent Code Guard README (385/48), ripgrep README (541/218), Wayfarer README (233/57) | Direct section catches ripgrep's unusually large local block; totals remain below document default |
+| Guide / tutorial | ripgrep GUIDE (1,025/101) | Document reviews while disciplined local sections pass |
+| Architecture / design | Wayfarer architecture (256/20), OpenTelemetry OTEPs | Typically structured; large OTEPs can review for document or code-heavy local units |
+| Specification / RFC | OpenTelemetry metrics SDK (2,012/109), Rust RFC boundary/outliers below | Document signal remains useful where direct units are disciplined; coherent keep is common |
+| Runbook / process | Wayfarer testing (245/242), OpenTelemetry CONTRIBUTING (195/31) | Direct span distinguishes the monolithic runbook from the structured process guide |
+| Reference / generated-like | ripgrep FAQ (1,063/1,063), OpenTelemetry profile proto (1,676/565) | Strongest coherent/no-change pressure; still useful REVIEW, no role exemption |
+
+Values in parentheses are document physical lines / maximum direct-section
+physical span. Changelogs were excluded rather than used as a role threshold.
+
 ## 7. Document-size distributions
 
 ### Aggregate
@@ -161,13 +194,13 @@ lines are the simpler and more honest measurement.
 
 ## 9. Document boundary inspections
 
-| Position | Example | Measurement | Inspection |
-|---|---|---:|---|
-| Below | OpenTelemetry `trace/tracestate-probability-sampling.md` | 497 | Coherent specification with usable headings; no split needed, but below the conservative default |
-| Around middle candidate | Rust RFC `3513-gen-blocks.md` | 803 | Many language-by-language prior-art subsections; navigation is material and REVIEW is useful even if retained |
-| Moderately above | Rust RFC `2091-inline-semantic.md` | 1,199 | Long semantic proposal; structured but sufficiently large that extension deserves an outline check |
-| Extreme | Rust RFC `1398-kinds-of-allocators.md` | 2,205 | Formal, intentionally comprehensive RFC; coherent keep is plausible, but targeted retrieval cost is real |
-| Extreme | OpenTelemetry `specification/metrics/sdk.md` | 2,012 | Mature multi-topic specification with a 2,007-line root subtree; document REVIEW is clearer than subtree REVIEW |
+| Position | Role | Example | Measurement | Inspection |
+|---|---|---|---:|---|
+| Below | Specification | OpenTelemetry `trace/tracestate-probability-sampling.md` | 497 | Coherent specification with usable headings; no split needed, but below the conservative default |
+| Around middle candidate | RFC | Rust RFC `3513-gen-blocks.md` | 803 | Many language-by-language prior-art subsections; navigation is material and REVIEW is useful even if retained |
+| Moderately above | RFC | Rust RFC `2091-inline-semantic.md` | 1,199 | Long semantic proposal; structured but sufficiently large that extension deserves an outline check |
+| Extreme | RFC | Rust RFC `1398-kinds-of-allocators.md` | 2,205 | Formal, intentionally comprehensive RFC; coherent keep is plausible, but targeted retrieval cost is real |
+| Extreme | Specification | OpenTelemetry `specification/metrics/sdk.md` | 2,012 | Mature multi-topic specification with a 2,007-line root subtree; document REVIEW is clearer than subtree REVIEW |
 
 Total size is coarse, but not redundant with direct section size. A 2,000-line
 specification can have disciplined 100-line local units while still imposing a
@@ -219,15 +252,15 @@ rather than shipped alongside direct content.
 
 ## 12. Section boundary inspections
 
-| Position | Example section | Span | Inspection |
-|---|---|---:|---|
-| Below | Rust RFC 2011 `Generic assert` local block | 80 | Compact proposal unit; no signal needed |
-| Around 120 | Rust RFC 0216 `Detailed design` | 121 | Long API/code exposition but one coherent design; useful evidence against a low default |
-| Around 160 | Rust RFC 2580 `Reference-level explanation` | 161 | Several API definitions and code; inspectable, often coherent; supports a more conservative boundary |
-| Around selected | Wayfarer `docs/22-Testing.md`, `Testing` | 242 | One heading owns policies, environment discovery, databases, browser preflight, commands, and CI; meaningful headings would improve targeted retrieval |
-| Above | Rust RFC 1479 `Detailed design` | 416 | Large code-heavy design; REVIEW useful, but retaining it as one formal unit is defensible |
-| Extreme | ripgrep `FAQ` | 1,063 | Questions use raw HTML headings, outside the bounded outline contract; the huge local unit is real to Markdown-outline tooling and warrants inspection, though conversion may have compatibility costs |
-| Extreme keep | OpenTelemetry profiles `Proto Definition` | 565 | 432 fenced lines dominate a coherent protocol definition; explicit `reviewed; coherent; keep` |
+| Position | Role | Example section | Span | Inspection |
+|---|---|---|---:|---|
+| Below | RFC | Rust RFC 2011 `Generic assert` local block | 80 | Compact proposal unit; no signal needed |
+| Around 120 | RFC | Rust RFC 0216 `Detailed design` | 121 | Long API/code exposition but one coherent design; useful evidence against a low default |
+| Around 160 | RFC | Rust RFC 2580 `Reference-level explanation` | 161 | Several API definitions and code; inspectable, often coherent; supports a more conservative boundary |
+| Around selected | Runbook/process | Wayfarer `docs/22-Testing.md`, `Testing` | 242 | One heading owns policies, environment discovery, databases, browser preflight, commands, and CI; meaningful headings would improve targeted retrieval |
+| Above | RFC | Rust RFC 1479 `Detailed design` | 416 | Large code-heavy design; REVIEW useful, but retaining it as one formal unit is defensible |
+| Extreme | Reference/FAQ | ripgrep `FAQ` | 1,063 | Questions use raw HTML headings, outside the bounded outline contract; the huge local unit is real to Markdown-outline tooling and warrants inspection, though conversion may have compatibility costs |
+| Extreme keep | Protocol/reference | OpenTelemetry profiles `Proto Definition` | 565 | 432 fenced lines dominate a coherent protocol definition; explicit `reviewed; coherent; keep` |
 
 Direct content best answers “does this local documentation unit deserve
 inspection?” It finds the mixed-responsibility testing runbook and the unusual

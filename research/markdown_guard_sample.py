@@ -14,6 +14,7 @@ from pathlib import Path
 _ATX = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+(.*?)|[ \t]*)$")
 _SETEXT = re.compile(r"^ {0,3}(=+|-+)[ \t]*$")
 _FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+_BLOCK_PREFIX = re.compile(r"^ {0,3}(?:>|[-+*][ \t]+|\d{1,9}[.)][ \t]+|<)")
 _MARKDOWN_SUFFIXES = {".md", ".markdown"}
 
 
@@ -108,9 +109,11 @@ def _setext_heading(lines: list[str], index: int) -> _Heading | None:
     if index == 0 or not _SETEXT.match(lines[index]):
         return None
     title = lines[index - 1]
+    if index >= 2 and lines[index - 2].strip():
+        return None
     if not title.strip() or len(title) - len(title.lstrip(" ")) >= 4:
         return None
-    if _ATX.match(title) or _FENCE_OPEN.match(title):
+    if _ATX.match(title) or _FENCE_OPEN.match(title) or _BLOCK_PREFIX.match(title):
         return None
     underline = _SETEXT.match(lines[index]).group(1)
     return _Heading(title.strip(), 1 if underline[0] == "=" else 2, index, index + 1)
