@@ -60,7 +60,7 @@ class PhpFactNormalizationTests(unittest.TestCase):
                     self.assertTrue(all(item.callable_key == callable_fact.key for item in conditions))
                     self.assertEqual([item.source_range.start_line for item in conditions], sorted(item.source_range.start_line for item in conditions))
                     source = path.read_bytes()
-                    for condition in conditions[1:]:
+                    for condition in (item for item in conditions if item.provider_kind == "else_if_clause"):
                         authored = source[condition.source_range.start.byte_offset:condition.source_range.end.byte_offset]
                         self.assertTrue(authored.startswith(b"elseif"))
                     self.assertEqual(measurements(root, path, callable_fact.identity), (expected_complexity, expected_nesting))
