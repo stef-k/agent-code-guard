@@ -309,6 +309,16 @@ class GitSelectionTests(CodeGuardTestCase):
             )
             self.assertEqual([item["path"] for item in self.findings(from_subdirectory)], ["src/a.py"])
 
+    def test_changed_only_directory_bound_uses_path_containment_not_prefixes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); init_git(root)
+            write_lines(root / "src/app/a.py", 1); write_lines(root / "src/application-other/b.py", 1)
+            git(root, "add", "."); git(root, "commit", "-m", "baseline")
+            write_lines(root / "src/app/a.py", 4); write_lines(root / "src/application-other/b.py", 4)
+
+            result = self.run_guard(root, "src/app", "--changed-only", "--warn", "3", "--fail", "6", "--json")
+            self.assertEqual([item["path"] for item in self.findings(result)], ["src/app/a.py"])
+
     def test_changed_only_validates_missing_and_does_not_broaden_external_bound(self) -> None:
         with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside_temp:
             root = Path(temp); init_git(root)
