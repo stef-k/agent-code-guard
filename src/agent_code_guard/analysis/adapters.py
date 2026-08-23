@@ -461,26 +461,26 @@ def _extra_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> t
     if language == "java" and node.type == "switch_rule":
         return () if _is_default_branch(node, region.source) else ((node.type, region.original_range(node)),)
 
-    clause_types: set[str]
+    clauses: tuple
     provider_kind: str
     if language == "cpp" and node.type == "compound_statement" and node.parent.type == "switch_statement":
-        clause_types = {"case_statement"}
+        clauses = tuple(_cpp_switch_clauses(node))
         provider_kind = "case_statement"
     elif language == "csharp" and node.type == "switch_body":
-        clause_types = {"switch_section"}
+        clauses = tuple(child for child in node.named_children if child.type == "switch_section")
         provider_kind = "switch_section"
     elif language == "java" and node.type == "switch_block":
-        clause_types = {"switch_block_statement_group"}
+        clauses = tuple(child for child in node.named_children if child.type == "switch_block_statement_group")
         provider_kind = "switch_block_statement_group"
     elif language in {"javascript", "typescript", "tsx"} and node.type == "switch_body":
-        clause_types = {"switch_case", "switch_default"}
+        clauses = tuple(child for child in node.named_children if child.type in {"switch_case", "switch_default"})
         provider_kind = "switch_case"
     else:
         return ()
 
     ranges: list[SourceRange] = []
     pending_case = None
-    for clause in (child for child in node.named_children if child.type in clause_types):
+    for clause in clauses:
         non_default = not _is_default_branch(clause, region.source)
         if not _classic_switch_clause_has_body(clause):
             if non_default and pending_case is None:
@@ -492,6 +492,15 @@ def _extra_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> t
             ranges.append(region.original_range(representative))
         pending_case = None
     return tuple((provider_kind, arm_range) for arm_range in ranges)
+
+
+def _cpp_switch_clauses(node) -> Iterator:
+    for child in node.named_children:
+        if child.type == "switch_statement":
+            continue
+        if child.type == "case_statement":
+            yield child
+        yield from _cpp_switch_clauses(child)
 
 
 def _classic_switch_clause_has_body(clause) -> bool:

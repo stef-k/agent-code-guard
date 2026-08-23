@@ -91,6 +91,21 @@ class ClassicSwitchFactTests(unittest.TestCase):
             self.assertEqual([len(switch_arms(analyze_files([path]))) for path in paths], [2] * 6)
             self.assertNotIn(generic, {item.path for item in facts.files})
 
+    def test_cpp_switch_labels_inside_language_wrappers_remain_visible(self) -> None:
+        sources = {
+            "nested_block": "void sample(int x) { switch(x) { { case 1: work(); break; } default: break; } }",
+            "preprocessor": "void sample(int x) { switch(x) {\n#if FLAG\ncase 1: work(); break;\n#endif\ndefault: break; } }",
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name, source in sources.items():
+                with self.subTest(name=name):
+                    path = write_source(root, ".cpp", source, name)
+                    arms = switch_arms(analyze_files([path]))
+                    self.assertEqual(len(arms), 1)
+                    self.assertEqual(arms[0].source_range.start.byte_offset,
+                                     path.read_bytes().index(b"case 1"))
+
     def test_nested_switches_and_switch_if_nesting_preserve_structure(self) -> None:
         source = """function nested(x, y) {
   switch (x) {
@@ -109,6 +124,20 @@ class ClassicSwitchFactTests(unittest.TestCase):
             condition = next(item for item in facts.controls if item.provider_kind == "if_statement")
             self.assertEqual(condition.parent_control_range, switches[0].source_range)
             self.assertEqual(switches[1].parent_control_range, condition.source_range)
+
+    def test_cpp_and_typescript_nested_switches_normalize_each_container(self) -> None:
+        sources = {
+            ".cpp": "void nested(int x, int y) { switch(x) { case 1: switch(y) { case 2: case 3: work(); break; default: break; } break; default: break; } }",
+            ".ts": "function nested(x: number, y: number) { switch(x) { case 1: switch(y) { case 2: case 3: work(); break; default: break; } break; default: break; } }",
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for suffix, source in sources.items():
+                with self.subTest(suffix=suffix):
+                    facts = analyze_files([write_source(root, suffix, source, "nested")])
+                    self.assertEqual(len(switch_arms(facts)), 2)
+                    self.assertEqual([item.source_range.start.byte_offset for item in switch_arms(facts)],
+                                     [source.index("case 1"), source.index("case 2")])
 
     def test_switch_decisions_stay_owned_by_child_callables(self) -> None:
         sources = {
