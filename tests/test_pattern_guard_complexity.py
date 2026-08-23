@@ -55,6 +55,8 @@ class PatternGuardFactTests(unittest.TestCase):
             source = path.read_bytes()
             self.assertEqual([item.source_range.start.byte_offset for item in decisions],
                              [source.index(b"case 1"), source.index(b"case x"), source.index(b"x > 1")])
+            guard = decisions[-1].source_range
+            self.assertEqual(source[guard.start.byte_offset:guard.end.byte_offset], b"x > 1")
 
     def test_exact_csharp_audit_emits_authored_arm_and_guard_facts(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -68,6 +70,8 @@ class PatternGuardFactTests(unittest.TestCase):
             source = path.read_bytes()
             self.assertEqual([item.source_range.start.byte_offset for item in decisions],
                              [source.index(b"1 when"), source.index(b"x > 0")])
+            guard = decisions[-1].source_range
+            self.assertEqual(source[guard.start.byte_offset:guard.end.byte_offset], b"x > 0")
 
     def test_python_case_matrix_preserves_guarded_and_unguarded_wildcards(self) -> None:
         source = '''def classify(value, ready):
@@ -176,24 +180,34 @@ class PatternGuardFactTests(unittest.TestCase):
 
     def test_rust_and_swift_pattern_guard_regressions(self) -> None:
         sources = {
-            "guard.rs": "fn choose(x: i32) -> i32 { match x { n if n > 0 => 1, _ => 0 } }",
-            "guard.swift": '''func choose(_ x: Int) -> Int {
+            "guard.rs": (
+                "fn choose(x: i32) -> i32 { match x { n if n > 0 => 1, _ => 0 } }",
+                ["match_arm", "binary_expression"], b"n > 0",
+            ),
+            "guard.swift": ('''func choose(_ x: Int) -> Int {
     switch x {
     case let n where n > 0: return 1
     default: return 0
     }
 }
-''',
+''', ["switch_entry", "comparison_expression"], b"n > 0"),
         }
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            for name, source in sources.items():
+            for name, (source, provider_kinds, guard_text) in sources.items():
                 with self.subTest(name=name):
-                    facts = analyze_files([write_source(root, name, source)])
-                    decisions = owned_decisions(facts, facts.callables[0])
+                    path = write_source(root, name, source)
+                    facts = analyze_files([path])
+                    callable_fact = facts.callables[0]
+                    decisions = owned_decisions(facts, callable_fact)
                     self.assertEqual([item.category for item in decisions],
                                      ["switch_arm", "pattern_guard"])
+                    self.assertEqual([item.provider_kind for item in decisions], provider_kinds)
+                    self.assertTrue(all(item.callable_key == callable_fact.key for item in decisions))
                     self.assertEqual(len({item.source_range.start.byte_offset for item in decisions}), 2)
+                    guard = decisions[-1].source_range
+                    authored = path.read_bytes()
+                    self.assertEqual(authored[guard.start.byte_offset:guard.end.byte_offset], guard_text)
                     self.assertEqual(facts, analyze_files([root / name]))
 
     def test_malformed_python_and_csharp_fail_closed(self) -> None:
