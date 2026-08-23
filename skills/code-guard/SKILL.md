@@ -61,7 +61,7 @@ Without Git or another VCS that can provide changed scope, pass exactly the file
 code-guard src/Foo.py src/Bar.ts tests/FooTests.cs
 ```
 
-Do not create a manifest or temporary scope file. Specific positional files mean “inspect these artifacts.” A directory or `.` means a deliberate recursive audit of that scope. `--changed-only` means “ask Git for current work” and fails outside a Git repository; it never falls back to an audit.
+Do not create a manifest or temporary scope file. Specific positional files mean “inspect these artifacts.” A directory or `.` means a deliberate recursive audit when no Git selector is used. Positional files/directories bound the candidates selected by `--changed-only`, `--staged`, or `--base-ref`; Git selection fails outside a Git repository and never falls back to an audit.
 
 Prefer normal zero-config scope and respect project `scope.exclude`; do not
 remove or alter exclusions merely to silence findings. Repeated

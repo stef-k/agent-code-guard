@@ -16,7 +16,10 @@ from .result_model import GuardResult, aggregate_state, required_policies
 
 def parser() -> argparse.ArgumentParser:
     value = argparse.ArgumentParser(description="Run deterministic Code Guard checks.")
-    value.add_argument("paths", nargs="*", default=["."], help="Files or directories to inspect.")
+    value.add_argument(
+        "paths", nargs="*", default=["."],
+        help="Files or directories to inspect; bounds files selected by a Git selection mode.",
+    )
     value.add_argument("--config", help="Path to code-guard.config.json.")
     value.add_argument("--warn", type=int, help="Override the global LOC warning threshold.")
     value.add_argument("--fail", type=int, help="Override the global LOC failure threshold.")

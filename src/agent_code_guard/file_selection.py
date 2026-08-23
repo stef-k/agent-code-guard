@@ -47,18 +47,15 @@ def resolve_scope(args: SelectionArgs, start: Path) -> ResolvedScope:
     git_root = find_repo_root(working_root)
     root = git_root or working_root
     validate_selection_args(args, git_root)
+    paths = resolve_explicit_paths(args.paths, working_root)
 
     if args.base_ref is not None:
         candidates = git_base_files(git_root, args.base_ref)
-        files = existing_files(candidates)
+        files = bound_git_candidates(existing_files(candidates), paths)
     elif args.changed_only or args.staged:
         candidates = git_files(git_root, staged=args.staged)
-        files = existing_files(candidates)
+        files = bound_git_candidates(existing_files(candidates), paths)
     else:
-        paths = [Path(value) if Path(value).is_absolute() else working_root / value for value in args.paths]
-        missing = [value for value, path in zip(args.paths, paths) if not path.exists()]
-        if missing:
-            raise FileNotFoundError(f"explicit path does not exist: {missing[0]}")
         files = existing_files(expand_paths(paths, git_root))
 
     normalized = tuple(dict.fromkeys(path.resolve() for path in files))
@@ -68,6 +65,27 @@ def resolve_scope(args: SelectionArgs, start: Path) -> ResolvedScope:
         if not any(matches_path_glob(relative_or_absolute_path(path, root), pattern) for pattern in exclusions)
     )
     return ResolvedScope(root, filtered)
+
+
+def resolve_explicit_paths(values: list[str], working_root: Path) -> list[Path]:
+    """Resolve and validate positional paths against the caller's working directory."""
+    paths = [Path(value) if Path(value).is_absolute() else working_root / value for value in values]
+    missing = [value for value, path in zip(values, paths) if not path.exists()]
+    if missing:
+        raise FileNotFoundError(f"explicit path does not exist: {missing[0]}")
+    return paths
+
+
+def bound_git_candidates(candidates: list[Path], bounds: list[Path]) -> list[Path]:
+    """Intersect Git-selected files with the union of positional file/directory bounds."""
+    normalized_bounds = [(path.resolve(), path.is_dir()) for path in bounds]
+    return [
+        candidate for candidate in candidates
+        if any(
+            is_within(candidate, bound) if is_directory else candidate.resolve() == bound
+            for bound, is_directory in normalized_bounds
+        )
+    ]
 
 
 def load_scope_exclusions(args: SelectionArgs, start: Path) -> list[str]:
