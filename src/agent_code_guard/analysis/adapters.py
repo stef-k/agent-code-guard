@@ -69,8 +69,8 @@ def _structural_facts(callable_node, callable_key: CallableKey, region: Executab
                 decisions.append(DecisionFact(
                     callable_key.identity, callable_key, DECISION_CATEGORIES.get(child.type, child.type), child.type, child_range,
                 ))
-            for arm_range in _extra_switch_arm_ranges(child, language, region):
-                decisions.append(DecisionFact(callable_key.identity, callable_key, "switch_arm", child.type, arm_range))
+            for provider_kind, arm_range in _extra_switch_arm_ranges(child, language, region):
+                decisions.append(DecisionFact(callable_key.identity, callable_key, "switch_arm", provider_kind, arm_range))
             for arm_range in _php_switch_arm_ranges(child, language, region):
                 decisions.append(DecisionFact(
                     callable_key.identity, callable_key, "switch_arm", "case_statement", arm_range,
@@ -457,20 +457,79 @@ def _control_category(provider_kind: str, language: str) -> str:
     return CONTROL_CATEGORIES.get(provider_kind, provider_kind)
 
 
-def _extra_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> tuple[SourceRange, ...]:
-    eligible = (
-        (language == "csharp" and node.type == "switch_section")
-        or (language == "java" and node.type in {"switch_block_statement_group", "switch_rule"})
-        or (language in {"javascript", "typescript", "tsx"} and node.type == "switch_case")
-    )
-    if not eligible:
+def _extra_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> tuple[tuple[str, SourceRange], ...]:
+    if language == "java" and node.type == "switch_rule":
+        return () if _is_default_branch(node, region.source) else ((node.type, region.original_range(node)),)
+
+    clauses: tuple
+    provider_kind: str
+    if language == "cpp" and node.type == "compound_statement" and node.parent.type == "switch_statement":
+        clauses = tuple(_cpp_switch_clauses(node))
+        provider_kind = "case_statement"
+    elif language == "csharp" and node.type == "switch_body":
+        clauses = tuple(child for child in node.named_children if child.type == "switch_section")
+        provider_kind = "switch_section"
+    elif language == "java" and node.type == "switch_block":
+        clauses = tuple(child for child in node.named_children if child.type == "switch_block_statement_group")
+        provider_kind = "switch_block_statement_group"
+    elif language in {"javascript", "typescript", "tsx"} and node.type == "switch_body":
+        clauses = tuple(child for child in node.named_children if child.type in {"switch_case", "switch_default"})
+        provider_kind = "switch_case"
+    else:
         return ()
-    labels = [child for child in node.named_children if child.type in {
-        "case_switch_label", "case_pattern_switch_label", "switch_label", "case",
-    }]
-    if labels:
-        return tuple(region.original_range(label) for label in labels if not _is_default_branch(label, region.source))
-    return () if _is_default_branch(node, region.source) else (region.original_range(node),)
+
+    ranges: list[SourceRange] = []
+    pending_case = None
+    for index, clause in enumerate(clauses):
+        non_default = not _is_default_branch(clause, region.source)
+        next_clause = clauses[index + 1] if language == "cpp" and index + 1 < len(clauses) else None
+        if not _classic_switch_clause_has_body(clause, next_clause):
+            if non_default and pending_case is None:
+                pending_case = clause
+            continue
+
+        representative = pending_case or (clause if non_default else None)
+        if representative is not None:
+            ranges.append(region.original_range(representative))
+        pending_case = None
+    return tuple((provider_kind, arm_range) for arm_range in ranges)
+
+
+def _cpp_switch_clauses(node) -> Iterator:
+    for child in node.named_children:
+        if child.type == "switch_statement":
+            continue
+        if child.type == "case_statement":
+            yield child
+        yield from _cpp_switch_clauses(child)
+
+
+def _classic_switch_clause_has_body(clause, next_clause=None) -> bool:
+    colon = next((child for child in clause.children if child.type == ":"), None)
+    if colon is None:
+        return False
+    for child in clause.children:
+        if not child.is_named or child.start_byte < colon.end_byte or child.type in {"comment", "empty_statement"}:
+            continue
+        if next_clause is not None and child.start_byte < next_clause.start_byte < child.end_byte:
+            if child.type == "compound_statement" or child.type.startswith("preproc_"):
+                return _cpp_wrapper_has_executable_before(child, next_clause.start_byte)
+            return True
+        return True
+    return False
+
+
+def _cpp_wrapper_has_executable_before(node, limit: int) -> bool:
+    preprocessor_wrapper = node.type.startswith("preproc_")
+    for child in node.named_children:
+        if child.start_byte >= limit or child.type in {"case_statement", "comment", "empty_statement"}:
+            continue
+        if child.type == "compound_statement" or child.type.startswith("preproc_"):
+            if _cpp_wrapper_has_executable_before(child, limit):
+                return True
+        elif not preprocessor_wrapper or child.type.endswith(("_statement", "_declaration")) or child.type == "declaration":
+            return True
+    return False
 
 
 def _php_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> tuple[SourceRange, ...]:
