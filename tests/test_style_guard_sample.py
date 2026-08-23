@@ -62,6 +62,44 @@ class StyleGuardSampleTests(unittest.TestCase):
         )
         self.assertEqual(result["selectors"], [])
 
+    def test_supports_at_rule_and_all_sass_controls_stay_separate(self) -> None:
+        result = scan_bytes(
+            b"""@supports (display: grid) { .grid { display: grid; } }
+@for $i from 1 through 2 { .x-#{$i} { z-index: $i; } }
+@each $name in a, b { .x-#{$name} { color: red; } }
+@while $n > 0 { $n: $n - 1; }
+@else { .fallback { color: blue; } }
+""",
+            "scss",
+        )
+
+        self.assertEqual(
+            [block["kind"] for block in result["blocks"]],
+            [
+                "at-rule",
+                "rule",
+                "control",
+                "rule",
+                "control",
+                "rule",
+                "control",
+                "control",
+                "rule",
+            ],
+        )
+        self.assertEqual(result["blocks"][1]["at_rule_depth"], 1)
+        self.assertEqual(result["blocks"][3]["control_depth"], 1)
+
+    def test_custom_property_heavy_block_is_visible_as_noise_control(self) -> None:
+        result = scan_bytes(
+            b":root { --a: red; --b: blue; --braces: '{}'; color: var(--a) }",
+            "css",
+        )
+
+        block = result["blocks"][0]
+        self.assertEqual(block["declarations"], 4)
+        self.assertEqual(block["custom_property_declarations"], 3)
+
     def test_lf_crlf_unicode_and_empty_blocks_are_deterministic(self) -> None:
         lf = scan_bytes(".λ {\n}\n.empty {}\n".encode(), "scss")
         crlf = scan_bytes(".λ {\r\n}\r\n.empty {}\r\n".encode(), "scss")

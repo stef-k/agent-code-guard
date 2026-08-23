@@ -441,3 +441,26 @@ measurement error rather than recovery or silent skip. Markup must not enter
 executable `AnalysisFacts`, own file discovery, or motivate generic
 `ArtifactFacts`/plugin infrastructure. Full corpus evidence and parser tradeoffs
 are recorded in `docs/markup-guard-evidence.md`.
+
+## D34 — Style block size is configurable-only; selector/style-lint metrics stay out
+
+Pinned evidence across 235 manually maintained CSS/SCSS documents admits
+source-ranged style block physical size as **ACCEPT — CONFIGURABLE ONLY**. It is
+a local owner/reasoning-surface anchor distinct from existing file LOC, but no
+universal threshold or default enablement is justified. Any later production
+slice must require a positive project-supplied REVIEW threshold, remain disabled
+when omitted, pass at equality, never FAIL, distinguish style rules, at-rules,
+keyframes, mixins/functions, and Sass controls, and permit `reviewed; coherent;
+keep`. Metric-only splitting, mixin extraction, declaration movement, or line
+compression is not an authorized correction.
+
+SCSS selector nesting depth, selector complexity/specificity, and declaration
+count/fan-out are **REJECT / OUT OF SCOPE**. Stylelint already owns nesting and
+selector policy with mature CSS Nesting, parent-selector, interpolation, and
+exception semantics. Declaration-count outliers are dominated by legitimate
+custom-property/theme blocks and add no ownership information beyond block
+span. Style facts must use a separate family-specific pass over final
+`ResolvedScope.files`; they do not enter executable `AnalysisFacts`, own
+discovery, or justify generic artifact/plugin infrastructure. Full corpus,
+provider, recovery, boundary, and gaming evidence is recorded in
+`docs/style-guard-evidence.md`.
