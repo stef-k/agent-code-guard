@@ -100,7 +100,7 @@ def scan_bytes(source: bytes, format_name: str) -> dict:
             index += 1
             continue
         if char == "{":
-            _open_block(text, index, line, boundaries, stack, blocks, selectors)
+            _open_block(text, format_name, index, line, boundaries, stack, blocks, selectors)
         elif char == ";":
             _count_declaration(text, boundaries[-1], index, stack)
             boundaries[-1] = index + 1
@@ -130,6 +130,7 @@ def scan_bytes(source: bytes, format_name: str) -> dict:
 
 def _open_block(
     text: str,
+    format_name: str,
     index: int,
     line: int,
     boundaries: list[int],
@@ -148,7 +149,7 @@ def _open_block(
     block = {
         "kind": kind,
         "header": " ".join(header.split())[:240],
-        "start_line": _line_at(text, boundaries[-1], index),
+        "start_line": _line_at(text, format_name, boundaries[-1], index),
         "end_line": line,
         "physical_lines": 1,
         "declarations": 0,
@@ -193,12 +194,15 @@ def _close_block(
     boundaries[-1] = index + 1
 
 
-def _line_at(text: str, start: int, end: int) -> int:
+def _line_at(text: str, format_name: str, start: int, end: int) -> int:
     meaningful = start
     while meaningful < end:
         if text.startswith("/*", meaningful):
             close = text.find("*/", meaningful + 2)
             meaningful = end if close < 0 else close + 2
+        elif format_name == "scss" and text.startswith("//", meaningful):
+            newline = text.find("\n", meaningful + 2)
+            meaningful = end if newline < 0 else newline + 1
         elif text[meaningful].isspace():
             meaningful += 1
         else:

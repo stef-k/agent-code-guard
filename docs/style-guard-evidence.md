@@ -4,7 +4,7 @@
 
 Issue #38 evaluated four candidates independently under D27 over 235 manually maintained CSS/SCSS documents and 4,117 authored blocks from five pinned projects.
 
-- **Rule/block physical size: ACCEPT — CONFIGURABLE ONLY.** A source-ranged local block span is distinct from file LOC (document LOC versus maximum block span Pearson correlation `0.3471`) and the largest style-rule, mixin, and responsive-region facts identify plausible component/responsibility review anchors. The evidence does not support one universal boundary: at `> 80`, corpus finding rates range from `0.12%` to `3.21%` and affected-document rates from `6.67%` to `29.79%`; container kinds have materially different meanings. Any later production guard must require a positive project-supplied REVIEW threshold, remain disabled when omitted, and report the block kind. It must never FAIL or recommend metric-only splitting/compression.
+- **Rule/block physical size: ACCEPT — CONFIGURABLE ONLY.** A source-ranged local block span is distinct from file LOC (document LOC versus maximum block span Pearson correlation `0.3485`) and the largest style-rule, mixin, and responsive-region facts identify plausible component/responsibility review anchors. The evidence does not support one universal boundary: at `> 80`, corpus finding rates range from `0.12%` to `3.21%` and affected-document rates from `6.67%` to `29.79%`; container kinds have materially different meanings. Any later production guard must require a positive project-supplied REVIEW threshold, remain disabled when omitted, and report the block kind. It must never FAIL or recommend metric-only splitting/compression.
 - **SCSS selector nesting depth: REJECT / OUT OF SCOPE.** It is deterministic when selector, at-rule, and Sass control ancestry are kept separate, but Stylelint's `max-nesting-depth` already owns this exact concern with mature at-rule and pseudo-class exceptions. `&` may express a pseudo-state, BEM suffix, reversed context, interpolation, or selector-function input rather than one uniform coupling cost. Code Guard adds no distinct agent-maintainability responsibility.
 - **Selector complexity/specificity: REJECT / OUT OF SCOPE.** Stylelint directly owns maximum specificity, compound selectors, combinators, IDs, qualifying types, and related selector policy. Reimplementing its CSS Nesting and interpolation semantics would be a worse specialist linter, not a Code Guard signal.
 - **Declaration count/rule fan-out: REJECT / OUT OF SCOPE.** It is mostly a formatting-independent correlate of block size. Its strongest outliers are legitimate theme/token blocks: four of the five blocks above 20 declarations are custom-property-dominated (`49/50`, `30/31`, `30/31` and a theme-token block). It contributes no better ownership boundary.
@@ -20,7 +20,7 @@ All candidate comparisons use strict greater-than boundaries; equality passes. F
 3. **Selector complexity** records, per selector list, list length and the maximum component, combinator, and research specificity values among its selectors. Commas inside brackets/parentheses do not split selectors. Interpolation remains opaque. These values only quantify overlap; they are not proposed production semantics.
 4. **Declaration count** counts direct declarations in a block, including a final declaration without a semicolon, but excludes nested-block declarations. Custom-property declarations are separately counted so token/theme domination can be inspected.
 
-Braces in block comments, SCSS line comments, quoted strings, escapes, and `#{...}` interpolation never open or close structural blocks. Empty blocks have zero declarations and a one-line span when authored on one line. Unicode is decoded as UTF-8 and does not alter coordinates.
+Braces in block comments, SCSS line comments, quoted strings, escapes, and `#{...}` interpolation never open or close structural blocks. Preceding block comments, SCSS line comments, and whitespace are not part of the next block's header span; comments after its opening brace remain part of its inclusive span. Empty blocks have zero declarations and a one-line span when authored on one line. Unicode is decoded as UTF-8 and does not alter coordinates.
 
 Physical lines are retained rather than nonblank lines: excluding blank/comment lines adds a formatting-policy question without changing block ownership. This is still gameable through line compression, so an eventual policy must forbid formatting solely to lower the metric and must let a coherent large block remain unchanged after review.
 
@@ -40,10 +40,10 @@ Disposable shallow clones were created outside Agent Code Guard. The manifest ex
 
 | Corpus | Pinned SHA | Documents | Role and retained noise controls |
 | --- | --- | ---: | --- |
-| `django/django` admin CSS | `6177d5f8497f2c08f9874f5221fd17ce5acd2ad7` | 13 | Conventional application CSS; admin `css/**`, excluding `vendor/**` and minified files. Retains large responsive regions and root theme variables. |
-| `primer/css` | `03988c5a5ba248c3b9b11ea96fd4fda5e98849aa` | 111 | Mature component/design system; manually maintained `src/**/*.scss`. Retains intentionally deep `PageLayout` and large component blocks. |
-| `twbs/bootstrap` | `1039a4788d6abc368d5485ae6bac84a8f0e3096f` | 49 | Substantial SCSS codebase; `scss/**/*.scss`, excluding `scss/tests/**` and vendored RFS. Retains complex mixins and form components. |
-| `picocss/pico` | `0875df4f25373511874f5bfcd117a1bc2006762f` | 47 | Modern CSS-heavy source authored as SCSS; `scss/**/*.scss`, excluding distribution output. Retains module gates, themes, tooltips, and modern selectors. |
+| `django/django` admin CSS | `03988c5a5ba248c3b9b11ea96fd4fda5e98849aa` | 13 | Conventional application CSS; admin `css/**`, excluding `vendor/**` and minified files. Retains large responsive regions and root theme variables. |
+| `primer/css` | `0875df4f25373511874f5bfcd117a1bc2006762f` | 111 | Mature component/design system; manually maintained `src/**/*.scss`. Retains intentionally deep `PageLayout` and large component blocks. |
+| `twbs/bootstrap` | `6177d5f8497f2c08f9874f5221fd17ce5acd2ad7` | 49 | Substantial SCSS codebase; `scss/**/*.scss`, excluding `scss/tests/**` and vendored RFS. Retains complex mixins and form components. |
+| `picocss/pico` | `1039a4788d6abc368d5485ae6bac84a8f0e3096f` | 47 | Modern CSS-heavy source authored as SCSS; `scss/**/*.scss`, excluding distribution output. Retains module gates, themes, tooltips, and modern selectors. |
 | `stef-k/Wayfarer` | `264e74d9e5b9f93c83ce1eff659b399b2eb22cf6` | 15 | Relevant application CSS under Trip Editor, `wwwroot/css`, views, and docs; excludes libraries, bundles, and minified output. Retains the coherent 173-line mobile drawer media region. |
 
 The selected set contains 235 documents, 4,117 blocks, 3,332 style rules/selectors, and 1,807 SCSS style rules. It is heterogeneous but not a statistical population model. Candidate boundaries are engineering probes, not percentile-derived thresholds.
@@ -52,7 +52,7 @@ The selected set contains 235 documents, 4,117 blocks, 3,332 style rules/selecto
 
 | Candidate | Nodes | Median | P75 | P90 | P95 | P99 | Max |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Block physical lines | 4,117 | 5 | 8 | 16 | 28 | 89 | 472 |
+| Block physical lines | 4,117 | 5 | 8 | 15 | 27 | 86 | 472 |
 | SCSS selector depth | 1,807 | 1 | 2 | 3 | 3 | 4 | 6 |
 | Selector components | 3,332 | 1 | 2 | 3 | 4 | 7 | 16 |
 | Selector combinators | 3,332 | 0 | 1 | 2 | 2 | 4 | 11 |
@@ -70,15 +70,15 @@ Each cell is `findings / affected documents / documents with multiple findings`.
 | Corpus | > 40 | > 60 | > 80 | > 120 |
 | --- | ---: | ---: | ---: | ---: |
 | Django admin | 7/4/2 | 3/2/1 | 3/2/1 | 2/1/1 |
-| Primer CSS | 57/29/15 | 20/17/2 | 13/11/1 | 7/6/1 |
-| Bootstrap SCSS | 14/9/3 | 8/7/1 | 7/6/1 | 1/1/0 |
-| Pico | 59/29/16 | 32/16/10 | 23/14/8 | 13/11/2 |
+| Primer CSS | 49/27/13 | 19/16/2 | 12/10/1 | 7/6/1 |
+| Bootstrap SCSS | 12/8/2 | 7/6/1 | 7/6/1 | 1/1/0 |
+| Pico | 58/29/16 | 31/16/9 | 23/14/8 | 13/11/2 |
 | Wayfarer | 4/4/0 | 3/3/0 | 1/1/0 | 1/1/0 |
-| **All** | **141/75/36** | **66/45/14** | **47/34/11** | **24/20/4** |
+| **All** | **130/72/33** | **63/43/13** | **46/33/11** | **24/20/4** |
 
-At `> 80`, 47 findings are `1.14%` of blocks and affect 34/235 documents (`14.47%`), with 11 multi-finding documents. Per corpus the finding/affected-document rates are Django `0.39%/15.38%`, Primer `0.93%/9.91%`, Bootstrap `1.69%/12.24%`, Pico `3.21%/29.79%`, and Wayfarer `0.12%/6.67%`. This spread and the different meaning of style-rule, at-rule, control, and mixin spans defeat a universal default.
+At `> 80`, 46 findings are `1.12%` of blocks and affect 33/235 documents (`14.04%`), with 11 multi-finding documents. Per corpus the finding/affected-document rates are Django `0.39%/15.38%`, Primer `0.86%/9.01%`, Bootstrap `1.69%/12.24%`, Pico `3.21%/29.79%`, and Wayfarer `0.12%/6.67%`. This spread and the different meaning of style-rule, at-rule, control, and mixin spans defeat a universal default.
 
-For style rules alone, `> 40/60/80/120` yields `69/32/21/7` findings. At `> 80`, every affected rule is in a different document: a low-noise opt-in responsibility prompt. The remaining all-kind `> 80` findings are 5 at-rules, 15 control containers, and 6 mixins; large keyframes/functions produce none. A future implementation issue must decide configured kind applicability explicitly rather than silently combining unlike owners.
+For style rules alone, `> 40/60/80/120` yields `61/31/21/7` findings. At `> 80`, every affected rule is in a different document: a low-noise opt-in responsibility prompt. The remaining all-kind `> 80` findings are 5 at-rules, 15 control containers, and 5 mixins; large keyframes/functions produce none. A future implementation issue must decide configured kind applicability explicitly rather than silently combining unlike owners.
 
 ### SCSS selector depth
 
@@ -122,9 +122,9 @@ At `> 15`, 18 findings are `0.44%` of blocks and affect 14 documents (`5.96%`), 
 ### Block physical size
 
 - Below (`40–60`): ordinary Primer component wrappers and Bootstrap mixins frequently contain one coherent selector family. A review threshold this low affects almost one-third of documents and is routine noise.
-- Near (`60–90`): Primer color-mode mixins (57/89 lines), Bootstrap grid generation (65), Pico tooltip hover media (79), and Wayfarer mobile map/surface regions (64/71) are navigable owner boundaries. Some warrant inspection, but extraction is not automatically an improvement.
-- Above: Primer `.form-group` (280), `.PageLayout` (254), Pico tooltip rule (206), Bootstrap validation mixin (145), and Wayfarer's mobile drawer media region (173) are genuine local surfaces. `.PageLayout` mixes responsive pane/content variants and is a plausible review target; the mobile drawer media region is a coherent viewport override whose extraction would separate the responsive behavior from its component.
-- Outlier/coherent keep: Django's 472- and 376-line responsive media regions intentionally collect breakpoint overrides; Pico's 468-line module `@if` owns an entire optional forms module; Pico's 254/214-line light/dark mixins are theme tables. Their size is real, but kind-aware review may conclude `coherent; keep`.
+- Near (`60–90`): Primer's color-mode theme mixin (70 lines), Bootstrap grid generation (60), Pico tooltip hover media (78), and Wayfarer mobile map/surface regions (64/71) are navigable owner boundaries. Some warrant inspection, but extraction is not automatically an improvement.
+- Above: Primer `.form-group` (269), `.PageLayout` (254), Pico tooltip rule (206), Bootstrap validation mixin (145), and Wayfarer's mobile drawer media region (173) are genuine local surfaces. `.PageLayout` mixes responsive pane/content variants and is a plausible review target; the mobile drawer media region is a coherent viewport override whose extraction would separate the responsive behavior from its component.
+- Outlier/coherent keep: Django's 472- and 376-line responsive media regions intentionally collect breakpoint overrides; Pico's 468-line module `@if` owns an entire optional forms module; Pico's 253/213-line light/dark mixins are theme tables. Their size is real, but kind-aware review may conclude `coherent; keep`.
 
 The low LOC correlation shows local span is not just file LOC. Overlap still matters: a large control/at-rule can contain large rules, so all ancestor findings should not be emitted blindly. This evidence accepts the anchor, not a finalized finding de-duplication contract.
 
