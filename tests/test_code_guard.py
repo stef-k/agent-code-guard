@@ -365,13 +365,16 @@ class GitSelectionTests(CodeGuardTestCase):
                 write_lines(root / name, 1 if name != "legacy.py" else 7)
             git(root, "add", "."); git(root, "commit", "-m", "baseline")
             base = git(root, "rev-parse", "HEAD").stdout.strip()
-            write_lines(root / "src/a.py", 4); write_lines(root / "src/b.py", 4); write_lines(root / "docs/spec.md", 80)
+            write_lines(root / "src/a.py", 4); write_lines(root / "src/b.py", 4); write_lines(root / "docs/spec.md", 801)
             git(root, "add", "."); git(root, "commit", "-m", "feature")
 
             subtree = self.run_guard(root, "src", "--base-ref", base, "--warn", "3", "--fail", "6", "--json")
             self.assertEqual({item["path"] for item in self.findings(subtree)}, {"src/a.py", "src/b.py"})
             file_bound = self.run_guard(root, "docs/spec.md", "--base-ref", base, "--json")
-            self.assertEqual([item["path"] for item in self.findings(file_bound)], ["docs/spec.md"])
+            self.assertEqual(
+                [item["path"] for item in self.read_json(file_bound)["guards"]["markdownDocumentSize"]["findings"]],
+                ["docs/spec.md"],
+            )
             empty = self.run_guard(root, "tests", "--base-ref", base, "--json")
             self.assertEqual((empty.returncode, self.read_json(empty)["overall"], self.findings(empty)), (0, "pass", []))
 

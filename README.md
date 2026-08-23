@@ -136,7 +136,7 @@ dependency set and command. The normal installed command is `code-guard`.
 
 Code Guard keeps three scope sources distinct:
 
-- Git-derived current work: `--changed-only`, `--staged`, or `--base-ref <ref>` asks Git for scope and requires a Git repository.
+- Git-derived current work: `--changed-only`, `--staged`, or `--base-ref <ref>` asks Git for candidates and requires a Git repository. Positional files/directories bound those candidates.
 - Explicit caller scope: one or more positional file paths inspect exactly those existing artifacts, subject to each guard's applicability and exclusions.
 - Explicit audit scope: a positional directory or `.` recursively inspects that supplied tree. It does not mean changed-only.
 
