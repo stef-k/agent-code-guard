@@ -4,6 +4,21 @@ Agent Code Guard should remain deliberately small. A new guard is not admitted b
 
 Candidate evaluation is a separate phase from production implementation. A candidate issue starts from uncertainty and must earn an admission decision. If accepted, the normal next step is one end-to-end vertical implementation slice through measurement/facts, guard behavior, configuration, runner integration, results, policy, tests, documentation, and CI.
 
+## Gate 0 — Agent-guardrail product fit
+
+The first question is whether the candidate is specifically useful as a broadly applicable guardrail for a coding agent while it creates, edits, reviews, or refactors a project. Determinism and general code-quality usefulness are not sufficient by themselves. The candidate must show distinct agent-oriented guardrail value rather than primarily reimplementing a concern already solved well by a compiler, formatter, linter, scanner, test runner, dependency tool, framework analyzer, or similar specialist tool.
+
+Require concrete evidence for all four questions:
+
+1. **Agent failure mode / behavior:** What characteristic failure mode or risk of agent-assisted development does this constrain?
+2. **Agent-workflow value:** Why is this valuable during normal agent creation, editing, review, or refactoring rather than merely during a conventional audit?
+3. **Distinct responsibility:** Why should a mature specialist development tool not remain solely responsible for this concern?
+4. **Guardrail value:** What distinct value do deterministic PASS / REVIEW / FAIL findings plus agent judgment provide?
+
+A clear failure should normally stop evaluation with **REJECT / OUT OF SCOPE**. Do not spend parser, threshold, dependency, or architecture effort on an obvious product-fit failure. Criterion 4 below remains the deeper evaluation of whether Code Guard takes a distinct responsibility instead of poorly duplicating another tool.
+
+Directional examples clarify the boundary but are not a permanent allowlist or denylist. Runaway file or callable growth, excessive structural nesting or branching introduced during agent edits, oversized agent-generated instruction or specification sections, and deterministic change-shape or scope signals for suspiciously broad agent edits are likely Code Guard territory. Unused imports, formatting and style, compiler or type errors, dependency auditing, vulnerability scanning, framework conventions, and generic lint rules normally remain specialist-tool territory unless evidence establishes a distinct agent-oriented responsibility. Future guardrails remain welcome when they earn admission under this gate.
+
 ## Primary admission criteria
 
 The first eight questions decide whether a candidate fundamentally belongs in Agent Code Guard. A material failure here should usually stop the proposal before production design work.
@@ -103,6 +118,9 @@ Use the following process for future proposals:
 ```text
 new candidate idea
     -> open a Candidate guard issue
+    -> evaluate agent-guardrail product-fit gate
+       -> clear FAIL: REJECT / OUT OF SCOPE
+       -> PASS / QUALIFIED: continue
     -> evaluate primary admission criteria
     -> prototype / sample representative code where evidence is missing
     -> evaluate production-readiness criteria
@@ -131,6 +149,7 @@ A candidate may pass the first two and still require project-supplied configurat
 Every candidate issue should end with a compact decision record using this structure:
 
 ```text
+Agent-guardrail product fit: PASS / FAIL / QUALIFIED
 Deterministic anchor: PASS / FAIL
 Engineering value: PASS / FAIL / UNCLEAR
 Broad applicability: PASS / FAIL / QUALIFIED
@@ -147,7 +166,7 @@ Failure behavior: PASS / FAIL / QUALIFIED
 Portability/testability: PASS / FAIL / QUALIFIED
 
 Decision:
-ACCEPT / ACCEPT — CONFIGURABLE ONLY / NEEDS MORE EVIDENCE / REJECT
+ACCEPT / ACCEPT — CONFIGURABLE ONLY / NEEDS MORE EVIDENCE / REJECT / OUT OF SCOPE
 ```
 
 If accepted, the issue should also state the proposed vertical implementation boundary and any evidence that must remain explicit as a qualification.

@@ -11,6 +11,19 @@ Describe the engineering concern and why it may be worth detecting.
 
 Do **not** assume this candidate belongs in Agent Code Guard. This issue exists to gather evidence and reach an admission decision.
 
+## Gate 0 — Agent-guardrail product fit
+
+Answer these before researching parsers, thresholds, dependencies, or architecture. Determinism and general code-quality usefulness are not sufficient by themselves.
+
+- **Agent failure mode / behavior:** What characteristic failure mode or risk of agent-assisted development would this constrain?
+- **Agent-workflow value:** Why is this valuable during normal agent creation, editing, review, or refactoring rather than merely during a conventional audit?
+- **Existing specialist tooling / distinct responsibility:** Which compiler, formatter, linter, scanner, test runner, dependency tool, framework analyzer, or similar tool already addresses the concern? Why is that tool insufficient as the sole owner?
+- **PASS / REVIEW / FAIL guardrail value:** What distinct value would deterministic states plus agent judgment provide?
+
+Evidence:
+
+A clear product-fit **FAIL** normally ends the proposal as **REJECT / OUT OF SCOPE**. Do not assume acceptance or continue implementation research for an obvious product-fit failure.
+
 ## Proposed deterministic anchor
 
 What exactly would be measured or detected?
@@ -121,6 +134,7 @@ List only the experiments needed to answer unresolved admission questions. Keep 
 Complete this section before closing the evaluation issue.
 
 ```text
+Agent-guardrail product fit: PASS / FAIL / QUALIFIED
 Deterministic anchor: PASS / FAIL
 Engineering value: PASS / FAIL / UNCLEAR
 Broad applicability: PASS / FAIL / QUALIFIED
@@ -137,7 +151,7 @@ Failure behavior: PASS / FAIL / QUALIFIED
 Portability/testability: PASS / FAIL / QUALIFIED
 
 Decision:
-ACCEPT / ACCEPT — CONFIGURABLE ONLY / NEEDS MORE EVIDENCE / REJECT
+ACCEPT / ACCEPT — CONFIGURABLE ONLY / NEEDS MORE EVIDENCE / REJECT / OUT OF SCOPE
 ```
 
 ## Vertical implementation slice if accepted
