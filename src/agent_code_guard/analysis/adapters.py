@@ -57,7 +57,7 @@ def _structural_facts(callable_node, callable_key: CallableKey, region: Executab
                 continue
             child_range = region.original_range(child)
             next_parent = parent_control
-            if child.type in CONTROL_TYPES[language]:
+            if child.type in CONTROL_TYPES[language] and _is_meaningful_control(child, language):
                 increases = not (child.type in {"elif_clause", "else_if_clause"} or _is_else_if(child, language))
                 controls.append(ControlFlowFact(
                     callable_key.identity, callable_key, _control_category(child.type, language), child.type,
@@ -457,6 +457,12 @@ def _control_category(provider_kind: str, language: str) -> str:
     if language == "swift" and provider_kind == "do_statement":
         return "exception"
     return CONTROL_CATEGORIES.get(provider_kind, provider_kind)
+
+
+def _is_meaningful_control(node, language: str) -> bool:
+    if language == "swift" and node.type == "do_statement":
+        return any(child.type == "catch_block" for child in node.named_children)
+    return True
 
 
 def _extra_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> tuple[tuple[str, SourceRange], ...]:
