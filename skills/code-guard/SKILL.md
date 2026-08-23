@@ -1,12 +1,12 @@
 ---
 name: code-guard
-description: Use when creating, editing, reviewing, or refactoring source files to run deterministic cross-language code guardrails and load only the policy guidance required by triggered findings.
+description: Use when creating, editing, reviewing, or refactoring supported code or Markdown documentation to run deterministic guardrails and load only the policy guidance required by triggered findings.
 license: Complete terms in LICENSE.txt
 ---
 
 # Code Guard
 
-Use this skill whenever handwritten source files are created, edited, reviewed, or refactored.
+Use this skill whenever supported code or Markdown documentation artifacts are created, edited, reviewed, or refactored.
 
 Code Guard provides deterministic measurements that act as anchors for agent judgment. The measurement is objective; the response to a `REVIEW` finding still requires design judgment.
 
@@ -29,24 +29,24 @@ Code Guard provides deterministic measurements that act as anchors for agent jud
 
 ## Workflow
 
-With Git, run the installed Code Guard command after source edits:
+With Git, run the installed Code Guard command after supported code or Markdown documentation edits:
 
 ```bash
-code-guard . --changed-only --config .agent-tools/code-guard.config.json
+code-guard . --changed-only
 ```
 
-The normal packaged workflow installs Code Guard and its syntax dependencies in
-one step, then uses the installed command:
+The current checkout-based packaged workflow installs Code Guard and its syntax
+dependencies from the current checkout, then uses the installed command:
 
 ```bash
 python -m pip install .
-code-guard . --changed-only --config examples/code-guard.config.json
+code-guard . --changed-only
 ```
 
 The compatibility runner remains available directly from a repository checkout:
 
 ```bash
-python3 skills/code-guard/scripts/code_guard.py . --changed-only --config examples/code-guard.config.json
+python3 skills/code-guard/scripts/code_guard.py . --changed-only
 ```
 
 `pyproject.toml` canonically owns the production pins. Tree-sitter remains
@@ -58,7 +58,7 @@ LOC-only result also requires both Markdown guards to be explicitly disabled.
 Without Git or another VCS that can provide changed scope, pass exactly the files you created or modified. You are responsible for supplying the complete edited-file set:
 
 ```bash
-code-guard src/Foo.py src/Bar.ts tests/FooTests.cs
+code-guard src/Foo.py src/Bar.ts docs/guide.md
 ```
 
 Do not create a manifest or temporary scope file. Specific positional files mean “inspect these artifacts.” A directory or `.` means a deliberate recursive audit when no Git selector is used. Positional files/directories bound the candidates selected by `--changed-only`, `--staged`, or `--base-ref`; Git selection fails outside a Git repository and never falls back to an audit.

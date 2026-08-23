@@ -3,8 +3,17 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 from helpers import CodeGuardTestCase
+from agent_code_guard.guards import (
+    callable_size,
+    complexity,
+    loc,
+    markdown_document_size,
+    markdown_section_size,
+    nesting,
+)
 
 
 class ConfigurationValidationTests(CodeGuardTestCase):
@@ -91,6 +100,26 @@ class ConfigurationValidationTests(CodeGuardTestCase):
             example = Path(__file__).resolve().parents[1] / "examples" / "code-guard.config.json"
             result = self.run_guard(root, "valid.py", "--config", str(example), "--json")
             self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_example_configuration_preserves_all_builtin_guard_defaults(self) -> None:
+        example = Path(__file__).resolve().parents[1] / "examples" / "code-guard.config.json"
+        args = SimpleNamespace(
+            config=str(example), warn=None, fail=None, include=[], exclude=[],
+            count_blank_lines=False, ignore_comment_lines=False,
+        )
+
+        loc_config = loc.load_config(args)
+        self.assertEqual((loc_config.enabled, loc_config.warn_at, loc_config.fail_at), (True, 400, 600))
+        for loader, expected in (
+            (callable_size.load_config, 80),
+            (nesting.load_config, 4),
+            (complexity.load_config, 15),
+            (markdown_document_size.load_config, 800),
+            (markdown_section_size.load_config, 200),
+        ):
+            with self.subTest(loader=loader.__module__):
+                config = loader(args)
+                self.assertEqual((config.enabled, config.review_at), (True, expected))
 
     def test_original_typo_precedes_valid_and_malformed_source_analysis(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
