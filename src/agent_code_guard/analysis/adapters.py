@@ -512,19 +512,22 @@ def _classic_switch_clause_has_body(clause, next_clause=None) -> bool:
         if not child.is_named or child.start_byte < colon.end_byte or child.type in {"comment", "empty_statement"}:
             continue
         if next_clause is not None and child.start_byte < next_clause.start_byte < child.end_byte:
-            return _cpp_wrapper_has_executable_before(child, next_clause.start_byte)
+            if child.type == "compound_statement" or child.type.startswith("preproc_"):
+                return _cpp_wrapper_has_executable_before(child, next_clause.start_byte)
+            return True
         return True
     return False
 
 
 def _cpp_wrapper_has_executable_before(node, limit: int) -> bool:
+    preprocessor_wrapper = node.type.startswith("preproc_")
     for child in node.named_children:
         if child.start_byte >= limit or child.type in {"case_statement", "comment", "empty_statement"}:
             continue
-        if child.end_byte > limit:
+        if child.type == "compound_statement" or child.type.startswith("preproc_"):
             if _cpp_wrapper_has_executable_before(child, limit):
                 return True
-        elif child.type.endswith(("_statement", "_declaration")) or child.type == "declaration":
+        elif not preprocessor_wrapper or child.type.endswith(("_statement", "_declaration")) or child.type == "declaration":
             return True
     return False
 

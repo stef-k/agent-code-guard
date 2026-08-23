@@ -110,6 +110,10 @@ class ClassicSwitchFactTests(unittest.TestCase):
         cases = {
             "grouped": ("case 1: { case 2: work(); break; }", 1),
             "fallthrough": ("case 1: { prepare(); case 2: finish(); break; }", 2),
+            "control_fallthrough": ("case 1: if (x) { case 2: finish(); break; }", 2),
+            "preprocessor_fallthrough": (
+                "case 1: {\n#if FLAG\nprepare();\n#endif\ncase 2: finish(); break; }", 2,
+            ),
         }
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
