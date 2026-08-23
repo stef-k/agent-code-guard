@@ -7,9 +7,110 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+from agent_code_guard import skill_distribution
+from agent_code_guard.code_guard import main
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CODE_GUARD = REPO_ROOT / "skills" / "code-guard" / "scripts" / "code_guard.py"
+SKILL_SOURCE = REPO_ROOT / "skills" / "code-guard"
+
+
+class SkillDistributionTests(unittest.TestCase):
+    def test_payload_manifest_matches_canonical_source_bytes(self) -> None:
+        authored_payload = sorted(
+            path.relative_to(SKILL_SOURCE).as_posix()
+            for path in SKILL_SOURCE.rglob("*")
+            if path.is_file() and "scripts" not in path.relative_to(SKILL_SOURCE).parts
+        )
+        self.assertEqual(sorted(skill_distribution.PAYLOAD_FILES), authored_payload)
+        installed = skill_distribution.skill_path()
+        for relative in skill_distribution.PAYLOAD_FILES:
+            self.assertEqual((installed / relative).read_bytes(), (SKILL_SOURCE / relative).read_bytes())
+
+    def test_management_modes_do_not_load_config_or_resolve_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            skill = Path(temp) / "installed-skill"
+            skill.mkdir()
+            with (
+                patch.object(sys, "argv", ["code-guard", "--skill-path"]),
+                patch("agent_code_guard.code_guard.installed_skill_path", return_value=skill),
+                patch("agent_code_guard.code_guard.validate_configuration") as validate,
+                patch("agent_code_guard.code_guard.resolve_scope") as resolve,
+            ):
+                self.assertEqual(main(), 0)
+            validate.assert_not_called()
+            resolve.assert_not_called()
+
+    def test_export_copies_only_manifest_and_adds_distribution_version(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            installed = root / "installed-skill"
+            for relative in skill_distribution.PAYLOAD_FILES:
+                source = installed / relative
+                source.parent.mkdir(parents=True, exist_ok=True)
+                source.write_bytes((SKILL_SOURCE / relative).read_bytes())
+            target = root / "exported-skill"
+
+            with (
+                patch.object(sys, "argv", ["code-guard", "--export-skill", str(target)]),
+                patch("agent_code_guard.skill_distribution.skill_path", return_value=installed),
+                patch("agent_code_guard.skill_distribution.version", return_value="9.8.7"),
+            ):
+                self.assertEqual(main(), 0)
+
+            self.assertEqual(
+                sorted(path.relative_to(target).as_posix() for path in target.rglob("*") if path.is_file()),
+                sorted([*skill_distribution.PAYLOAD_FILES, ".agent-code-guard-version"]),
+            )
+            for relative in skill_distribution.PAYLOAD_FILES:
+                self.assertEqual((target / relative).read_bytes(), (SKILL_SOURCE / relative).read_bytes())
+            self.assertEqual((target / ".agent-code-guard-version").read_text(encoding="utf-8"), "9.8.7\n")
+
+    def test_export_rejects_nonempty_target_without_overwriting(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "target"
+            target.mkdir()
+            existing = target / "keep.txt"
+            existing.write_text("keep", encoding="utf-8")
+            with patch.object(sys, "argv", ["code-guard", "--export-skill", str(target)]):
+                self.assertEqual(main(), 3)
+            self.assertEqual(existing.read_text(encoding="utf-8"), "keep")
+
+    def test_payload_validation_rejects_symlinked_bundle_content(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            external = root / "external"
+            external.mkdir()
+            payload = root / "payload"
+            payload.mkdir()
+            for relative in skill_distribution.PAYLOAD_FILES:
+                destination_root = external if relative.startswith("references/") else payload
+                destination = (
+                    destination_root / Path(relative).name
+                    if relative.startswith("references/")
+                    else destination_root / relative
+                )
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes((SKILL_SOURCE / relative).read_bytes())
+            try:
+                (payload / "references").symlink_to(external, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"directory symlinks unavailable: {exc}")
+            with self.assertRaisesRegex(ValueError, "unsafe or missing file"):
+                skill_distribution._validate_payload(payload)
+
+    def test_management_mode_rejects_guard_arguments(self) -> None:
+        cases = [
+            ["--skill-path", "--changed-only"],
+            ["--skill-path", "--json"],
+            ["--export-skill", "target", "src/example.py"],
+            ["--skill-path", "--export-skill", "target"],
+        ]
+        for arguments in cases:
+            with self.subTest(arguments=arguments), patch.object(sys, "argv", ["code-guard", *arguments]):
+                self.assertEqual(main(), 3)
 
 class InstalledPackageTests(unittest.TestCase):
     def test_distribution_declares_canonical_runtime_dependencies(self) -> None:
