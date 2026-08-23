@@ -265,6 +265,116 @@ class ConfigurationValidationTests(CodeGuardTestCase):
 
 
 class GitSelectionTests(CodeGuardTestCase):
+    def test_changed_only_intersects_git_candidates_with_positional_bounds(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); init_git(root)
+            for name in ["src/a.py", "src/b.py", "tests/test_a.py", "docs/readme.md", "unchanged.py"]:
+                write_lines(root / name, 1)
+            git(root, "add", "."); git(root, "commit", "-m", "baseline")
+            write_lines(root / "src/a.py", 4); write_lines(root / "src/b.py", 4)
+
+            cases = [
+                ((".",), {"src/a.py", "src/b.py"}),
+                (("src/a.py",), {"src/a.py"}),
+                (("unchanged.py",), set()),
+                (("src",), {"src/a.py", "src/b.py"}),
+                (("./src",), {"src/a.py", "src/b.py"}),
+                ((str((root / "src").resolve()),), {"src/a.py", "src/b.py"}),
+                (("tests",), set()),
+                (("src/a.py", "src/b.py"), {"src/a.py", "src/b.py"}),
+                (("src", "tests"), {"src/a.py", "src/b.py"}),
+                (("src/a.py", "tests"), {"src/a.py"}),
+            ]
+            for bounds, expected in cases:
+                with self.subTest(bounds=bounds):
+                    result = self.run_guard(root, *bounds, "--changed-only", "--warn", "3", "--fail", "6", "--json")
+                    self.assertEqual({item["path"] for item in self.findings(result)}, expected)
+                    if not expected:
+                        self.assertEqual((result.returncode, self.read_json(result)["overall"]), (0, "pass"))
+
+    def test_changed_only_normalizes_deduplicates_and_resolves_from_working_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); init_git(root)
+            write_lines(root / "src/a.py", 1); write_lines(root / "other.py", 1)
+            git(root, "add", "."); git(root, "commit", "-m", "baseline")
+            write_lines(root / "src/a.py", 4); write_lines(root / "other.py", 4)
+
+            equivalent = self.run_guard(
+                root, "./src/a.py", "src/../src/a.py", str((root / "src/a.py").resolve()),
+                "--changed-only", "--warn", "3", "--fail", "6", "--json",
+            )
+            self.assertEqual([item["path"] for item in self.findings(equivalent)], ["src/a.py"])
+            from_subdirectory = self.run_guard(
+                root / "src", ".", "--changed-only", "--warn", "3", "--fail", "6", "--json",
+            )
+            self.assertEqual([item["path"] for item in self.findings(from_subdirectory)], ["src/a.py"])
+
+    def test_changed_only_validates_missing_and_does_not_broaden_external_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside_temp:
+            root = Path(temp); init_git(root)
+            write_lines(root / "other.py", 1); git(root, "add", "."); git(root, "commit", "-m", "baseline")
+            write_lines(root / "other.py", 4)
+            outside = Path(outside_temp) / "outside.py"; write_lines(outside, 4)
+
+            missing = self.run_guard(root, "missing.py", "--changed-only", "--json")
+            self.assertEqual(missing.returncode, 3)
+            self.assertIn("explicit path does not exist: missing.py", self.read_json(missing)["error"])
+            external = self.run_guard(root, str(outside), "--changed-only", "--warn", "3", "--fail", "6", "--json")
+            self.assertEqual((external.returncode, self.read_json(external)["overall"], self.findings(external)), (0, "pass", []))
+
+    def test_changed_only_exact_issue_46_regression_is_empty_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); init_git(root)
+            write_lines(root / "narrow.py", 1); write_lines(root / "other.py", 1)
+            git(root, "add", "."); git(root, "commit", "-m", "baseline")
+            write_lines(root / "other.py", 75)
+            result = self.run_guard(root, "narrow.py", "--changed-only", "--warn", "50", "--fail", "100", "--json")
+            self.assertEqual((result.returncode, self.read_json(result)["overall"], self.findings(result)), (0, "pass", []))
+
+    def test_scope_exclude_applies_after_changed_bound_intersection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); init_git(root)
+            write_lines(root / "src/a.py", 1); write_lines(root / "src/b.py", 1)
+            git(root, "add", "."); git(root, "commit", "-m", "baseline")
+            write_lines(root / "src/a.py", 4); write_lines(root / "src/b.py", 4)
+            result = self.run_guard(
+                root, "src", "--changed-only", "--scope-exclude", "src/a.py",
+                "--warn", "3", "--fail", "6", "--json",
+            )
+            self.assertEqual([item["path"] for item in self.findings(result)], ["src/b.py"])
+
+    def test_staged_intersects_candidates_with_file_bounds_and_can_be_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); init_git(root)
+            for name in ["src/a.py", "src/b.py", "unstaged.py", "unchanged.py"]:
+                write_lines(root / name, 1)
+            git(root, "add", "."); git(root, "commit", "-m", "baseline")
+            write_lines(root / "src/a.py", 4); write_lines(root / "src/b.py", 4)
+            git(root, "add", "src/a.py", "src/b.py")
+            write_lines(root / "unstaged.py", 4)
+
+            bounded = self.run_guard(root, "src/a.py", "--staged", "--warn", "3", "--fail", "6", "--json")
+            self.assertEqual([item["path"] for item in self.findings(bounded)], ["src/a.py"])
+            empty = self.run_guard(root, "unchanged.py", "--staged", "--json")
+            self.assertEqual((empty.returncode, self.read_json(empty)["overall"], self.findings(empty)), (0, "pass", []))
+
+    def test_base_ref_intersects_candidates_with_subtree_file_and_empty_bounds(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); init_git(root)
+            for name in ["src/a.py", "src/b.py", "docs/spec.md", "tests/unchanged.py", "legacy.py"]:
+                write_lines(root / name, 1 if name != "legacy.py" else 7)
+            git(root, "add", "."); git(root, "commit", "-m", "baseline")
+            base = git(root, "rev-parse", "HEAD").stdout.strip()
+            write_lines(root / "src/a.py", 4); write_lines(root / "src/b.py", 4); write_lines(root / "docs/spec.md", 80)
+            git(root, "add", "."); git(root, "commit", "-m", "feature")
+
+            subtree = self.run_guard(root, "src", "--base-ref", base, "--warn", "3", "--fail", "6", "--json")
+            self.assertEqual({item["path"] for item in self.findings(subtree)}, {"src/a.py", "src/b.py"})
+            file_bound = self.run_guard(root, "docs/spec.md", "--base-ref", base, "--json")
+            self.assertEqual([item["path"] for item in self.findings(file_bound)], ["docs/spec.md"])
+            empty = self.run_guard(root, "tests", "--base-ref", base, "--json")
+            self.assertEqual((empty.returncode, self.read_json(empty)["overall"], self.findings(empty)), (0, "pass", []))
+
     def test_git_modes_fail_cleanly_without_git_even_when_loc_is_disabled(self) -> None:
         modes = [("--changed-only",), ("--staged",), ("--base-ref", "main")]
         with tempfile.TemporaryDirectory() as temp:
