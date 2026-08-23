@@ -329,6 +329,44 @@ Agent LOC Guard is the completed prototype/reference whose mature behavior at co
 
 There is no runtime dependency, synchronization layer, or second LOC implementation. Retirement of the prototype repository remains issue #3.
 
+## Scope model
+
+Code Guard resolves one common file scope before any guard runs. Recursive
+directories inside the invocation's Git repository use Git's standard ignore
+rules, including nested `.gitignore`, `.git/info/exclude`, and global excludes.
+Tracked files remain discoverable even when a later ignore pattern matches.
+Recursive discovery also conservatively prunes `.git`, `node_modules`, `bin`,
+and `obj`. Outside Git, recursive discovery uses the same built-in pruning with
+a normal filesystem walk.
+
+An explicitly named file bypasses automatic Git-ignore behavior and built-in
+recursive pruning, because naming a file is deliberate caller intent. An
+explicit directory remains recursive discovery. After every selection mode,
+`scope.exclude` and repeated `--scope-exclude` patterns remove files from the
+common scope seen by all guards. Config and CLI patterns are additive; an empty
+resulting scope is valid.
+
+`guards.loc.exclude` is different: it runs afterward and hides a selected file
+only from LOC. Existing `--exclude` remains LOC-only.
+
+```json
+{
+  "scope": {
+    "exclude": ["vendor/**"]
+  },
+  "guards": {
+    "loc": {
+      "exclude": ["Migrations/**"]
+    }
+  }
+}
+```
+
+Here no guard sees `vendor/**`, while syntax guards may still inspect
+`Migrations/**` even though LOC does not. Scope patterns use the same normalized
+glob matching as LOC. Empty and whitespace-only patterns are rejected because
+they express no useful policy.
+
 ## Result and exit contract
 
 Native LOC states normalize as `ok -> PASS`, `warn -> REVIEW`, `fail -> FAIL`, and `exempt -> PASS` with the exemption reason retained. Only REVIEW and FAIL add `loc` to `requiredPolicies`. Callable size, nesting, and complexity contribute only PASS or REVIEW and route their stable guard IDs only on REVIEW.

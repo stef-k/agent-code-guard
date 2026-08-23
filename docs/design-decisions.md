@@ -367,3 +367,19 @@ enablement. Explicit false remains false, and explicit thresholds retain their
 values. LOC 400 REVIEW / 600 FAIL is unchanged and is retained as a pragmatic
 navigation, cohesion, and reasoning-surface guardrail, not retroactively
 presented as statistical proof.
+
+## D31 — Common scope policy precedes all guard applicability
+
+`scope.exclude` is authoritative all-guard policy applied after selection and
+before the shared `ResolvedScope` reaches LOC or syntax analysis. Guard-specific
+applicability and `guards.loc.exclude` run afterward; an exclusion that empties
+the common scope is valid.
+
+Git ignore rules affect only automatic recursive discovery. An explicit file
+bypasses Git ignores and the conservative `.git`/`node_modules`/`bin`/`obj`
+traversal pruning, while an explicit directory remains recursive. Recursive
+directories inside the invocation's already-resolved repository use Git-native
+standard-exclude enumeration; directories outside it use a filesystem walk.
+Git-derived changed, staged, and base-ref selections are not re-filtered through
+ignore rules, so tracked files retain their established selection semantics.
+Global scope policy still applies after every one of those modes.

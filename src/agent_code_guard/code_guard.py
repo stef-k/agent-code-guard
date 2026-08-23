@@ -27,6 +27,10 @@ def parser() -> argparse.ArgumentParser:
     value.add_argument("--base-ref", help="Inspect committed ACMR changes from <ref>...HEAD.")
     value.add_argument("--include", action="append", default=[], help="Extra LOC extension.")
     value.add_argument("--exclude", action="append", default=[], help="Extra LOC exclusion glob.")
+    value.add_argument(
+        "--scope-exclude", action="append", default=[],
+        help="All-guards scope exclusion glob; repeat to add patterns (unlike LOC-only --exclude).",
+    )
     value.add_argument("--count-blank-lines", action="store_true", help="Count blank lines for LOC.")
     value.add_argument("--ignore-comment-lines", action="store_true", help="Ignore simple comment-only lines.")
     return value

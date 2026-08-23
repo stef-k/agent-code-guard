@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import argparse
-import fnmatch
 import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from ..result_model import Finding, GuardResult
+from ..path_matching import matches_path_glob, relative_or_absolute_path
 
 DEFAULT_WARN_AT = 400
 DEFAULT_FAIL_AT = 600
@@ -184,18 +184,6 @@ def should_include(path: Path, config: Config, root: Path) -> bool:
     )
 
 
-def matches_path_glob(path: str, pattern: str) -> bool:
-    normalised_path = path.replace("\\", "/").removeprefix("./")
-    normalised_pattern = pattern.replace("\\", "/").removeprefix("./")
-    if normalised_path == normalised_pattern:
-        return True
-    candidates = [normalised_pattern]
-    while normalised_pattern.startswith("**/"):
-        normalised_pattern = normalised_pattern[3:]
-        candidates.append(normalised_pattern)
-    return any(fnmatch.fnmatch(normalised_path, candidate) for candidate in candidates)
-
-
 def evaluate(path: Path, config: Config, root: Path) -> Finding:
     rel = relative_path(path, root)
     counted = count_loc(path, config)
@@ -244,7 +232,4 @@ def effective_thresholds(rel: str, config: Config) -> tuple[int, int, int | None
 
 
 def relative_path(path: Path, root: Path) -> str:
-    try:
-        return path.resolve().relative_to(root.resolve()).as_posix()
-    except ValueError:
-        return path.resolve().as_posix()
+    return relative_or_absolute_path(path, root)

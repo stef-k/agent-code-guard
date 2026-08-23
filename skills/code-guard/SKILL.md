@@ -63,6 +63,13 @@ code-guard src/Foo.py src/Bar.ts tests/FooTests.cs
 
 Do not create a manifest or temporary scope file. Specific positional files mean “inspect these artifacts.” A directory or `.` means a deliberate recursive audit of that scope. `--changed-only` means “ask Git for current work” and fails outside a Git repository; it never falls back to an audit.
 
+Prefer normal zero-config scope and respect project `scope.exclude`; do not
+remove or alter exclusions merely to silence findings. Repeated
+`--scope-exclude` is caller-supplied all-guard scope policy and composes with
+project exclusions. LOC `--exclude` remains LOC-specific. Explicit files may
+intentionally inspect Git-ignored or built-in-pruned artifacts, unless Code
+Guard `scope.exclude` or `--scope-exclude` removes them.
+
 When all guards return `PASS`, no detailed policy file needs to be loaded.
 
 When a guard returns `REVIEW` or `FAIL`, read only the policy file named by that finding. The runner returns required policy identifiers/files in both human-readable and JSON output.

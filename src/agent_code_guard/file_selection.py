@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
+
+from .path_matching import matches_path_glob, relative_or_absolute_path
+
+BUILTIN_PRUNED_DIRECTORIES = {".git", "node_modules", "bin", "obj"}
 
 
 class SelectionArgs(Protocol):
@@ -14,6 +19,8 @@ class SelectionArgs(Protocol):
     changed_only: bool
     staged: bool
     base_ref: str | None
+    config: str | None
+    scope_exclude: list[str]
 
 
 @dataclass(frozen=True)
@@ -52,9 +59,35 @@ def resolve_scope(args: SelectionArgs, start: Path) -> ResolvedScope:
         missing = [value for value, path in zip(args.paths, paths) if not path.exists()]
         if missing:
             raise FileNotFoundError(f"explicit path does not exist: {missing[0]}")
-        files = existing_files(expand_paths(paths))
+        files = existing_files(expand_paths(paths, git_root))
 
-    return ResolvedScope(root, tuple(dict.fromkeys(path.resolve() for path in files)))
+    normalized = tuple(dict.fromkeys(path.resolve() for path in files))
+    exclusions = load_scope_exclusions(args, working_root)
+    filtered = tuple(
+        path for path in normalized
+        if not any(matches_path_glob(relative_or_absolute_path(path, root), pattern) for pattern in exclusions)
+    )
+    return ResolvedScope(root, filtered)
+
+
+def load_scope_exclusions(args: SelectionArgs, start: Path) -> list[str]:
+    explicit_config = getattr(args, "config", None)
+    config_path = Path(explicit_config) if explicit_config else start / ".agent-tools" / "code-guard.config.json"
+    if explicit_config and not config_path.exists():
+        raise FileNotFoundError(f"config file not found: {explicit_config}")
+    document = json.loads(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
+    if not isinstance(document, dict):
+        raise ValueError("configuration must be an object")
+    scope = document.get("scope", {})
+    if not isinstance(scope, dict):
+        raise ValueError("scope must be an object")
+    exclude = scope.get("exclude", [])
+    if not isinstance(exclude, list) or any(not isinstance(pattern, str) for pattern in exclude):
+        raise ValueError("scope.exclude must be an array of strings")
+    combined = [*exclude, *getattr(args, "scope_exclude", [])]
+    if any(not pattern.strip() for pattern in combined):
+        raise ValueError("scope.exclude patterns must be non-empty strings")
+    return combined
 
 
 def validate_selection_args(args: SelectionArgs, git_root: Path | None) -> None:
@@ -115,17 +148,49 @@ def git_base_files(root: Path, base_ref: str) -> list[Path]:
     return [root / os.fsdecode(path) for path in result.stdout.split(b"\0") if path]
 
 
-def expand_paths(paths: list[Path]) -> list[Path]:
+def expand_paths(paths: list[Path], git_root: Path | None) -> list[Path]:
     files: list[Path] = []
     for path in paths:
         if path.is_file():
             files.append(path)
         elif path.is_dir():
-            for current_root, dir_names, file_names in os.walk(path):
-                dir_names[:] = [name for name in dir_names if name not in {".git", "node_modules", "bin", "obj"}]
-                dir_names.sort()
-                files.extend(Path(current_root) / name for name in sorted(file_names))
+            if git_root is not None and is_within(path, git_root):
+                files.extend(git_directory_files(git_root, path))
+            else:
+                files.extend(walk_directory_files(path))
     return files
+
+
+def git_directory_files(root: Path, directory: Path) -> list[Path]:
+    relative = directory.resolve().relative_to(root.resolve())
+    pathspec = "." if not relative.parts else relative.as_posix()
+    result = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", pathspec],
+        cwd=root, check=True, capture_output=True,
+    )
+    selected = [root / os.fsdecode(value) for value in result.stdout.split(b"\0") if value]
+    return [path for path in selected if not has_pruned_directory(path, root)]
+
+
+def walk_directory_files(directory: Path) -> list[Path]:
+    files: list[Path] = []
+    for current_root, dir_names, file_names in os.walk(directory):
+        dir_names[:] = sorted(name for name in dir_names if name not in BUILTIN_PRUNED_DIRECTORIES)
+        files.extend(Path(current_root) / name for name in sorted(file_names))
+    return files
+
+
+def has_pruned_directory(path: Path, root: Path) -> bool:
+    relative = path.resolve().relative_to(root.resolve())
+    return any(part in BUILTIN_PRUNED_DIRECTORIES for part in relative.parts[:-1])
+
+
+def is_within(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
 
 
 def existing_files(paths: list[Path]) -> list[Path]:

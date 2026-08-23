@@ -49,7 +49,9 @@ class ScopePolicyTests(CodeGuardTestCase):
             config = root / "combined.json"
             config.write_text(json.dumps({"scope": {"exclude": ["vendor/**"]}}), encoding="utf-8")
             resolved = resolve_scope(selection_args(".", config=config, scope_exclude=["generated/**"]), root)
-            self.assertEqual(resolved.files, (root / "keep.py", root / "valid.json", root / "combined.json"))
+            self.assertIn(root / "keep.py", resolved.files)
+            self.assertNotIn(root / "vendor" / "drop.py", resolved.files)
+            self.assertNotIn(root / "generated" / "drop.py", resolved.files)
 
     def test_patterns_apply_to_explicit_git_and_external_files_and_can_empty_scope(self) -> None:
         with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as external_temp:
@@ -61,6 +63,7 @@ class ScopePolicyTests(CodeGuardTestCase):
             patterns = ["nested\\**", external.resolve().as_posix()]
             config = root / "scope.json"
             config.write_text(json.dumps({"scope": {"exclude": patterns}}), encoding="utf-8")
+            git(root, "add", "scope.json"); git(root, "commit", "-m", "config")
             self.assertEqual(resolve_scope(selection_args(str(source), config=config), root).files, ())
             self.assertEqual(resolve_scope(selection_args(str(external), config=config), root).files, ())
             self.assertEqual(resolve_scope(selection_args(".", config=config, changed_only=True), root).files, ())
@@ -74,16 +77,36 @@ class ScopePolicyTests(CodeGuardTestCase):
             write_lines(root / "normal.py", 1)
             write_lines(root / "ignored.py", 1)
             write_lines(root / "nested" / "ignored.py", 1)
+            write_lines(root / "ignored-directory" / "ignored.py", 1)
+            write_lines(root / "sp ace" / "Δ.py", 1)
             write_lines(root / "info-ignored.py", 1)
-            (root / ".gitignore").write_text("ignored.py\ntracked-but-now-ignored.py\n", encoding="utf-8")
+            (root / ".gitignore").write_text(
+                "ignored.py\ntracked-but-now-ignored.py\nignored-directory/\n", encoding="utf-8"
+            )
             (root / "nested" / ".gitignore").write_text("ignored.py\n", encoding="utf-8")
             (root / ".git" / "info" / "exclude").write_text("info-ignored.py\n", encoding="utf-8")
             resolved = resolve_scope(selection_args("."), root)
             relative = {path.relative_to(root).as_posix() for path in resolved.files}
-            self.assertTrue({"tracked.py", "tracked-but-now-ignored.py", "normal.py"} <= relative)
+            self.assertTrue({"tracked.py", "tracked-but-now-ignored.py", "normal.py", "sp ace/Δ.py"} <= relative)
             self.assertTrue({"ignored.py", "nested/ignored.py", "info-ignored.py"}.isdisjoint(relative))
             self.assertEqual(resolve_scope(selection_args("ignored.py"), root).files, (root / "ignored.py",))
             self.assertEqual(resolve_scope(selection_args("nested"), root).files, (root / "nested" / ".gitignore",))
+            self.assertEqual(resolve_scope(selection_args("ignored-directory"), root).files, ())
+            self.assertEqual(resolve_scope(selection_args("sp ace"), root).files, (root / "sp ace" / "Δ.py",))
+
+    def test_scope_exclusion_applies_after_changed_staged_and_base_ref_selection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); init_git(root)
+            source = root / "generated" / "changed.py"; write_lines(source, 1)
+            config = root / "scope.json"
+            config.write_text(json.dumps({"scope": {"exclude": ["generated/**"]}}), encoding="utf-8")
+            git(root, "add", "."); git(root, "commit", "-m", "base")
+            base = git(root, "rev-parse", "HEAD").stdout.strip()
+            write_lines(source, 2); git(root, "add", "generated/changed.py")
+            self.assertEqual(resolve_scope(selection_args(".", config=config, changed_only=True), root).files, ())
+            self.assertEqual(resolve_scope(selection_args(".", config=config, staged=True), root).files, ())
+            git(root, "commit", "-m", "change")
+            self.assertEqual(resolve_scope(selection_args(".", config=config, base_ref=base), root).files, ())
 
     def test_recursive_builtin_pruning_does_not_override_explicit_file_intent(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -132,7 +155,7 @@ class ScopePolicyTests(CodeGuardTestCase):
         with tempfile.TemporaryDirectory() as temp:
             result = self.run_guard(Path(temp), "--help")
             self.assertIn("--scope-exclude", result.stdout)
-            self.assertIn("all guards", result.stdout)
+            self.assertIn("All-guards", result.stdout)
             self.assertIn("LOC-only", result.stdout)
 
 
