@@ -67,19 +67,20 @@ class PhpFactNormalizationTests(unittest.TestCase):
 
     def test_classic_switch_emits_one_fact_per_executable_non_default_destination(self) -> None:
         cases = {
-            "distinct": ("case 1: a(); break; case 2: b(); break; default: c();", 2),
-            "grouped": ("case 1: case 2: a(); break; default: b();", 1),
-            "three_grouped": ("case 1: case 2: case 3: a(); break;", 1),
-            "default_only": ("default: return 0;", 0),
-            "case_with_default": ("case 1: default: return 0;", 1),
-            "executable_fallthrough": ("case 1: prepare(); case 2: finish(); break;", 2),
+            "distinct": ("case 1: a(); break; case 2: b(); break; default: c();", 2, (b"case 1", b"case 2")),
+            "grouped": ("case 1: case 2: a(); break; default: b();", 1, (b"case 1",)),
+            "three_grouped": ("case 1: case 2: case 3: a(); break;", 1, (b"case 1",)),
+            "default_only": ("default: return 0;", 0, ()),
+            "case_with_default": ("case 1: default: return 0;", 1, (b"case 1",)),
+            "executable_fallthrough": ("case 1: prepare(); case 2: finish(); break;", 2, (b"case 1", b"case 2")),
         }
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            for name, (arms, expected_count) in cases.items():
+            for name, (arms, expected_count, expected_labels) in cases.items():
                 with self.subTest(name=name):
                     path = write_php(root, f"<?php\nfunction {name}($x) {{ switch ($x) {{ {arms} }} }}\n", f"{name}.php")
                     facts = analyze_files([path])
+                    self.assertEqual(facts, analyze_files([path]))
                     callable_fact, decisions = callable_decisions(facts, f"{name}.{name}")
                     switch_arms = [item for item in decisions if item.category == "switch_arm"]
                     self.assertEqual(len(switch_arms), expected_count)
@@ -87,8 +88,11 @@ class PhpFactNormalizationTests(unittest.TestCase):
                     self.assertTrue(all(item.callable_key == callable_fact.key for item in switch_arms))
                     self.assertEqual(switch_arms, sorted(switch_arms, key=lambda item: item.source_range.start.byte_offset))
                     source = path.read_bytes()
-                    self.assertTrue(all(source[item.source_range.start.byte_offset:item.source_range.end.byte_offset].startswith(b"case")
-                                        for item in switch_arms))
+                    authored_ranges = [source[item.source_range.start.byte_offset:item.source_range.end.byte_offset]
+                                       for item in switch_arms]
+                    self.assertEqual([next(label for label in expected_labels if authored.startswith(label))
+                                      for authored in authored_ranges], list(expected_labels))
+                    self.assertEqual(len({item.source_range.start.byte_offset for item in switch_arms}), expected_count)
                     self.assertEqual(measurements(root, path, callable_fact.identity), (1 + expected_count, 1))
 
     def test_switch_composes_with_existing_controls_without_case_nesting(self) -> None:
@@ -156,6 +160,13 @@ function second($x) {
             self.assertEqual([by_identity[name].source_range.start_line for name in ("Mixed.first", "Mixed.second")], [5, 11])
             self.assertEqual([item.category for item in callable_decisions(facts, "Mixed.first")[1]], ["condition", "condition"])
             self.assertEqual([item.category for item in callable_decisions(facts, "Mixed.second")[1]], ["switch_arm", "switch_arm"])
+            first_decisions = callable_decisions(facts, "Mixed.first")[1]
+            second_decisions = callable_decisions(facts, "Mixed.second")[1]
+            source = path.read_bytes()
+            self.assertEqual(first_decisions[1].source_range.start.byte_offset, source.index(b"elseif"))
+            self.assertEqual([item.source_range.start.byte_offset for item in second_decisions],
+                             [source.index(b"case 1"), source.index(b"case 2")])
+            self.assertTrue(all(item.callable_key.path == path for item in (*first_decisions, *second_decisions)))
             self.assertTrue(all(item.path == path and item.embedded_language == "php" for item in facts.callables))
             self.assertFalse(any(item.provider_kind in {"text", "text_interpolation"} for item in (*facts.controls, *facts.decisions)))
 
@@ -220,11 +231,30 @@ class PhpPublicComplexityTests(CodeGuardTestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             path = write_php(root, "<?php function broken( { elseif ($x) {}")
-            result = self.run_guard(root, str(path), "--json")
-            self.assertEqual(result.returncode, 3)
-            payload = self.read_json(result)
+            first = self.run_guard(root, str(path), "--json")
+            second = self.run_guard(root, str(path), "--json")
+            self.assertEqual((first.returncode, second.returncode), (3, 3))
+            payload = self.read_json(first)
+            self.assertEqual(payload, self.read_json(second))
             self.assertEqual(set(payload), {"error"})
             self.assertIn("syntax tree contains errors", payload["error"])
+
+    def test_below_threshold_php_complexity_requires_no_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = write_php(root, "<?php function default_only($x) { switch ($x) { default: return 0; } }")
+            config = write_config(root, {"enabled": False}, guards={
+                "callableSize": {"enabled": False},
+                "nesting": {"enabled": False},
+                "cyclomaticComplexity": {"reviewAt": 2},
+                "markdownDocumentSize": {"enabled": False},
+                "markdownSectionSize": {"enabled": False},
+            })
+            result = self.run_guard(root, str(path), "--config", str(config), "--json")
+            payload = self.read_json(result)
+            finding = payload["guards"]["complexity"]["findings"][0]
+            self.assertEqual((result.returncode, finding["measured"], finding["state"]), (0, 1, "pass"))
+            self.assertEqual(payload["requiredPolicies"], [])
 
 
 if __name__ == "__main__":
