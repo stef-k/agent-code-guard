@@ -151,6 +151,7 @@ class PatternGuardFactTests(unittest.TestCase):
             self.assertTrue(all(item.provider_kind == "binary_expression"
                                 for item in decisions if item.category == "pattern_guard"))
             self.assertFalse(any(item.category == "condition" for item in decisions))
+            self.assertFalse(any(item.callable_key == target.key for item in facts.controls))
             starts = [item.source_range.start.byte_offset for item in decisions]
             self.assertEqual(starts, sorted(starts))
             authored = path.read_bytes()
