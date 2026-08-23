@@ -37,11 +37,7 @@ code-guard . --changed-only
 
 An installed Agent Code Guard distribution provides both the command and this
 version-matched skill payload. The skill's normal execution route is always the
-installed command:
-
-```bash
-code-guard . --changed-only
-```
+installed `code-guard` command.
 
 For repository development only, the compatibility runner remains available
 directly from a checkout. It is not part of the externally installed skill

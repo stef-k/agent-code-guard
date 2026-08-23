@@ -78,6 +78,29 @@ class SkillDistributionTests(unittest.TestCase):
                 self.assertEqual(main(), 3)
             self.assertEqual(existing.read_text(encoding="utf-8"), "keep")
 
+    def test_payload_validation_rejects_symlinked_bundle_content(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            external = root / "external"
+            external.mkdir()
+            payload = root / "payload"
+            payload.mkdir()
+            for relative in skill_distribution.PAYLOAD_FILES:
+                destination_root = external if relative.startswith("references/") else payload
+                destination = (
+                    destination_root / Path(relative).name
+                    if relative.startswith("references/")
+                    else destination_root / relative
+                )
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes((SKILL_SOURCE / relative).read_bytes())
+            try:
+                (payload / "references").symlink_to(external, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"directory symlinks unavailable: {exc}")
+            with self.assertRaisesRegex(ValueError, "unsafe or missing file"):
+                skill_distribution._validate_payload(payload)
+
     def test_management_mode_rejects_guard_arguments(self) -> None:
         cases = [
             ["--skill-path", "--changed-only"],

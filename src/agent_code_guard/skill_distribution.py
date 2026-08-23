@@ -68,11 +68,16 @@ def export_skill(target: Path) -> Path:
 
 
 def _validate_payload(path: Path) -> None:
-    if not path.is_dir():
+    if path.is_symlink() or not path.is_dir():
         raise ValueError(f"installed skill payload is missing: {path}")
     for relative in PAYLOAD_FILES:
         candidate = path / relative
-        if candidate.is_symlink() or not candidate.is_file():
+        relative_path = Path(relative)
+        parents = (
+            path.joinpath(*relative_path.parts[:index])
+            for index in range(1, len(relative_path.parts))
+        )
+        if any(parent.is_symlink() for parent in parents) or candidate.is_symlink() or not candidate.is_file():
             raise ValueError(f"installed skill payload has an unsafe or missing file: {relative}")
 
 
