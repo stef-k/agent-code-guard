@@ -480,9 +480,10 @@ def _extra_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> t
 
     ranges: list[SourceRange] = []
     pending_case = None
-    for clause in clauses:
+    for index, clause in enumerate(clauses):
         non_default = not _is_default_branch(clause, region.source)
-        if not _classic_switch_clause_has_body(clause):
+        next_clause = clauses[index + 1] if language == "cpp" and index + 1 < len(clauses) else None
+        if not _classic_switch_clause_has_body(clause, next_clause):
             if non_default and pending_case is None:
                 pending_case = clause
             continue
@@ -503,13 +504,29 @@ def _cpp_switch_clauses(node) -> Iterator:
         yield from _cpp_switch_clauses(child)
 
 
-def _classic_switch_clause_has_body(clause) -> bool:
+def _classic_switch_clause_has_body(clause, next_clause=None) -> bool:
     colon = next((child for child in clause.children if child.type == ":"), None)
     if colon is None:
         return False
-    return any(child.is_named and child.start_byte >= colon.end_byte
-               and child.type not in {"comment", "empty_statement"}
-               for child in clause.children)
+    for child in clause.children:
+        if not child.is_named or child.start_byte < colon.end_byte or child.type in {"comment", "empty_statement"}:
+            continue
+        if next_clause is not None and child.start_byte < next_clause.start_byte < child.end_byte:
+            return _cpp_wrapper_has_executable_before(child, next_clause.start_byte)
+        return True
+    return False
+
+
+def _cpp_wrapper_has_executable_before(node, limit: int) -> bool:
+    for child in node.named_children:
+        if child.start_byte >= limit or child.type in {"case_statement", "comment", "empty_statement"}:
+            continue
+        if child.end_byte > limit:
+            if _cpp_wrapper_has_executable_before(child, limit):
+                return True
+        elif child.type.endswith(("_statement", "_declaration")) or child.type == "declaration":
+            return True
+    return False
 
 
 def _php_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> tuple[SourceRange, ...]:

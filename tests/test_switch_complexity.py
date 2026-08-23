@@ -106,6 +106,21 @@ class ClassicSwitchFactTests(unittest.TestCase):
                     self.assertEqual(arms[0].source_range.start.byte_offset,
                                      path.read_bytes().index(b"case 1"))
 
+    def test_cpp_wrapper_grouping_distinguishes_empty_labels_from_authored_fallthrough(self) -> None:
+        cases = {
+            "grouped": ("case 1: { case 2: work(); break; }", 1),
+            "fallthrough": ("case 1: { prepare(); case 2: finish(); break; }", 2),
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name, (body, expected) in cases.items():
+                source = f"void sample(int x) {{ switch(x) {{ {body} default: break; }} }}"
+                with self.subTest(name=name):
+                    path = write_source(root, ".cpp", source, name)
+                    arms = switch_arms(analyze_files([path]))
+                    self.assertEqual(len(arms), expected)
+                    self.assertEqual(arms[0].source_range.start.byte_offset, path.read_bytes().index(b"case 1"))
+
     def test_nested_switches_and_switch_if_nesting_preserve_structure(self) -> None:
         source = """function nested(x, y) {
   switch (x) {
