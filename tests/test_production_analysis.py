@@ -121,7 +121,7 @@ class ProductionParityTests(unittest.TestCase):
             self.assertEqual(len({item.key for item in facts.callables}), 2)
             self.assertEqual({item.callable_key for item in facts.controls}, {item.key for item in facts.callables})
 
-    def test_structural_facts_preserve_elif_and_each_non_default_switch_label(self) -> None:
+    def test_structural_facts_preserve_elif_and_normalize_executable_switch_arms(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             python_path = Path(temp) / "branches.py"
             python_path.write_text(
@@ -139,7 +139,7 @@ class ProductionParityTests(unittest.TestCase):
                 encoding="utf-8",
             )
             arms = [item for item in analyze_files([js_path]).decisions if item.category == "switch_arm"]
-            self.assertEqual(len(arms), 3)
+            self.assertEqual(len(arms), 2)
 
     def test_short_circuit_boolean_expressions_are_not_complexity_decisions(self) -> None:
         cases = {

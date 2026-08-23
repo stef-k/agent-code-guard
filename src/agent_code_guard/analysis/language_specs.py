@@ -74,7 +74,7 @@ DECISION_TYPES = {
     "javascript": {"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "catch_clause", "ternary_expression"},
     "typescript": {"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "catch_clause", "ternary_expression"},
     "tsx": {"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "catch_clause", "ternary_expression"},
-    "cpp": {"if_statement", "for_statement", "range_based_for_statement", "while_statement", "do_statement", "catch_clause", "conditional_expression", "case_statement"},
+    "cpp": {"if_statement", "for_statement", "range_based_for_statement", "while_statement", "do_statement", "catch_clause", "conditional_expression"},
     "rust": {"if_expression", "loop_expression", "while_expression", "for_expression", "match_arm"},
     "php": {"if_statement", "else_if_clause", "for_statement", "foreach_statement", "while_statement", "do_statement", "catch_clause", "conditional_expression", "match_conditional_expression"},
     "swift": {"if_statement", "guard_statement", "for_statement", "while_statement", "repeat_while_statement", "catch_block", "ternary_expression", "switch_entry"},

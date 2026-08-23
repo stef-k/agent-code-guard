@@ -458,19 +458,44 @@ def _control_category(provider_kind: str, language: str) -> str:
 
 
 def _extra_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> tuple[SourceRange, ...]:
-    eligible = (
-        (language == "csharp" and node.type == "switch_section")
-        or (language == "java" and node.type in {"switch_block_statement_group", "switch_rule"})
-        or (language in {"javascript", "typescript", "tsx"} and node.type == "switch_case")
-    )
-    if not eligible:
+    if language == "java" and node.type == "switch_rule":
+        return () if _is_default_branch(node, region.source) else (region.original_range(node),)
+
+    clause_types: set[str]
+    if language == "cpp" and node.type == "compound_statement" and node.parent.type == "switch_statement":
+        clause_types = {"case_statement"}
+    elif language == "csharp" and node.type == "switch_body":
+        clause_types = {"switch_section"}
+    elif language == "java" and node.type == "switch_block":
+        clause_types = {"switch_block_statement_group"}
+    elif language in {"javascript", "typescript", "tsx"} and node.type == "switch_body":
+        clause_types = {"switch_case", "switch_default"}
+    else:
         return ()
-    labels = [child for child in node.named_children if child.type in {
-        "case_switch_label", "case_pattern_switch_label", "switch_label", "case",
-    }]
-    if labels:
-        return tuple(region.original_range(label) for label in labels if not _is_default_branch(label, region.source))
-    return () if _is_default_branch(node, region.source) else (region.original_range(node),)
+
+    ranges: list[SourceRange] = []
+    pending_case = None
+    for clause in (child for child in node.named_children if child.type in clause_types):
+        non_default = not _is_default_branch(clause, region.source)
+        if not _classic_switch_clause_has_body(clause):
+            if non_default and pending_case is None:
+                pending_case = clause
+            continue
+
+        representative = pending_case or (clause if non_default else None)
+        if representative is not None:
+            ranges.append(region.original_range(representative))
+        pending_case = None
+    return tuple(ranges)
+
+
+def _classic_switch_clause_has_body(clause) -> bool:
+    colon = next((child for child in clause.children if child.type == ":"), None)
+    if colon is None:
+        return False
+    return any(child.is_named and child.start_byte >= colon.end_byte
+               and child.type not in {"comment", "empty_statement"}
+               for child in clause.children)
 
 
 def _php_switch_arm_ranges(node, language: str, region: ExecutableRegion) -> tuple[SourceRange, ...]:
