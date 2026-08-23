@@ -6,6 +6,7 @@ import argparse
 import json
 import re
 import statistics
+from collections import Counter
 from dataclasses import dataclass
 from fnmatch import fnmatch
 from pathlib import Path
@@ -153,7 +154,7 @@ def _section_rows(
 def measure(
     paths: list[str], start: Path, excludes: tuple[str, ...] = (),
     document_thresholds: tuple[int, ...] = (300, 500, 800, 1200),
-    section_thresholds: tuple[int, ...] = (100, 150, 200, 300),
+    section_thresholds: tuple[int, ...] = (100, 150, 200, 240, 300),
 ) -> dict:
     """Scan explicit Markdown paths and return stable rows and distributions."""
     root = start.resolve()
@@ -194,9 +195,32 @@ def _summaries(documents: list[dict], doc_thresholds: tuple[int, ...], section_t
         "totalPhysicalLines": _distribution([row["totalPhysicalLines"] for row in documents], doc_thresholds),
         "nonblankPhysicalLines": _distribution([row["nonblankPhysicalLines"] for row in documents], doc_thresholds),
         "maxDirectContentSectionLines": _distribution(direct, section_thresholds),
+        "directContentSectionFindings": _section_finding_summary(documents, section_thresholds),
         "maxSubtreeSectionLines": _distribution(subtree, section_thresholds),
         "maxHeadingDepth": _distribution([row["maxHeadingDepth"] for row in documents], (3, 4, 5, 6)),
     }
+
+
+def _section_finding_summary(documents: list[dict], thresholds: tuple[int, ...]) -> dict:
+    sections = [section for document in documents for section in document["directContentSections"]]
+    above = {}
+    for threshold in thresholds:
+        counts = [
+            sum(section["physicalLines"] > threshold for section in document["directContentSections"])
+            for document in documents
+        ]
+        finding_count = sum(counts)
+        affected_documents = sum(count > 0 for count in counts)
+        histogram = Counter(counts)
+        above[str(threshold)] = {
+            "findingCount": finding_count,
+            "findingPercent": round(100 * finding_count / len(sections), 2) if sections else 0.0,
+            "affectedDocuments": affected_documents,
+            "affectedDocumentPercent": round(100 * affected_documents / len(documents), 2) if documents else 0.0,
+            "documentsWithMultipleFindings": sum(count > 1 for count in counts),
+            "findingsPerDocument": {str(count): histogram[count] for count in sorted(histogram)},
+        }
+    return {"totalSections": len(sections), "above": above}
 
 
 def _distribution(values: list[int], thresholds: tuple[int, ...]) -> dict:
@@ -238,7 +262,7 @@ def main() -> int:
     result = measure(
         args.paths, Path.cwd(), tuple(args.exclude),
         tuple(args.document_threshold or (300, 500, 800, 1200)),
-        tuple(args.section_threshold or (100, 150, 200, 300)),
+        tuple(args.section_threshold or (100, 150, 200, 240, 300)),
     )
     encoded = json.dumps(result, indent=2, ensure_ascii=False) + "\n"
     if args.output:
