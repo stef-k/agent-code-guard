@@ -37,7 +37,7 @@ class MarkdownScannerTests(unittest.TestCase):
         text = (
             "# Real\n"
             "````markdown\n# fenced\n```\n## still fenced\n````\n"
-            "~~~text\n## tilde\n~~~~\n~~~\n"
+            "~~~~text\n## tilde\n~~~\n~~~~\n"
             "    # indented\n    Setext-looking\n    ----\n"
             "\\# escaped\n## Final ##\n"
         )
