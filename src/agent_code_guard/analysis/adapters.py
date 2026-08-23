@@ -286,7 +286,11 @@ def _second_wave_name(node, language: str, source: bytes) -> str | None:
         name = signature.child_by_field_name("name") if signature is not None else _assigned_name(node, language)
     elif language == "dart" and node.type == "method_signature":
         signature = next((child for child in node.named_children
-                          if child.type in {"function_signature", "constructor_signature"}), None)
+                          if child.type in {
+                              "function_signature", "constructor_signature", "factory_constructor_signature",
+                          }), None)
+        if signature is not None and signature.type in {"constructor_signature", "factory_constructor_signature"}:
+            return _dart_constructor_name(signature, source)
         name = signature.child_by_field_name("name") if signature is not None else None
     elif language == "dart" and node.type == "class_definition":
         name = node.child_by_field_name("name")
@@ -295,6 +299,11 @@ def _second_wave_name(node, language: str, source: bytes) -> str | None:
     if name is None and language == "swift" and node.type == "class_declaration":
         name = next((child for child in node.named_children if child.type in {"type_identifier", "user_type"}), None)
     return _text(name, source).lstrip("$") if name is not None else None
+
+
+def _dart_constructor_name(signature, source: bytes) -> str | None:
+    identifiers = [child for child in signature.named_children if child.type == "identifier"]
+    return ".".join(_text(child, source) for child in identifiers) or None
 
 
 def _deep_named_child(node, types: set[str]):

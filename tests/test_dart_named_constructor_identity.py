@@ -65,13 +65,14 @@ class DartNamedConstructorFactTests(unittest.TestCase):
         self.assertEqual(facts, analyze_files([path]))
         for callable_fact in facts.callables:
             self.assertEqual(callable_fact.key.identity, callable_fact.identity)
-            self.assertEqual(callable_fact.boundary_kind, "declaration")
+            self.assertEqual(callable_fact.boundary_kind, "callable")
             self.assertIsNone(callable_fact.parent_callable)
             self.assertIsNone(callable_fact.parent_key)
 
         named = facts.callables[1]
-        start = source.encode().index(b"A.named()")
-        end = source.encode().index(b"}", start) + 1
+        written_source = path.read_bytes()
+        start = written_source.index(b"A.named()")
+        end = written_source.index(b"}", start) + 1
         self.assertEqual(
             (
                 named.source_range.start.line,
@@ -131,11 +132,12 @@ class DartNamedConstructorFactTests(unittest.TestCase):
         )
         _, facts = self.analyze(source, "nested.dart")
         constructor = next(item for item in facts.callables if item.identity == "nested.C.C.named")
-        child = next(item for item in facts.callables if item.boundary_kind == "callback")
+        child = next(item for item in facts.callables if item.identity == "nested.C.child")
 
-        self.assertEqual(child.identity, "nested.C.C.named.child")
+        self.assertEqual(child.identity, "nested.C.child")
+        self.assertEqual(child.boundary_kind, "nested")
         self.assertEqual((child.parent_callable, child.parent_key), (constructor.identity, constructor.key))
-        self.assertEqual(_measurements(facts, constructor.identity), (13, 2, 3))
+        self.assertEqual(_measurements(facts, constructor.identity), (12, 2, 3))
         self.assertEqual(_measurements(facts, child.identity), (5, 1, 2))
         self.assertEqual(
             {item.callable_key for item in facts.decisions},
