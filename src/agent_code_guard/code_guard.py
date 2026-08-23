@@ -130,6 +130,14 @@ def print_text(data: dict[str, object]) -> None:
                 f"— {finding['callable']} complexity {finding['measured']} "
                 f"(review {finding['thresholds']['reviewAt']})"
             )
+    _print_markdown_findings(data)
+    policies = data["requiredPolicies"]
+    if policies:
+        print(f"Required policies: {', '.join(policies)}")
+        print("Required action: inspect each actionable finding using its policy guidance.")
+
+
+def _print_markdown_findings(data: dict[str, object]) -> None:
     markdown_document_result = data["guards"].get("markdownDocumentSize")
     if markdown_document_result:
         for finding in markdown_document_result["findings"]:
@@ -149,10 +157,6 @@ def print_text(data: dict[str, object]) -> None:
                 f"— section {json.dumps(finding['heading'], ensure_ascii=False)} is {finding['measured']} lines "
                 f"(review {finding['thresholds']['reviewAt']})"
             )
-    policies = data["requiredPolicies"]
-    if policies:
-        print(f"Required policies: {', '.join(policies)}")
-        print("Required action: inspect each actionable finding using its policy guidance.")
 
 
 def exit_code(overall: str, ci: bool) -> int:
