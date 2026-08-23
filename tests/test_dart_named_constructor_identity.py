@@ -160,6 +160,22 @@ class DartNamedConstructorFactTests(unittest.TestCase):
 
         self.assertEqual([item.identity for item in facts.callables], ["constructors.C.C"])
 
+    def test_constructor_identifiers_keep_existing_dollar_normalization(self) -> None:
+        source = (
+            "class $C {\n"
+            "  $C() {}\n"
+            "  $C.$named() {}\n"
+            "  void $run() {}\n"
+            "}\n"
+        )
+        _, facts = self.analyze(source)
+
+        self.assertEqual([item.identity for item in facts.callables], [
+            "constructors.C.C",
+            "constructors.C.C.named",
+            "constructors.C.run",
+        ])
+
     def test_malformed_named_constructor_fails_closed(self) -> None:
         with self.assertRaises(SyntaxAnalysisError):
             self.analyze("class C { C.named( { }", "broken.dart")

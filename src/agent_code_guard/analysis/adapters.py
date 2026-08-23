@@ -303,7 +303,7 @@ def _second_wave_name(node, language: str, source: bytes) -> str | None:
 
 def _dart_constructor_name(signature, source: bytes) -> str | None:
     identifiers = [child for child in signature.named_children if child.type == "identifier"]
-    return ".".join(_text(child, source) for child in identifiers) or None
+    return ".".join(_text(child, source).lstrip("$") for child in identifiers) or None
 
 
 def _deep_named_child(node, types: set[str]):
