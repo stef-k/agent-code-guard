@@ -395,6 +395,16 @@ threshold, and never FAIL. REVIEW means inspect navigation and responsibility;
 a coherent long-form specification, reference, table, procedure, or code-heavy
 section may be retained without metric-driven restructuring.
 
+The section guard emits every direct-content section above its threshold in
+deterministic path/start-line order, not only the largest section per document.
+The pinned corpus contains 13,157 direct sections: at `>200`, 29 findings
+(0.22%) affect 29 documents (3.18%), with no document producing multiple
+findings; `>240` yields 17/17 and `>300` yields 9/9. Near-boundary documents
+with multiple sections above 150 contained distinct responsibilities rather
+than redundant warnings. Keeping every offending range preserves actionability
+if a future document has multiple oversized units; no per-document cap is
+justified.
+
 Document size counts every physical line. Section size counts from a heading's
 start through immediately before the next heading of any level, including
 blank, fenced-code, table, and list lines. Nonblank document size is rejected as

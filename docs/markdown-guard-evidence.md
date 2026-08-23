@@ -21,7 +21,8 @@ The exact threshold passes; only a greater measurement reviews.
 
 The evidence is 912 Markdown documents from five heterogeneous repositories.
 At the proposed boundaries, 59 documents (6.47%) review for document size and
-29 (3.18%) review for direct section size. The findings include genuine
+29 section findings affect 29 documents (3.18%) for direct section size; those
+findings are 0.22% of 13,157 measured direct sections. The findings include genuine
 navigation/cohesion prompts and deliberate coherent keep cases. This is an
 acceptable REVIEW workload, not a claim that either number is a quality law.
 
@@ -133,7 +134,7 @@ python <agent-code-guard>/research/markdown_guard_sample.py . --exclude 'CHANGEL
 
 The first form applied to Agent Code Guard and Rust RFCs, the second to
 Wayfarer, and the third to ripgrep and OpenTelemetry. Default candidate sets in
-the JSON were document `300/500/800/1200` and section `100/150/200/300`;
+the JSON were document `300/500/800/1200` and section `100/150/200/240/300`;
 the compact tables additionally calculate the nearby stated boundaries from
 the emitted per-document rows. Raw JSON was deliberately not committed.
 
@@ -219,9 +220,9 @@ Per document, the metric below is the maximum section span.
 
 ## 11. Section-size candidate thresholds
 
-### Direct-content span
+### Affected documents by maximum direct-content span
 
-| Boundary | Reviews | Rate |
+| Boundary | Affected documents | Document rate |
 |---:|---:|---:|
 | `>100` | 129 | 14.14% |
 | `>120` | 95 | 10.42% |
@@ -235,6 +236,46 @@ At `>200`, per-corpus rates are 0% Agent Code Guard, 3.45% Wayfarer, 9.09%
 ripgrep, 3.11% OpenTelemetry, and 3.06% Rust RFCs. The higher ripgrep rate is
 two deliberately large user-facing documents in a small 22-file set, not a
 large warning count.
+
+### Actual direct-section finding volume
+
+The earlier maximum-per-document distribution answers which documents are
+affected, but a future guard naturally has one possible finding per oversized
+section. The same pinned rows were therefore counted individually across all
+13,157 direct-content sections:
+
+| Boundary | Oversized sections | Section rate | Affected documents | Document rate | Documents with multiple findings |
+|---:|---:|---:|---:|---:|---:|
+| **`>200`** | **29** | **0.22%** | **29** | **3.18%** | **0** |
+| `>240` | 17 | 0.13% | 17 | 1.86% | 0 |
+| `>300` | 9 | 0.07% | 9 | 0.99% | 0 |
+
+The findings-per-document distributions were `0:883, 1:29` at `>200`,
+`0:895, 1:17` at `>240`, and `0:903, 1:9` at `>300`. Thus the previously stated
+29/3.18% was an affected-document statistic, but it happens to equal the true
+finding count in this corpus. Per corpus at `>200`, findings/affected documents
+were Agent Code Guard 0/0, Wayfarer 1/1, ripgrep 2/2, OpenTelemetry 6/6, and
+Rust RFCs 20/20.
+
+No sampled document had multiple sections above any of the three serious
+boundaries, so there was no over-threshold multi-finding set to inspect for
+redundancy. As a boundary stress check, the only three documents with multiple
+sections above 150 were inspected:
+
+| Document | Large direct sections | Inspection |
+|---|---|---|
+| Rust RFC 3875, build-std explicit dependencies | `Cargo subcommands` 257; `Proposal` 195 | Distinct responsibilities; if both crossed 200, suppressing either would hide an actionable unit |
+| OpenTelemetry OTEP 0156, columnar encoding | `ArrowStreamService` 239; protocol-buffer appendix 169 | Distinct protocol explanation and coherent reference code; second may be a keep, but is not redundant |
+| Rust RFC 3873, build-std context | working-group history 242; rustup alternative 162 | Separate historical and architectural topics; independent inspection is meaningful |
+
+This evidence settles the future output contract: **emit every direct-content
+section whose span is greater than the configured threshold**, in deterministic
+path/start-line order. Do not reduce a document to only its largest offending
+section. The all-findings contract adds no observed volume at `>200`, preserves
+the exact actionable range of each independent local unit, and avoids hiding a
+second responsibility if future corpora contain two oversized sections. Result
+aggregation may still present a document-level guard state, but must retain all
+section findings. No per-document cap is justified.
 
 ### Heading-subtree span
 
@@ -264,7 +305,9 @@ rather than shipped alongside direct content.
 
 Direct content best answers “does this local documentation unit deserve
 inspection?” It finds the mixed-responsibility testing runbook and the unusual
-single-section FAQ, while policy can retain formal/code-heavy units.
+single-section FAQ, while policy can retain formal/code-heavy units. The
+section-finding volume confirms that `>200` remains conservative under the
+all-oversized-sections output contract.
 
 ## 13. Heading-depth evaluation
 
