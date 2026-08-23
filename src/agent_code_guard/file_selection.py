@@ -73,6 +73,11 @@ def resolve_explicit_paths(values: list[str], working_root: Path) -> list[Path]:
     missing = [value for value, path in zip(values, paths) if not path.exists()]
     if missing:
         raise FileNotFoundError(f"explicit path does not exist: {missing[0]}")
+    directory_links = [value for value, path in zip(values, paths) if path.is_symlink() and path.is_dir()]
+    if directory_links:
+        raise ValueError(
+            f"explicit directory symlink is not recursively traversed: {directory_links[0]}"
+        )
     return paths
 
 
@@ -187,14 +192,21 @@ def git_directory_files(root: Path, directory: Path) -> list[Path]:
         cwd=root, check=True, capture_output=True,
     )
     selected = [root / os.fsdecode(value) for value in result.stdout.split(b"\0") if value]
-    return [path for path in selected if not has_pruned_directory(path, root)]
+    return [path for path in selected if not path.is_symlink() and not has_pruned_directory(path, root)]
 
 
 def walk_directory_files(directory: Path) -> list[Path]:
     files: list[Path] = []
     for current_root, dir_names, file_names in os.walk(directory):
-        dir_names[:] = sorted(name for name in dir_names if name not in BUILTIN_PRUNED_DIRECTORIES)
-        files.extend(Path(current_root) / name for name in sorted(file_names))
+        current = Path(current_root)
+        dir_names[:] = sorted(
+            name for name in dir_names
+            if name not in BUILTIN_PRUNED_DIRECTORIES and not (current / name).is_symlink()
+        )
+        files.extend(
+            current / name for name in sorted(file_names)
+            if not (current / name).is_symlink()
+        )
     return files
 
 

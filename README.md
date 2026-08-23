@@ -381,11 +381,14 @@ rules, including nested `.gitignore`, `.git/info/exclude`, and global excludes.
 Tracked files remain discoverable even when a later ignore pattern matches.
 Recursive discovery also conservatively prunes `.git`, `node_modules`, `bin`,
 and `obj`. Outside Git, recursive discovery uses the same built-in pruning with
-a normal filesystem walk.
+a normal filesystem walk. Recursive directory discovery does not follow file or
+directory symlinks.
 
 An explicitly named file bypasses automatic Git-ignore behavior and built-in
 recursive pruning, because naming a file is deliberate caller intent. An
-explicit directory remains recursive discovery. After every selection mode,
+explicit file symlink is likewise treated as deliberate caller intent, while an
+explicit directory symlink is rejected rather than recursively traversed. An
+explicit ordinary directory remains recursive discovery. After every selection mode,
 `scope.exclude` and repeated `--scope-exclude` patterns remove files from the
 common scope seen by all guards. Config and CLI patterns are additive; an empty
 resulting scope is valid.
