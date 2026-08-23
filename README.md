@@ -61,7 +61,7 @@ For numerical candidates, keep three questions separate: **can we measure it det
 
 Every new proposal should begin as a **Candidate guard** issue using the repository issue template and end with one of four explicit decisions: **ACCEPT**, **ACCEPT — CONFIGURABLE ONLY**, **NEEDS MORE EVIDENCE**, or **REJECT / OUT OF SCOPE**. Accepted guards should normally ship as one vertical production slice from deterministic provider/facts through configuration, runner/result/policy integration, tests, CI, and documentation.
 
-See [Guard Admission and Candidate Evaluation](docs/guard-admission.md) for the full evidence checklist, decision record, and delivery rules.
+See [Guard Admission and Candidate Evaluation](https://github.com/stef-k/agent-code-guard/blob/main/docs/guard-admission.md) for the full evidence checklist, decision record, and delivery rules.
 
 Project-specific architecture boundaries, framework-specific rules, arbitrary style preferences, security scanning, dependency auditing, and similar concerns remain outside the universal core unless a candidate evaluation produces evidence for a distinct Code Guard responsibility.
 

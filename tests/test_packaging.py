@@ -113,6 +113,21 @@ class SkillDistributionTests(unittest.TestCase):
                 self.assertEqual(main(), 3)
 
 class InstalledPackageTests(unittest.TestCase):
+    def test_distribution_metadata_exposes_canonical_navigation(self) -> None:
+        metadata = importlib.metadata.metadata("agent-code-guard")
+        self.assertEqual(
+            metadata.get_all("Project-URL"),
+            [
+                "Source, https://github.com/stef-k/agent-code-guard",
+                "Issues, https://github.com/stef-k/agent-code-guard/issues",
+            ],
+        )
+        self.assertIn(
+            "https://github.com/stef-k/agent-code-guard/blob/main/docs/guard-admission.md",
+            metadata.get_payload(),
+        )
+        self.assertNotIn("](docs/", metadata.get_payload())
+
     def test_distribution_declares_canonical_runtime_dependencies(self) -> None:
         requirements = importlib.metadata.requires("agent-code-guard") or []
         self.assertEqual(

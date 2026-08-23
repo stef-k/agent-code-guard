@@ -14,6 +14,10 @@ dependencies = [
     "tree-sitter-language-pack==1.14.3",
 ]
 
+[project.urls]
+Source = "https://github.com/stef-k/agent-code-guard"
+Issues = "https://github.com/stef-k/agent-code-guard/issues"
+
 [project.scripts]
 code-guard = "agent_code_guard.code_guard:main"
 
