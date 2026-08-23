@@ -422,3 +422,22 @@ introduce generic `ArtifactFacts`, or own discovery/ignore/exclusion policy.
 The evidence scanner needs only the standard library, so no Markdown parser
 dependency is currently justified. This issue records admission only and
 changes no production behavior.
+
+## D33 — Markup depth, subtree span, and fan-out are not admitted
+
+Pinned evidence across 556 manually maintained HTML/XML documents rejects all
+three proposed markup structural metrics. Element depth is too domain-specific
+and emits descendant floods in wrapper-heavy UI. Non-root subtree physical span
+strongly tracks existing file LOC and emits overlapping ancestor findings.
+Direct-child fan-out primarily identifies legitimate homogeneous collections
+such as dependencies, exported packages, table rows, options, resources, and
+declarative layout children. No universal default or configurable-only guard is
+justified, and no production markup family is created.
+
+HTML and XML retain separate failure semantics for any future markup research:
+HTML measurement must use explicitly bounded tolerant recovery without turning
+validity into a guard, while supported malformed XML must produce a structured
+measurement error rather than recovery or silent skip. Markup must not enter
+executable `AnalysisFacts`, own file discovery, or motivate generic
+`ArtifactFacts`/plugin infrastructure. Full corpus evidence and parser tradeoffs
+are recorded in `docs/markup-guard-evidence.md`.
