@@ -9,6 +9,7 @@ import json
 import sys
 from pathlib import Path
 
+from .config_validation import validate_configuration
 from .file_selection import resolve_scope
 from .guards import callable_size, complexity, loc, markdown_document_size, markdown_section_size, nesting
 from .result_model import GuardResult, aggregate_state, required_policies
@@ -173,6 +174,7 @@ def exit_code(overall: str, ci: bool) -> int:
 def main() -> int:
     args = parser().parse_args()
     try:
+        validate_configuration(args.config, Path.cwd())
         scope = resolve_scope(args, Path.cwd())
         data = payload(run_guards(scope, args))
         if args.json:
