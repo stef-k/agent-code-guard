@@ -50,6 +50,23 @@ class StyleGuardSampleTests(unittest.TestCase):
             {"rule", "at-rule", "mixin", "function", "control"},
         )
 
+    def test_scss_ranges_exclude_preceding_line_comments_but_count_internal_comments(self) -> None:
+        source = """// first explanation
+
+  // second explanation
+.component {
+  // this comment belongs to the block
+  color: red;
+}
+""".encode()
+
+        result = scan_bytes(source, "scss")
+
+        block = result["blocks"][0]
+        self.assertEqual(block["start_line"], 4)
+        self.assertEqual(block["end_line"], 7)
+        self.assertEqual(block["physical_lines"], 4)
+
     def test_keyframes_steps_are_not_selectors(self) -> None:
         result = scan_bytes(
             b"@keyframes pulse {\n from { opacity: 0; }\n 50% { opacity: .5; }\n to { opacity: 1; }\n}",
