@@ -100,61 +100,16 @@ def scan_bytes(source: bytes, format_name: str) -> dict:
             index += 1
             continue
         if char == "{":
-            header = _clean_header(text[boundaries[-1] : index])
-            kind = _classify(header, stack)
-            selector_depth = sum(item["kind"] == "rule" for item in stack)
-            at_rule_depth = sum(item["kind"] == "at-rule" for item in stack)
-            control_depth = sum(item["kind"] == "control" for item in stack)
-            if kind == "rule":
-                selector_depth += 1
-            elif kind == "at-rule":
-                at_rule_depth += 1
-            elif kind == "control":
-                control_depth += 1
-            block = {
-                "kind": kind,
-                "header": " ".join(header.split())[:240],
-                "start_line": _line_at(text, boundaries[-1], index),
-                "end_line": line,
-                "physical_lines": 1,
-                "declarations": 0,
-                "custom_property_declarations": 0,
-                "selector_depth": selector_depth,
-                "at_rule_depth": at_rule_depth,
-                "control_depth": control_depth,
-                "has_parent_selector": kind == "rule" and "&" in header,
-                "recovered": False,
-            }
-            blocks.append(block)
-            if kind == "rule":
-                selector = _selector_fact(header, block)
-                selectors.append(selector)
-            stack.append(block)
-            boundaries[-1] = index + 1
-            boundaries.append(index + 1)
+            _open_block(text, index, line, boundaries, stack, blocks, selectors)
         elif char == ";":
-            if stack:
-                statement = _clean_header(text[boundaries[-1] : index])
-                if _is_declaration(statement):
-                    stack[-1]["declarations"] += 1
-                    if statement.lstrip().startswith("--"):
-                        stack[-1]["custom_property_declarations"] += 1
+            _count_declaration(text, boundaries[-1], index, stack)
             boundaries[-1] = index + 1
         elif char == "}":
             if not stack:
                 errors += 1
                 boundaries[-1] = index + 1
             else:
-                trailing = _clean_header(text[boundaries[-1] : index])
-                if _is_declaration(trailing):
-                    stack[-1]["declarations"] += 1
-                    if trailing.lstrip().startswith("--"):
-                        stack[-1]["custom_property_declarations"] += 1
-                block = stack.pop()
-                block["end_line"] = line
-                block["physical_lines"] = line - block["start_line"] + 1
-                boundaries.pop()
-                boundaries[-1] = index + 1
+                _close_block(text, index, line, boundaries, stack)
         index += 1
 
     for block in stack:
@@ -171,6 +126,71 @@ def scan_bytes(source: bytes, format_name: str) -> dict:
         "blocks": blocks,
         "selectors": selectors,
     }
+
+
+def _open_block(
+    text: str,
+    index: int,
+    line: int,
+    boundaries: list[int],
+    stack: list[dict],
+    blocks: list[dict],
+    selectors: list[dict],
+) -> None:
+    header = _clean_header(text[boundaries[-1] : index])
+    kind = _classify(header, stack)
+    selector_depth = sum(item["kind"] == "rule" for item in stack)
+    at_rule_depth = sum(item["kind"] == "at-rule" for item in stack)
+    control_depth = sum(item["kind"] == "control" for item in stack)
+    selector_depth += kind == "rule"
+    at_rule_depth += kind == "at-rule"
+    control_depth += kind == "control"
+    block = {
+        "kind": kind,
+        "header": " ".join(header.split())[:240],
+        "start_line": _line_at(text, boundaries[-1], index),
+        "end_line": line,
+        "physical_lines": 1,
+        "declarations": 0,
+        "custom_property_declarations": 0,
+        "selector_depth": selector_depth,
+        "at_rule_depth": at_rule_depth,
+        "control_depth": control_depth,
+        "has_parent_selector": kind == "rule" and "&" in header,
+        "recovered": False,
+    }
+    blocks.append(block)
+    if kind == "rule":
+        selectors.append(_selector_fact(header, block))
+    stack.append(block)
+    boundaries[-1] = index + 1
+    boundaries.append(index + 1)
+
+
+def _count_declaration(text: str, start: int, end: int, stack: list[dict]) -> None:
+    if not stack:
+        return
+    statement = _clean_header(text[start:end])
+    if not _is_declaration(statement):
+        return
+    stack[-1]["declarations"] += 1
+    if statement.lstrip().startswith("--"):
+        stack[-1]["custom_property_declarations"] += 1
+
+
+def _close_block(
+    text: str,
+    index: int,
+    line: int,
+    boundaries: list[int],
+    stack: list[dict],
+) -> None:
+    _count_declaration(text, boundaries[-1], index, stack)
+    block = stack.pop()
+    block["end_line"] = line
+    block["physical_lines"] = line - block["start_line"] + 1
+    boundaries.pop()
+    boundaries[-1] = index + 1
 
 
 def _line_at(text: str, start: int, end: int) -> int:
