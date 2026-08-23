@@ -85,7 +85,7 @@ def load_scope_exclusions(args: SelectionArgs, start: Path) -> list[str]:
     if not isinstance(exclude, list) or any(not isinstance(pattern, str) for pattern in exclude):
         raise ValueError("scope.exclude must be an array of strings")
     combined = [*exclude, *getattr(args, "scope_exclude", [])]
-    if any(not pattern.strip() for pattern in combined):
+    if any(not isinstance(pattern, str) or not pattern.strip() for pattern in combined):
         raise ValueError("scope.exclude patterns must be non-empty strings")
     return combined
 
@@ -181,7 +181,7 @@ def walk_directory_files(directory: Path) -> list[Path]:
 
 
 def has_pruned_directory(path: Path, root: Path) -> bool:
-    relative = path.resolve().relative_to(root.resolve())
+    relative = path.relative_to(root)
     return any(part in BUILTIN_PRUNED_DIRECTORIES for part in relative.parts[:-1])
 
 
