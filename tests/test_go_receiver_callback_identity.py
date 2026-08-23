@@ -59,8 +59,11 @@ func (b B) Run() {
                 parent = next(item for item in facts.callables if item.key == callback.parent_key)
                 self.assertEqual(callback.parent_callable, parent.identity)
                 self.assertEqual(callback.key.identity, callback.identity)
+                self.assertEqual((callback.key.path, callback.key.embedded_language, callback.key.source_range),
+                                 (callback.path, "go", callback.source_range))
                 self.assertEqual(callback.parent_key, parent.key)
                 self.assertEqual(callback.boundary_kind, "callback")
+                self.assertEqual(callback.source_range.physical_loc, 5)
                 actual = authored[callback.source_range.start.byte_offset:callback.source_range.end.byte_offset]
                 self.assertTrue(actual.startswith(b"func() {"))
                 self.assertIn(b"if ready", actual)
@@ -68,8 +71,9 @@ func (b B) Run() {
                 self.assertEqual(owned(facts, parent, "decisions"), [])
                 self.assertEqual([item.provider_kind for item in owned(facts, callback, "decisions")],
                                  ["if_statement"])
-                self.assertEqual([item.provider_kind for item in owned(facts, callback, "controls")],
-                                 ["if_statement"])
+                controls = owned(facts, callback, "controls")
+                self.assertEqual([item.provider_kind for item in controls], ["if_statement"])
+                self.assertEqual([item.parent_control_range for item in controls], [None])
 
     def test_receiver_normalization_package_free_function_and_callback_locations(self) -> None:
         source = '''package workers
