@@ -33,7 +33,7 @@ with tempfile.TemporaryDirectory() as temp:
     path = Path(temp) / "sample.py"
     path.write_text("value = 1\\n", encoding="utf-8")
     config = Path(temp) / "config.json"
-    config.write_text('{"guards":{"callableSize":{"enabled":false},"nesting":{"enabled":false},"cyclomaticComplexity":{"enabled":false}}}', encoding="utf-8")
+    config.write_text('{"guards":{"callableSize":{"enabled":false},"nesting":{"enabled":false},"cyclomaticComplexity":{"enabled":false},"markdownDocumentSize":{"enabled":false},"markdownSectionSize":{"enabled":false}}}', encoding="utf-8")
     with patch.object(sys, "argv", ["code-guard", str(path), "--config", str(config), "--json"]):
         result = main()
 

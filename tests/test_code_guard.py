@@ -18,7 +18,9 @@ class ResultContractTests(CodeGuardTestCase):
             root = Path(temp)
             (root / "sample.py").write_text("def sample():\n    return 1\n", encoding="utf-8")
             result = self.run_guard(root, ".", "--json")
-            self.assertEqual((result.returncode, list(self.read_json(result)["guards"])), (0, ["loc", "callableSize", "nesting", "complexity"]))
+            self.assertEqual((result.returncode, list(self.read_json(result)["guards"])), (0, [
+                "loc", "callableSize", "nesting", "complexity", "markdownDocumentSize", "markdownSectionSize",
+            ]))
 
     def test_pass_review_fail_and_policy_routing(self) -> None:
         cases = [(2, "pass", "ok", 0, []), (4, "review", "warn", 1, ["loc"]), (7, "fail", "fail", 2, ["loc"])]
@@ -65,6 +67,8 @@ class ResultContractTests(CodeGuardTestCase):
                 "callableSize": {"state": "pass", "findings": []},
                 "nesting": {"state": "pass", "findings": []},
                 "complexity": {"state": "pass", "findings": []},
+                "markdownDocumentSize": {"state": "pass", "findings": []},
+                "markdownSectionSize": {"state": "pass", "findings": []},
             }})
 
 

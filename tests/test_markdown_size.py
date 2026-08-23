@@ -37,15 +37,16 @@ body
 ~~~~ info
 # fenced
 ~~~~
+
 Setext title
 ------------
 tail"""
         fact = scan_text(Path("sample.md"), text)
-        self.assertEqual(fact.physical_lines, 11)
+        self.assertEqual(fact.physical_lines, 12)
         self.assertEqual(
             [(section.heading, section.level, section.start_line, section.end_line, section.physical_lines)
              for section in fact.sections],
-            [("ATX", 1, 3, 4, 2), ("Child", 2, 5, 8, 4), ("Setext title", 2, 9, 11, 3)],
+            [("ATX", 1, 3, 4, 2), ("Child", 2, 5, 9, 5), ("Setext title", 2, 10, 12, 3)],
         )
 
     def test_fences_indentation_escapes_and_unclosed_fence_are_deterministic(self) -> None:
