@@ -52,14 +52,18 @@ func (b B) Run() {
             ])
             authored = path.read_bytes()
             callbacks = [item for item in facts.callables if item.boundary_kind == "callback"]
-            for callback, literal in zip(callbacks, (b"func() {\n        if ready", b"func() {\n        if ready")):
+            first_start = authored.index(b"func()")
+            expected_starts = [first_start, authored.index(b"func()", first_start + 1)]
+            self.assertEqual([item.source_range.start.byte_offset for item in callbacks], expected_starts)
+            for callback in callbacks:
                 parent = next(item for item in facts.callables if item.key == callback.parent_key)
                 self.assertEqual(callback.parent_callable, parent.identity)
                 self.assertEqual(callback.key.identity, callback.identity)
                 self.assertEqual(callback.parent_key, parent.key)
                 self.assertEqual(callback.boundary_kind, "callback")
                 actual = authored[callback.source_range.start.byte_offset:callback.source_range.end.byte_offset]
-                self.assertTrue(actual.startswith(literal))
+                self.assertTrue(actual.startswith(b"func() {"))
+                self.assertIn(b"if ready", actual)
                 self.assertTrue(actual.endswith(b"}"))
                 self.assertEqual(owned(facts, parent, "decisions"), [])
                 self.assertEqual([item.provider_kind for item in owned(facts, callback, "decisions")],
@@ -85,8 +89,8 @@ func Free() { _ = func() {} }
         with tempfile.TemporaryDirectory() as temp:
             facts = analyze_files([write_source(Path(temp), source, "different_name.go")])
             self.assertEqual([item.identity for item in facts.callables], [
-                "workers.Runner.Value", "workers.Runner.Value.<callback@5:32>",
-                "workers.Runner.Pointer", "workers.Runner.Pointer.<callback@6:42>",
+                "workers.Runner.Value", "workers.Runner.Value.<callback@5:31>",
+                "workers.Runner.Pointer", "workers.Runner.Pointer.<callback@6:41>",
                 "workers.Runner.Many", "workers.Runner.Many.<callback@8:14>",
                 "workers.Runner.Many.<callback@9:15>",
                 "workers.Free", "workers.Free.<callback@13:19>",
@@ -123,6 +127,14 @@ func (a A) Run() {
         with tempfile.TemporaryDirectory() as temp:
             facts = analyze_files([write_source(Path(temp), source)])
             self.assertEqual([item.identity for item in facts.callables], ["sample.A.Run", "sample.A.Stop"])
+
+    def test_generic_receiver_keeps_existing_textual_normalization(self) -> None:
+        source = "package sample\n\ntype A[T any] struct{}\n\nfunc (a A[T]) Run() { _ = func() {} }\n"
+        with tempfile.TemporaryDirectory() as temp:
+            facts = analyze_files([write_source(Path(temp), source)])
+            self.assertEqual([item.identity for item in facts.callables], [
+                "sample.A[T].Run", "sample.A[T].Run.<callback@5:27>",
+            ])
 
     def test_malformed_go_fails_closed(self) -> None:
         source = "package sample\ntype A struct{}\nfunc (a A) Run() { _ = func( { }\n"
