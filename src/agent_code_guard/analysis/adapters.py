@@ -179,10 +179,9 @@ def _identity(node, region: ExecutableRegion) -> str:
             if name:
                 parts.append(_text(name, source))
     if language == "go":
-        receiver = node.child_by_field_name("receiver")
-        if receiver:
-            words = _text(receiver, source).replace("(", "").replace(")", "").replace("*", "").split()
-            parts.append(words[-1] if words else "receiver")
+        receiver_type = _go_receiver_type(node, source)
+        if receiver_type:
+            parts.append(receiver_type)
     parts.append(region.original_path.stem if language == "python" else _package_or_namespace(node, language, source))
     return ".".join(reversed([part for part in parts if part]))
 
@@ -233,6 +232,14 @@ def _name_node(node, language: str):
     if name is None and language == "kotlin":
         name = next((child for child in node.named_children if child.type in {"simple_identifier", "type_identifier"}), None)
     return name
+
+
+def _go_receiver_type(method_node, source: bytes) -> str | None:
+    receiver = method_node.child_by_field_name("receiver")
+    if receiver is None:
+        return None
+    words = _text(receiver, source).replace("(", "").replace(")", "").replace("*", "").split()
+    return words[-1] if words else "receiver"
 
 
 def _second_wave_identity(node, region: ExecutableRegion) -> str:
@@ -385,6 +392,10 @@ def _mainstream_lambda_identity(node, region: ExecutableRegion) -> str:
             name = _name_node(current, region.language)
             if name is not None:
                 parts.append(_text(name, region.source))
+                if region.language == "go" and current.type == "method_declaration":
+                    receiver_type = _go_receiver_type(current, region.source)
+                    if receiver_type:
+                        parts.append(receiver_type)
         elif current.type in {"class_definition", "class_declaration", "object_declaration", "struct_declaration", "record_declaration", "enum_declaration"}:
             name = _name_node(current, region.language)
             if name is not None:
