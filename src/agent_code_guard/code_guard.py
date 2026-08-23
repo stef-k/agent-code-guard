@@ -13,12 +13,13 @@ from .config_validation import validate_configuration
 from .file_selection import resolve_scope
 from .guards import callable_size, complexity, loc, markdown_document_size, markdown_section_size, nesting
 from .result_model import GuardResult, aggregate_state, required_policies
+from .skill_distribution import export_skill, skill_path as installed_skill_path
 
 
 def parser() -> argparse.ArgumentParser:
     value = argparse.ArgumentParser(description="Run deterministic Code Guard checks.")
     value.add_argument(
-        "paths", nargs="*", default=["."],
+        "paths", nargs="*", default=[],
         help="Files or directories to inspect; bounds files selected by a Git selection mode.",
     )
     value.add_argument("--config", help="Path to code-guard.config.json.")
@@ -37,7 +38,45 @@ def parser() -> argparse.ArgumentParser:
     )
     value.add_argument("--count-blank-lines", action="store_true", help="Count blank lines for LOC.")
     value.add_argument("--ignore-comment-lines", action="store_true", help="Ignore simple comment-only lines.")
+    value.add_argument(
+        "--skill-path", action="store_true",
+        help="Print the absolute path to this distribution's bundled Code Guard skill.",
+    )
+    value.add_argument(
+        "--export-skill", metavar="TARGET_DIRECTORY",
+        help="Copy this distribution's bundled Code Guard skill into an empty target directory.",
+    )
     return value
+
+
+def _management_mode(args: argparse.Namespace) -> int | None:
+    if not args.skill_path and args.export_skill is None:
+        args.paths = args.paths or ["."]
+        return None
+    incompatible = (
+        args.skill_path and args.export_skill is not None
+        or bool(args.paths)
+        or args.config is not None
+        or args.warn is not None
+        or args.fail is not None
+        or args.json
+        or args.ci
+        or args.changed_only
+        or args.staged
+        or args.base_ref is not None
+        or bool(args.include)
+        or bool(args.exclude)
+        or bool(args.scope_exclude)
+        or args.count_blank_lines
+        or args.ignore_comment_lines
+    )
+    if incompatible:
+        raise ValueError("skill management options cannot be combined with guard execution options or paths")
+    if args.skill_path:
+        print(installed_skill_path())
+    else:
+        print(export_skill(Path(args.export_skill)))
+    return 0
 
 
 def payload(results: list[GuardResult]) -> dict[str, object]:
@@ -174,6 +213,9 @@ def exit_code(overall: str, ci: bool) -> int:
 def main() -> int:
     args = parser().parse_args()
     try:
+        management_result = _management_mode(args)
+        if management_result is not None:
+            return management_result
         validate_configuration(args.config, Path.cwd())
         scope = resolve_scope(args, Path.cwd())
         data = payload(run_guards(scope, args))

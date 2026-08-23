@@ -7,6 +7,7 @@ prune .github
 prune docs
 prune examples
 prune research
-prune skills
+graft skills/code-guard
+prune skills/code-guard/scripts
 prune tests
 global-exclude *.py[cod]

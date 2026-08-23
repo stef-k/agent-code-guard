@@ -35,15 +35,17 @@ With Git, run the installed Code Guard command after supported code or Markdown 
 code-guard . --changed-only
 ```
 
-The current checkout-based packaged workflow installs Code Guard and its syntax
-dependencies from the current checkout, then uses the installed command:
+An installed Agent Code Guard distribution provides both the command and this
+version-matched skill payload. The skill's normal execution route is always the
+installed command:
 
 ```bash
-python -m pip install .
 code-guard . --changed-only
 ```
 
-The compatibility runner remains available directly from a repository checkout:
+For repository development only, the compatibility runner remains available
+directly from a checkout. It is not part of the externally installed skill
+payload or the normal end-user execution route:
 
 ```bash
 python3 skills/code-guard/scripts/code_guard.py . --changed-only

@@ -19,3 +19,11 @@ code-guard = "agent_code_guard.code_guard:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.data-files]
+"share/agent-code-guard/skill" = [
+    "skills/code-guard/SKILL.md",
+    "skills/code-guard/LICENSE.txt",
+]
+"share/agent-code-guard/skill/agents" = ["skills/code-guard/agents/openai.yaml"]
+"share/agent-code-guard/skill/references" = ["skills/code-guard/references/*.md"]
