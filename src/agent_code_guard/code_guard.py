@@ -136,8 +136,7 @@ def print_text(data: dict[str, object]) -> None:
             if finding["state"] != "review":
                 continue
             print(
-                f"REVIEW: {finding['path']}:{finding['range']['startLine']}-{finding['range']['endLine']} "
-                f"— Markdown document is {finding['measured']} lines "
+                f"REVIEW: {finding['path']} — Markdown document is {finding['measured']} lines "
                 f"(review {finding['thresholds']['reviewAt']})"
             )
     markdown_section_result = data["guards"].get("markdownSectionSize")

@@ -58,8 +58,8 @@ def load_config(args: argparse.Namespace) -> Config:
 def run(root: Path, config: Config, facts: MarkdownFacts) -> GuardResult:
     assert config.review_at is not None
     findings = [MarkdownDocumentFinding(
-        reporting_path(fact.path, root), 1 if fact.physical_lines else 0, fact.physical_lines,
-        fact.physical_lines, "review" if fact.physical_lines > config.review_at else "pass",
+        reporting_path(fact.path, root), fact.physical_lines,
+        "review" if fact.physical_lines > config.review_at else "pass",
         {"reviewAt": config.review_at},
     ) for fact in facts.documents]
     findings.sort(key=lambda finding: finding.path)

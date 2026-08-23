@@ -157,6 +157,13 @@ class MarkdownGuardTests(unittest.TestCase):
             ])
             self.assertTrue(all(item.state == "review" for item in result.findings))
 
+            exact = root / "exact.md"
+            exact.write_text("# Exact\n" + "line\n" * 199, encoding="utf-8")
+            exact_result = markdown_section_size.run(
+                root, markdown_section_size.Config(True, 200), analyze_files((exact,))
+            )
+            self.assertEqual((exact_result.state, exact_result.findings[0].measured), ("pass", 200))
+
 
 class MarkdownRunnerTests(CodeGuardTestCase):
     def test_default_guard_order_and_markdown_json_human_output(self) -> None:
@@ -172,14 +179,14 @@ class MarkdownRunnerTests(CodeGuardTestCase):
             self.assertEqual(data["requiredPolicies"], ["markdownDocumentSize", "markdownSectionSize"])
             document = data["guards"]["markdownDocumentSize"]["findings"][0]
             self.assertEqual(document, {
-                "path": "large.md", "range": {"startLine": 1, "endLine": 801}, "measured": 801,
+                "path": "large.md", "measured": 801,
                 "state": "review", "thresholds": {"reviewAt": 800},
             })
             section = data["guards"]["markdownSectionSize"]["findings"][0]
             self.assertEqual(section["heading"], "Huge")
             self.assertEqual(section["range"], {"startLine": 1, "endLine": 801})
             human = self.run_guard(root, "large.md")
-            self.assertIn("large.md:1-801 — Markdown document is 801 lines (review 800)", human.stdout)
+            self.assertIn("large.md — Markdown document is 801 lines (review 800)", human.stdout)
             self.assertIn('section "Huge" is 801 lines (review 200)', human.stdout)
 
     def test_markdown_scan_is_independently_lazy_and_shared_once(self) -> None:

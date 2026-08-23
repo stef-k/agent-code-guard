@@ -67,8 +67,6 @@ class CallableFinding:
 @dataclass(frozen=True)
 class MarkdownDocumentFinding:
     path: str
-    start_line: int
-    end_line: int
     measured: int
     state: str
     thresholds: dict[str, int]
@@ -76,7 +74,6 @@ class MarkdownDocumentFinding:
     def to_json(self) -> dict[str, Any]:
         return {
             "path": self.path,
-            "range": {"startLine": self.start_line, "endLine": self.end_line},
             "measured": self.measured,
             "state": self.state,
             "thresholds": self.thresholds,
