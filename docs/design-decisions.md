@@ -383,3 +383,32 @@ standard-exclude enumeration; directories outside it use a filesystem walk.
 Git-derived changed, staged, and base-ref selections are not re-filtered through
 ignore rules, so tracked files retain their established selection semantics.
 Global scope policy still applies after every one of those modes.
+
+## D32 — Markdown size uses document and direct-section review anchors
+
+Pinned evidence across 912 Markdown files admits two future structured-artifact
+guards: document physical size reviews above 800 lines, and heading-delimited
+direct-content section physical span reviews above 200 lines. Both are
+conservative universal REVIEW defaults, should be enabled when omitted, permit
+a positive project override and explicit disablement, pass at the exact
+threshold, and never FAIL. REVIEW means inspect navigation and responsibility;
+a coherent long-form specification, reference, table, procedure, or code-heavy
+section may be retained without metric-driven restructuring.
+
+Document size counts every physical line. Section size counts from a heading's
+start through immediately before the next heading of any level, including
+blank, fenced-code, table, and list lines. Nonblank document size is rejected as
+the primary variant because it adds formatting-game pressure without improving
+upper-tail signal. Heading-subtree span is rejected as a noisy duplicate of
+document size. Maximum heading depth is rejected as weak maintainability signal
+that overlaps Markdown style/accessibility lint.
+
+A later production issue must deliver one vertical slice over final
+`ResolvedScope.files`, initially applying to evidence-backed `.md` files. One
+lazy bounded Markdown scan should produce separate concrete immutable document
+and direct-section facts for the two guards. It must not reuse executable
+`AnalysisFacts`, add Markdown to LOC, retain rejected research measurements,
+introduce generic `ArtifactFacts`, or own discovery/ignore/exclusion policy.
+The evidence scanner needs only the standard library, so no Markdown parser
+dependency is currently justified. This issue records admission only and
+changes no production behavior.

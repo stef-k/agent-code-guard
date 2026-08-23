@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from research.markdown_guard_sample import measure, scan_text
+from research.markdown_guard_sample import _distribution, measure, scan_text
 
 
 class MarkdownScannerTests(unittest.TestCase):
@@ -67,6 +67,27 @@ class MarkdownScannerTests(unittest.TestCase):
         self.assertEqual(len(result["headings"]), 1)
         self.assertEqual(result["unclosedFence"], True)
 
+    def test_atx_boundaries_and_setext_eligibility_are_bounded(self) -> None:
+        result = scan_text(
+            "   ###### Six ######\n"
+            "    # indented\n"
+            "####### seven\n"
+            "#missing-space\n"
+            "Title\n=======\n"
+            "\nNot a title\n\n---\n",
+        )
+
+        self.assertEqual(
+            [(heading["text"], heading["level"]) for heading in result["headings"]],
+            [("Six", 6), ("Title", 1)],
+        )
+
+    def test_backtick_info_with_backtick_is_not_a_fence(self) -> None:
+        result = scan_text("```bad`info\n# visible\n")
+
+        self.assertEqual(result["headings"][0]["text"], "visible")
+        self.assertFalse(result["unclosedFence"])
+
 
 class MarkdownMeasurementTests(unittest.TestCase):
     def test_measurement_orders_markdown_paths_and_summarizes_thresholds(self) -> None:
@@ -95,6 +116,19 @@ class MarkdownMeasurementTests(unittest.TestCase):
             result = measure([str(root)], root, excludes=("generated/**",))
 
         self.assertEqual([row["path"] for row in result["documents"]], ["keep.md"])
+
+    def test_duplicate_inputs_and_empty_distribution_are_deterministic(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "same.md"
+            source.write_text("# Same\n", encoding="utf-8")
+
+            result = measure([str(source), str(root), str(source)], root)
+
+        self.assertEqual([row["path"] for row in result["documents"]], ["same.md"])
+        self.assertEqual(_distribution([], (100,))["median"], None)
+        self.assertEqual(_distribution([1, 2, 3, 4], (2,))["p99"], 4)
+        self.assertEqual(_distribution([1, 2, 3, 4], (2,))["above"]["2"]["count"], 2)
 
 
 if __name__ == "__main__":
