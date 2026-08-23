@@ -40,7 +40,9 @@ file LOC can FAIL.
 
 ## Adding new guards
 
-Agent Code Guard should remain deliberately small. A new candidate guard is not accepted merely because a metric can be computed; its evaluation issue must gather evidence that the concern belongs in the universal deterministic core.
+Agent Code Guard should remain deliberately small, not become a generic static-analysis collection. The first admission question is whether a proposal provides distinct, broadly useful guardrail value for autonomous coding-agent work. Determinism and general code-quality value are not enough: a candidate should normally be rejected when a mature specialist tool already solves the concern and Code Guard adds no distinct agent-oriented responsibility. Future expansion remains welcome when evidence supports a genuine agent guardrail.
+
+A new candidate guard is not accepted merely because a metric can be computed; its evaluation issue must gather evidence that the concern belongs in the universal deterministic core.
 
 The primary admission gate asks whether the candidate:
 
