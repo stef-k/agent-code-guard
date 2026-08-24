@@ -47,7 +47,7 @@ jobs:
               raise SystemExit(f"Release tag {tag} does not match project version {version} ({expected_tag})")
           print(f"Release tag {tag} matches project version {version}")
           PY
-          git fetch origin main
+          git fetch origin main:refs/remotes/origin/main
           tag_commit="$(git rev-list -n 1 "$RELEASE_TAG^{commit}")"
           git merge-base --is-ancestor "$tag_commit" origin/main || {
             echo "Release tag commit $tag_commit is not contained in origin/main" >&2
