@@ -7,6 +7,7 @@
 Deterministic guardrails for agent-assisted software development.
 
 [![Production Analysis](https://github.com/stef-k/agent-code-guard/actions/workflows/analysis.yml/badge.svg)](https://github.com/stef-k/agent-code-guard/actions/workflows/analysis.yml)
+[![PyPI](https://img.shields.io/pypi/v/agent-code-guard?logo=pypi&logoColor=white)](https://pypi.org/project/agent-code-guard/)
 [![Python 3.10–3.14](https://img.shields.io/badge/Python-3.10%E2%80%933.14-3776AB?logo=python&logoColor=white)](https://github.com/stef-k/agent-code-guard/blob/main/docs/platform-support.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/stef-k/agent-code-guard/blob/main/LICENSE)
 
