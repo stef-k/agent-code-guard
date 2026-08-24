@@ -96,7 +96,9 @@ class CliVersionTests(unittest.TestCase):
         script = """
 import json
 import sys
+from pathlib import Path
 from unittest.mock import patch
+sys.path.insert(0, sys.argv[1])
 from agent_code_guard.code_guard import main
 with patch.object(sys, 'argv', ['code-guard', '--version']):
     result = main()
@@ -105,7 +107,9 @@ loaded = sorted(name for name in sys.modules if name.startswith(
 ))
 print(json.dumps({'result': result, 'loaded': loaded}))
 """
-        result = subprocess.run([sys.executable, "-c", script], text=True, capture_output=True)
+        result = subprocess.run(
+            [sys.executable, "-c", script, str(REPO_ROOT / "src")], text=True, capture_output=True,
+        )
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout.splitlines()[-1]), {"result": 0, "loaded": []})
@@ -136,6 +140,7 @@ print(json.dumps({'result': result, 'loaded': loaded}))
             "ci": ["--ci"],
             "skill_path": ["--skill-path"],
             "export_skill": ["--export-skill", "target"],
+            "help": ["--help"],
         }
         for name, arguments in cases.items():
             for json_arguments in ([], ["--json"]):

@@ -36,6 +36,33 @@ repository and skill compatibility; it is not the primary installed command.
 The public command is `code-guard`. With no paths, it defaults to `.`, but
 normal development should select current work explicitly.
 
+### Installed version
+
+Report the installed distribution identity without configuration, scope, Git,
+provider, skill, or guard work:
+
+```text
+$ code-guard --version
+agent-code-guard <version>
+```
+
+For machine-readable output:
+
+```text
+$ code-guard --version --json
+{
+  "distribution": "agent-code-guard",
+  "version": "<version>"
+}
+```
+
+The value is read from installed metadata for the canonical
+`agent-code-guard` distribution. `--version` may be combined only with
+`--json`. Incompatible arguments exit `3`; human errors use standard error and
+JSON errors use an `error` object on standard output. If distribution metadata
+is unavailable, the error is
+`installed distribution metadata is unavailable for agent-code-guard`.
+
 ### Git changed-only
 
 ```bash

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from importlib import import_module
+from importlib.metadata import PackageNotFoundError, version as distribution_version
 import json
 import sys
 from pathlib import Path
@@ -14,6 +15,9 @@ from .file_selection import resolve_scope
 from .guards import callable_size, complexity, loc, markdown_document_size, markdown_section_size, nesting
 from .result_model import GuardResult, aggregate_state, required_policies
 from .skill_distribution import export_skill, skill_path as installed_skill_path
+
+DISTRIBUTION_NAME = "agent-code-guard"
+METADATA_UNAVAILABLE = f"installed distribution metadata is unavailable for {DISTRIBUTION_NAME}"
 
 
 def parser() -> argparse.ArgumentParser:
@@ -26,6 +30,10 @@ def parser() -> argparse.ArgumentParser:
     value.add_argument("--warn", type=int, help="Override the global LOC warning threshold.")
     value.add_argument("--fail", type=int, help="Override the global LOC failure threshold.")
     value.add_argument("--json", action="store_true", help="Emit normalized JSON.")
+    value.add_argument(
+        "--version", action="store_true",
+        help="Print the installed agent-code-guard distribution version; may be combined only with --json.",
+    )
     value.add_argument("--ci", action="store_true", help="Do not fail solely on REVIEW.")
     value.add_argument("--changed-only", action="store_true", help="Inspect staged, unstaged, and untracked files.")
     value.add_argument("--staged", action="store_true", help="Inspect index-only changes.")
@@ -47,6 +55,39 @@ def parser() -> argparse.ArgumentParser:
         help="Copy this distribution's bundled Code Guard skill into an empty target directory.",
     )
     return value
+
+
+def _version_mode(args: argparse.Namespace) -> int | None:
+    if not args.version:
+        return None
+    incompatible = (
+        bool(args.paths)
+        or args.config is not None
+        or args.warn is not None
+        or args.fail is not None
+        or args.ci
+        or args.changed_only
+        or args.staged
+        or args.base_ref is not None
+        or bool(args.include)
+        or bool(args.exclude)
+        or bool(args.scope_exclude)
+        or args.count_blank_lines
+        or args.ignore_comment_lines
+        or args.skill_path
+        or args.export_skill is not None
+    )
+    if incompatible:
+        raise ValueError("--version may be combined only with --json")
+    try:
+        installed_version = distribution_version(DISTRIBUTION_NAME)
+    except (PackageNotFoundError, OSError) as exc:
+        raise ValueError(METADATA_UNAVAILABLE) from exc
+    if args.json:
+        print(json.dumps({"distribution": DISTRIBUTION_NAME, "version": installed_version}, indent=2))
+    else:
+        print(f"{DISTRIBUTION_NAME} {installed_version}")
+    return 0
 
 
 def _management_mode(args: argparse.Namespace) -> int | None:
@@ -210,9 +251,23 @@ def exit_code(overall: str, ci: bool) -> int:
     return 0
 
 
+def _print_tool_error(message: str, json_mode: bool) -> int:
+    if json_mode:
+        print(json.dumps({"error": message}, indent=2))
+    else:
+        print(f"Code Guard error: {message}", file=sys.stderr)
+    return 3
+
+
 def main() -> int:
+    raw_arguments = sys.argv[1:]
+    if "--version" in raw_arguments and any(value in raw_arguments for value in ("-h", "--help")):
+        return _print_tool_error("--version may be combined only with --json", "--json" in raw_arguments)
     args = parser().parse_args()
     try:
+        version_result = _version_mode(args)
+        if version_result is not None:
+            return version_result
         management_result = _management_mode(args)
         if management_result is not None:
             return management_result
@@ -225,11 +280,7 @@ def main() -> int:
             print_text(data)
         return exit_code(data["overall"], args.ci)
     except Exception as exc:
-        if args.json:
-            print(json.dumps({"error": str(exc)}, indent=2))
-        else:
-            print(f"Code Guard error: {exc}", file=sys.stderr)
-        return 3
+        return _print_tool_error(str(exc), args.json)
 
 
 if __name__ == "__main__":
