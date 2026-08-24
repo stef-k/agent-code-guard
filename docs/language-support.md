@@ -28,11 +28,12 @@ not establish C versus C++ language context.
 
 For Vue single-file components, syntax guards analyze inline JavaScript or
 TypeScript script regions. Vue template and style regions are not executable
-syntax input. External `src` scripts are not read through the Vue document.
+syntax input. External `src` scripts and unsupported explicit script languages
+are fail-closed tool errors rather than silently ignored inputs.
 
-For PHP, parser-backed analysis maps executable PHP regions back to their
-original positions in mixed-content files. Surrounding non-PHP markup is not
-treated as executable PHP syntax.
+For PHP, parser-backed analysis uses one identity-mapped whole-file region, so
+facts retain their original positions in mixed-content files. The grammar's
+surrounding non-PHP markup emits no executable facts.
 
 ## Markdown
 
