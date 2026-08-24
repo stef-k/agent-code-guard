@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import importlib.util
 import json
 import subprocess
 import sys
@@ -12,9 +13,17 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from agent_code_guard.code_guard import main
+import agent_code_guard
+
+agent_code_guard.__path__.insert(0, str(REPO_ROOT / "src" / "agent_code_guard"))
+module_spec = importlib.util.spec_from_file_location(
+    "agent_code_guard._checkout_code_guard", REPO_ROOT / "src" / "agent_code_guard" / "code_guard.py",
+)
+assert module_spec is not None and module_spec.loader is not None
+checkout_code_guard = importlib.util.module_from_spec(module_spec)
+module_spec.loader.exec_module(checkout_code_guard)
+main = checkout_code_guard.main
 
 
 COMPATIBILITY_RUNNER = REPO_ROOT / "skills" / "code-guard" / "scripts" / "code_guard.py"
@@ -34,14 +43,14 @@ class CliVersionTests(unittest.TestCase):
         return result, stdout.getvalue(), stderr.getvalue()
 
     def test_human_version_uses_distribution_metadata_exactly(self) -> None:
-        with patch("agent_code_guard.code_guard.distribution_version", return_value="9.8.7+local") as version:
+        with patch.object(checkout_code_guard, "distribution_version", return_value="9.8.7+local") as version:
             result = self.run_main("--version")
 
         self.assertEqual(result, (0, "agent-code-guard 9.8.7+local\n", ""))
         version.assert_called_once_with(DISTRIBUTION)
 
     def test_json_version_has_exact_stable_shape(self) -> None:
-        with patch("agent_code_guard.code_guard.distribution_version", return_value="9.8.7"):
+        with patch.object(checkout_code_guard, "distribution_version", return_value="9.8.7"):
             code, stdout, stderr = self.run_main("--version", "--json")
 
         self.assertEqual(code, 0)
@@ -49,30 +58,32 @@ class CliVersionTests(unittest.TestCase):
         self.assertEqual(json.loads(stdout), {"distribution": DISTRIBUTION, "version": "9.8.7"})
 
     def test_metadata_failure_uses_deterministic_human_error(self) -> None:
-        error = importlib.metadata.PackageNotFoundError(DISTRIBUTION)
-        with patch("agent_code_guard.code_guard.distribution_version", side_effect=error):
-            result = self.run_main("--version")
+        for error in (importlib.metadata.PackageNotFoundError(DISTRIBUTION), OSError("private detail")):
+            with self.subTest(error=type(error).__name__):
+                with patch.object(checkout_code_guard, "distribution_version", side_effect=error):
+                    result = self.run_main("--version")
 
-        self.assertEqual(
-            result,
-            (3, "", "Code Guard error: installed distribution metadata is unavailable for agent-code-guard\n"),
-        )
-        self.assertNotIn("Traceback", "".join(result[1:]))
-        self.assertNotIn(str(error), "".join(result[1:]))
+                self.assertEqual(
+                    result,
+                    (3, "", "Code Guard error: installed distribution metadata is unavailable for agent-code-guard\n"),
+                )
+                self.assertNotIn("Traceback", "".join(result[1:]))
+                self.assertNotIn(str(error), "".join(result[1:]))
 
     def test_metadata_failure_uses_deterministic_json_error(self) -> None:
-        error = importlib.metadata.PackageNotFoundError(DISTRIBUTION)
-        with patch("agent_code_guard.code_guard.distribution_version", side_effect=error):
-            code, stdout, stderr = self.run_main("--version", "--json")
+        for error in (importlib.metadata.PackageNotFoundError(DISTRIBUTION), OSError("private detail")):
+            with self.subTest(error=type(error).__name__):
+                with patch.object(checkout_code_guard, "distribution_version", side_effect=error):
+                    code, stdout, stderr = self.run_main("--version", "--json")
 
-        self.assertEqual(code, 3)
-        self.assertEqual(stderr, "")
-        self.assertEqual(
-            json.loads(stdout),
-            {"error": "installed distribution metadata is unavailable for agent-code-guard"},
-        )
-        self.assertNotIn("Traceback", stdout)
-        self.assertNotIn(str(error), stdout)
+                self.assertEqual(code, 3)
+                self.assertEqual(stderr, "")
+                self.assertEqual(
+                    json.loads(stdout),
+                    {"error": "installed distribution metadata is unavailable for agent-code-guard"},
+                )
+                self.assertNotIn("Traceback", stdout)
+                self.assertNotIn(str(error), stdout)
 
     def test_version_returns_before_analysis_configuration_scope_and_skill_work(self) -> None:
         forbidden_calls = [
@@ -82,11 +93,11 @@ class CliVersionTests(unittest.TestCase):
             "installed_skill_path",
             "export_skill",
         ]
-        patches = [patch(f"agent_code_guard.code_guard.{name}") for name in forbidden_calls]
+        patches = [patch.object(checkout_code_guard, name) for name in forbidden_calls]
         mocks = [item.start() for item in patches]
         self.addCleanup(lambda: [item.stop() for item in reversed(patches)])
 
-        with patch("agent_code_guard.code_guard.distribution_version", return_value="1.2.3"):
+        with patch.object(checkout_code_guard, "distribution_version", return_value="1.2.3"):
             self.assertEqual(self.run_main("--version"), (0, "agent-code-guard 1.2.3\n", ""))
 
         for mocked in mocks:
@@ -118,7 +129,7 @@ print(json.dumps({'result': result, 'loaded': loaded}))
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             before = list(root.rglob("*"))
-            with patch("agent_code_guard.code_guard.distribution_version", return_value="1.2.3"):
+            with patch.object(checkout_code_guard, "distribution_version", return_value="1.2.3"):
                 with patch("pathlib.Path.cwd", return_value=root):
                     self.assertEqual(self.run_main("--version")[0], 0)
             self.assertEqual(list(root.rglob("*")), before)
