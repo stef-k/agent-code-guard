@@ -1,31 +1,35 @@
 # Usage
 
-## Current pre-release installation
+## Installation
 
-Agent Code Guard is currently `0.1.0.dev0` and is not published to PyPI. Install
-the current pre-release from a checkout, preferably as an isolated CLI tool:
+Install Agent Code Guard as an isolated CLI tool with pipx:
 
 ```bash
-git clone https://github.com/stef-k/agent-code-guard.git
-cd agent-code-guard
-pipx install .
+pipx install agent-code-guard
 ```
 
 Inside an activated Python virtual environment, use:
 
 ```bash
-python -m pip install .
+python -m pip install agent-code-guard
 ```
 
-For repository development, an editable install is available:
+An isolated uv tool installation is also available:
 
 ```bash
+uv tool install agent-code-guard
+```
+
+For source or repository development installs, run one of the following from a
+checkout:
+
+```bash
+python -m pip install .
 python -m pip install -e .
 ```
 
-`uv tool install .` is also a supported local-tool alternative. The checkout
-runner at `skills/code-guard/scripts/code_guard.py` exists for repository and
-skill compatibility; it is not the primary installed command.
+The checkout runner at `skills/code-guard/scripts/code_guard.py` exists for
+repository and skill compatibility; it is not the primary installed command.
 
 ## Command and scope
 
