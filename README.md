@@ -187,15 +187,17 @@ are not syntax errors. Supported malformed syntax, unsupported explicit Vue
 script languages, external Vue scripts, or a missing required grammar fail
 deterministically instead of returning partial facts.
 
-The standard Python 3.10+ installation includes the syntax infrastructure.
-`pyproject.toml` is the single canonical declaration for the exact production
-pins `tree-sitter==0.26.0` and `tree-sitter-language-pack==1.14.3`. Both include native components. Published
-wheels cover CPython 3.10+ on mainstream Windows, macOS, and Linux platforms;
-unsupported platforms may require a local native build and are not silently
-downgraded to regex analysis. The language pack wheel is about 2–2.4 MB before
-installation. Parser instances are cached by embedded language inside one
-provider, and each executable region is parsed/extracted once for reuse by all
-enabled syntax guards.
+The standard installation supports CPython 3.10–3.14. Agent Code Guard's own
+wheel is pure Python, but syntax analysis depends on pinned native packages. The
+current normal binary-install envelope is Windows x86-64/ARM64, macOS
+x86-64/ARM64, and Linux glibc 2.34+ on x86-64/ARM64. Older-glibc Linux,
+musl/Alpine, and unlisted architectures may require native source builds and
+are best-effort rather than release-supported. See the
+[platform support contract](https://github.com/stef-k/agent-code-guard/blob/main/docs/platform-support.md)
+for deployment-tag details. Native dependency failure never silently
+downgrades analysis to regex or partial syntax facts. Parser instances are
+cached by embedded language inside one provider, and each executable region is
+parsed/extracted once for reuse by all enabled syntax guards.
 
 PHP files use one identity-mapped whole-file executable region. The pinned PHP
 grammar exposes PHP declarations alongside inert HTML `text` nodes, so mixed
