@@ -1,5 +1,9 @@
 # Agent Code Guard
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/stef-k/agent-code-guard/main/assets/agent-code-guard-mark.svg" width="180" alt="Agent Code Guard project mark">
+</p>
+
 Deterministic guardrails for agent-assisted software development.
 
 [![Production Analysis](https://github.com/stef-k/agent-code-guard/actions/workflows/analysis.yml/badge.svg)](https://github.com/stef-k/agent-code-guard/actions/workflows/analysis.yml)
