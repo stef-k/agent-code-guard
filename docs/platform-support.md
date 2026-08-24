@@ -1,6 +1,6 @@
 # Platform support
 
-Agent Code Guard publishes a pure-Python wheel, but normal zero-config syntax
+Agent Code Guard builds a pure-Python wheel, but normal zero-config syntax
 analysis requires the pinned native packages `tree-sitter==0.26.0` and
 `tree-sitter-language-pack==1.14.3`. The effective binary-install envelope is
 the intersection of compatible wheels from both releases, not every platform
