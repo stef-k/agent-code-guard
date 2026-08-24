@@ -21,18 +21,13 @@ PASS / REVIEW / FAIL
 agent judgment
 ```
 
-**Pre-release:** the package is currently `0.1.0.dev0` and is not yet published
-to PyPI. Install it from a checkout for current use.
-
 ## Installation
 
 [pipx](https://pipx.pypa.io/) keeps the command isolated from project
 environments:
 
 ```bash
-git clone https://github.com/stef-k/agent-code-guard.git
-cd agent-code-guard
-pipx install .
+pipx install agent-code-guard
 ```
 
 See the [usage guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md)

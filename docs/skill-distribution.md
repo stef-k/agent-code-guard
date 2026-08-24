@@ -4,8 +4,8 @@ The `agent-code-guard` Python distribution is the single versioned release
 unit. A pip, pipx, or uv tool installation receives the `code-guard` command,
 its runtime, and an inert canonical Code Guard skill payload from the same
 artifact version. Installation does not inspect or modify any agent directory
-or configuration. The package is not yet published on PyPI, so validation and
-development installations use local built artifacts or the repository.
+or configuration. Installing `agent-code-guard` through pip, pipx, or uv
+provides the command, runtime, and exact version-matched skill payload.
 
 CLI-only use is fully supported. Install the Python distribution and run, for
 example, `code-guard . --changed-only`. The bundled skill does not affect
