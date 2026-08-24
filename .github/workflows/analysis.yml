@@ -30,3 +30,32 @@ jobs:
       - run: python -m unittest discover -s tests
       - run: python -m compileall -q src skills research tests
       - run: git diff --check
+
+  python-compatibility:
+    name: Python ${{ matrix.python-version }} compatibility
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install .
+      - run: code-guard --help
+      - run: code-guard --skill-path
+      - run: python -c "from pathlib import Path; Path('compatibility-smoke.py').write_text('def answer(value):\n    if value:\n        return 42\n    return 0\n\nanswer(True)\n', encoding='utf-8')"
+      - run: code-guard compatibility-smoke.py --json
+      - run: python -m unittest discover -s tests
+
+  python-compatibility-required:
+    name: Python compatibility
+    needs: python-compatibility
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.python-compatibility.result }}" = "success"
