@@ -6,6 +6,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
@@ -14,15 +15,30 @@ from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-import agent_code_guard
+CHECKOUT_PACKAGE = "_checkout_agent_code_guard"
 
-agent_code_guard.__path__.insert(0, str(REPO_ROOT / "src" / "agent_code_guard"))
-module_spec = importlib.util.spec_from_file_location(
-    "agent_code_guard._checkout_code_guard", REPO_ROOT / "src" / "agent_code_guard" / "code_guard.py",
-)
-assert module_spec is not None and module_spec.loader is not None
-checkout_code_guard = importlib.util.module_from_spec(module_spec)
-module_spec.loader.exec_module(checkout_code_guard)
+
+def _load_checkout_code_guard():
+    package = types.ModuleType(CHECKOUT_PACKAGE)
+    package.__path__ = [str(REPO_ROOT / "src" / "agent_code_guard")]
+    module_name = f"{CHECKOUT_PACKAGE}.code_guard"
+    module_spec = importlib.util.spec_from_file_location(
+        module_name, REPO_ROOT / "src" / "agent_code_guard" / "code_guard.py",
+    )
+    assert module_spec is not None and module_spec.loader is not None
+    checkout_module = importlib.util.module_from_spec(module_spec)
+    sys.modules[CHECKOUT_PACKAGE] = package
+    sys.modules[module_name] = checkout_module
+    try:
+        module_spec.loader.exec_module(checkout_module)
+    finally:
+        for loaded_name in tuple(sys.modules):
+            if loaded_name == CHECKOUT_PACKAGE or loaded_name.startswith(f"{CHECKOUT_PACKAGE}."):
+                del sys.modules[loaded_name]
+    return checkout_module
+
+
+checkout_code_guard = _load_checkout_code_guard()
 main = checkout_code_guard.main
 
 
@@ -238,7 +254,12 @@ print(json.dumps({'result': result, 'loaded': loaded}))
                     self.assertEqual(result.stdout, f"{DISTRIBUTION} {expected_version}\n")
 
     def test_checkout_loading_does_not_mutate_package_search_path(self) -> None:
-        self.assertNotIn(str(REPO_ROOT / "src" / "agent_code_guard"), agent_code_guard.__path__)
+        self.assertFalse(any(
+            name == CHECKOUT_PACKAGE or name.startswith(f"{CHECKOUT_PACKAGE}.") for name in sys.modules
+        ))
+        host_package = sys.modules.get("agent_code_guard")
+        if host_package is not None:
+            self.assertNotIn(str(REPO_ROOT / "src" / "agent_code_guard"), host_package.__path__)
 
     def test_non_version_cli_behavior_is_preserved(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

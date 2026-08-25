@@ -20,6 +20,16 @@ DISTRIBUTION_NAME = "agent-code-guard"
 METADATA_UNAVAILABLE = f"installed distribution metadata is unavailable for {DISTRIBUTION_NAME}"
 
 
+def _installed_distribution_version() -> str:
+    try:
+        installed_version = distribution_version(DISTRIBUTION_NAME)
+    except (PackageNotFoundError, OSError, UnicodeError) as exc:
+        raise ValueError(METADATA_UNAVAILABLE) from exc
+    if not isinstance(installed_version, str):
+        raise ValueError(METADATA_UNAVAILABLE)
+    return installed_version
+
+
 def parser() -> argparse.ArgumentParser:
     value = argparse.ArgumentParser(description="Run deterministic Code Guard checks.")
     value.add_argument(
@@ -79,10 +89,7 @@ def _version_mode(args: argparse.Namespace) -> int | None:
     )
     if incompatible:
         raise ValueError("--version may be combined only with --json")
-    try:
-        installed_version = distribution_version(DISTRIBUTION_NAME)
-    except (PackageNotFoundError, OSError) as exc:
-        raise ValueError(METADATA_UNAVAILABLE) from exc
+    installed_version = _installed_distribution_version()
     if args.json:
         print(json.dumps({"distribution": DISTRIBUTION_NAME, "version": installed_version}, indent=2))
     else:
