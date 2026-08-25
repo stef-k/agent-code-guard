@@ -62,6 +62,18 @@ def _python() -> dict[str, object]:
         }
 
 
+def _distribution_owns_launcher(package: object, resolved: Path) -> bool:
+    try:
+        for item in package.files or ():
+            if Path(str(item)).name.lower() not in {"code-guard", "code-guard.exe", "code-guard-script.py"}:
+                continue
+            if Path(package.locate_file(item)).resolve() == resolved:
+                return True
+    except Exception:
+        return False
+    return False
+
+
 def _entry_point(package: object | None) -> dict[str, object]:
     invoked = sys.argv[0]
     resolved = None
@@ -77,7 +89,7 @@ def _entry_point(package: object | None) -> dict[str, object]:
         normalized = resolved.as_posix().lower()
         if normalized.endswith("/skills/code-guard/scripts/code_guard.py"):
             kind = "checkout-compatibility-runner"
-        elif resolved.stem.lower() in {"code-guard", "code_guard"}:
+        elif package is not None and _distribution_owns_launcher(package, resolved):
             kind = "console-script"
 
     owns_entry_point = False
@@ -243,14 +255,43 @@ def _providers() -> dict[str, object]:
 
 def gather_report() -> dict[str, object]:
     """Gather all independent diagnostics without invoking ordinary analysis."""
-    cwd = Path.cwd()
-    distribution, package = _distribution()
-    python = _python()
-    entry_point = _entry_point(package)
-    skill = _skill()
-    configuration = _configuration(cwd)
-    git = _git(cwd)
-    providers = _providers()
+    try:
+        cwd = Path.cwd()
+    except Exception as exc:
+        raise RuntimeError("current working directory is unavailable") from exc
+    distribution, package = _safe_check(
+        _distribution,
+        ({"name": DISTRIBUTION_NAME, "version": None, **_failure("distribution check failed")}, None),
+    )
+    python = _safe_check(_python, {
+        "implementation": "unavailable", "version": "unavailable", "executable": str(sys.executable),
+        **_failure("running Python details are unavailable"),
+    })
+    entry_point = _safe_check(lambda: _entry_point(package), {
+        "name": "code-guard", "target": ENTRY_POINT_TARGET, "invoked": sys.argv[0],
+        "resolvedPath": None, "kind": "other", **_failure("entry point check failed"),
+    })
+    skill = _safe_check(_skill, {
+        "available": False, "path": None, **_failure("bundled Code Guard skill check failed"),
+    })
+    configuration = _safe_check(lambda: _configuration(cwd), {
+        "mode": "file", "path": None, "valid": False, **_failure("configuration check failed"),
+    })
+    git = _safe_check(lambda: _git(cwd), {
+        "executableAvailable": False, "executable": None,
+        "repositoryAvailable": False, "root": None, **_failure("Git check failed"),
+    })
+    providers = _safe_check(_providers, {
+        "status": "unavailable", "message": "provider checks failed",
+        "distributions": [
+            {"name": name, "version": None, **_failure(f"provider distribution check failed for {name}")}
+            for name in PROVIDER_DISTRIBUTIONS
+        ],
+        "languages": [
+            {"name": name, **_failure(f"syntax provider check failed for {name}")}
+            for name in PROVIDER_LANGUAGES
+        ],
+    })
     required = (distribution, python, entry_point, skill, configuration, providers)
     status = "healthy" if all(item["status"] == "ok" for item in required) else "unhealthy"
     return {
@@ -264,6 +305,13 @@ def gather_report() -> dict[str, object]:
         "git": git,
         "providers": providers,
     }
+
+
+def _safe_check(check, fallback):
+    try:
+        return check()
+    except Exception:
+        return fallback
 
 
 def _label(item: dict[str, object]) -> str:

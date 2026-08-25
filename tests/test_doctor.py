@@ -1,19 +1,24 @@
 from __future__ import annotations
 
 import json
+import importlib
 import sys
 import tempfile
+import types
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "src"))
-
-from agent_code_guard import code_guard, doctor
+CHECKOUT_PACKAGE = "_doctor_checkout_agent_code_guard"
+package = types.ModuleType(CHECKOUT_PACKAGE)
+package.__path__ = [str(REPO_ROOT / "src" / "agent_code_guard")]
+sys.modules[CHECKOUT_PACKAGE] = package
+code_guard = importlib.import_module(f"{CHECKOUT_PACKAGE}.code_guard")
+doctor = importlib.import_module(f"{CHECKOUT_PACKAGE}.doctor")
 
 
 LANGUAGES = [
@@ -42,6 +47,8 @@ class DoctorTests(unittest.TestCase):
         distribution = SimpleNamespace(
             version="1.2.3",
             entry_points=[SimpleNamespace(group="console_scripts", name="code-guard", value="agent_code_guard.code_guard:main")],
+            files=[Path("../Scripts/code-guard")],
+            locate_file=lambda item: launcher,
         )
         provider = Mock()
         provider.parse.return_value = object()
@@ -74,6 +81,19 @@ class DoctorTests(unittest.TestCase):
                 list(report),
                 ["schemaVersion", "status", "distribution", "python", "entryPoint", "skill", "configuration", "git", "providers"],
             )
+            self.assertEqual(list(report["distribution"]), ["name", "version", "status", "message"])
+            self.assertEqual(list(report["python"]), ["implementation", "version", "executable", "status", "message"])
+            self.assertEqual(
+                list(report["entryPoint"]),
+                ["name", "target", "invoked", "resolvedPath", "kind", "status", "message"],
+            )
+            self.assertEqual(list(report["skill"]), ["available", "path", "status", "message"])
+            self.assertEqual(list(report["configuration"]), ["mode", "path", "valid", "status", "message"])
+            self.assertEqual(
+                list(report["git"]),
+                ["executableAvailable", "executable", "repositoryAvailable", "root", "status", "message"],
+            )
+            self.assertEqual(list(report["providers"]), ["status", "message", "distributions", "languages"])
             self.assertEqual(report["status"], "healthy")
             self.assertEqual([item["name"] for item in report["providers"]["languages"]], LANGUAGES)
             with patch.object(code_guard, "gather_doctor_report", return_value=report):
@@ -81,7 +101,17 @@ class DoctorTests(unittest.TestCase):
                 machine = self.run_main("doctor", "--json")
             self.assertEqual(human[0], 0)
             self.assertEqual(human[2], "")
-            self.assertEqual(human[1], doctor.format_human(report) + "\n")
+            self.assertEqual(human[1], "\n".join((
+                "Code Guard doctor: HEALTHY",
+                "Distribution: OK agent-code-guard 1.2.3",
+                f"Python: OK {report['python']['implementation']} {report['python']['version']} ({report['python']['executable']})",
+                f"Entry point: OK code-guard -> agent_code_guard.code_guard:main (console-script; {report['entryPoint']['resolvedPath']})",
+                f"Skill: OK {report['skill']['path']}",
+                "Configuration: OK defaults (no configuration file)",
+                f"Git: OK {report['git']['executable']}; repository {report['git']['root']}",
+                "Providers: OK tree-sitter 0.26.0; tree-sitter-language-pack 1.14.3; 14/14 languages available",
+                "",
+            )))
             self.assertEqual(machine[0], 0)
             self.assertEqual(machine[2], "")
             self.assertEqual(json.loads(machine[1]), report)
@@ -111,18 +141,39 @@ class DoctorTests(unittest.TestCase):
             with patch.object(code_guard, "gather_doctor_report", return_value=report):
                 self.assertEqual(self.run_main("doctor", "--json")[0], 1)
 
+        with (
+            patch.object(doctor, "_git", side_effect=RuntimeError("private failure")),
+            patch.object(doctor, "_providers", return_value=report["providers"]) as providers,
+        ):
+            continued = doctor.gather_report()
+        self.assertEqual(continued["git"]["message"], "Git check failed")
+        providers.assert_called_once()
+
     def test_reservation_rejection_and_early_dispatch_preserve_analysis_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            unrelated = Path(temp) / "code_guard.py"
+            unrelated.touch()
+            distribution = SimpleNamespace(
+                entry_points=[SimpleNamespace(group="console_scripts", name="code-guard", value="agent_code_guard.code_guard:main")],
+                files=[],
+            )
+            with patch.object(sys, "argv", [str(unrelated), "doctor"]):
+                entry = doctor._entry_point(distribution)
+            self.assertEqual(entry["kind"], "other")
+            self.assertEqual(entry["status"], "unavailable")
+
         healthy = {"status": "healthy"}
         forbidden = ["validate_configuration", "resolve_scope", "run_analysis", "installed_skill_path", "export_skill"]
-        mocks = [patch.object(code_guard, name).start() for name in forbidden]
-        self.addCleanup(lambda: [patch.stopall()])
-        with patch.object(code_guard, "gather_doctor_report", return_value=healthy):
+        with ExitStack() as stack:
+            mocks = [stack.enter_context(patch.object(code_guard, name)) for name in forbidden]
+            stack.enter_context(patch.object(code_guard, "gather_doctor_report", return_value=healthy))
             self.assertEqual(self.run_main("doctor", "--json")[0], 0)
-        for mocked in mocks:
-            mocked.assert_not_called()
+            for mocked in mocks:
+                mocked.assert_not_called()
 
-        with patch.object(code_guard, "resolve_scope", side_effect=RuntimeError("analysis entered")):
+        with patch.object(code_guard, "resolve_scope", side_effect=RuntimeError("qualified path analyzed")) as resolve:
             self.assertEqual(self.run_main("./doctor")[0], 3)
+            resolve.assert_called_once()
         self.assertEqual(self.run_main("doctor", "extra.py")[0], 3)
         self.assertEqual(self.run_main("doctor", "--config", "config.json")[0], 3)
 
