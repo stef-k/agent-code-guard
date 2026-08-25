@@ -64,6 +64,32 @@ use an `error` object on standard output. If distribution metadata is
 unavailable, the error is
 `installed distribution metadata is unavailable for agent-code-guard`.
 
+### Installation diagnostics
+
+Inspect the active installation and its immediate local capabilities without
+running project analysis:
+
+```bash
+code-guard doctor
+code-guard doctor --json
+```
+
+The human and JSON reports cover the active distribution, Python process,
+invoked entry point, bundled skill, current-directory configuration and Git
+context, and all supported parser providers. A healthy report exits `0`; a
+completed unhealthy report exits `1`; invocation or internal failures that
+prevent a report exit `3`. Completed reports use standard output only.
+
+`doctor` is reserved only as the exact first token. Analyze a file or directory
+with that name through a qualified spelling such as `./doctor`, `.\doctor`, or
+an absolute path. Doctor is read-only: it does not analyze source, repair or
+install dependencies, export skills, modify configuration or Git state, access
+the network, or persist diagnostics.
+
+Diagnostic output includes resolved launcher, interpreter, skill, Git, and
+configuration paths. Treat those paths and other environment details as
+potentially sensitive before sharing a report.
+
 ### Git changed-only
 
 ```bash
