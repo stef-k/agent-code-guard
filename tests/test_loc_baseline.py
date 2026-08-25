@@ -36,6 +36,14 @@ class LocBaselineTests(CodeGuardTestCase):
                     {"path": "small.py", "allowedLoc": 7},
                 ]},
             }, indent=2) + "\n", encoding="utf-8", newline="\n")
+            (root / "nested.py").write_text(
+                "def nested(value):\n    if value:\n        if value > 1:\n            return value\n",
+                encoding="utf-8",
+            )
+            (baseline.parent / "code-guard.config.json").write_text(json.dumps({
+                "version": 1,
+                "guards": {"nesting": {"reviewAt": 1}},
+            }), encoding="utf-8")
 
             full = self.run_guard(root, ".", "--warn", "3", "--fail", "5", "--json")
             self.assertEqual(full.returncode, 2)
@@ -55,6 +63,8 @@ class LocBaselineTests(CodeGuardTestCase):
             )
             self.assertEqual(data["overall"], "fail")
             self.assertIn("loc", data["requiredPolicies"])
+            self.assertEqual(data["guards"]["nesting"]["state"], "review")
+            self.assertIn("nesting", data["requiredPolicies"])
 
             compact = self.run_guard(
                 root, ".", "--warn", "3", "--fail", "5", "--json", "--json-mode", "compact",
@@ -124,6 +134,10 @@ class LocBaselineTests(CodeGuardTestCase):
             self.assertEqual(baseline.read_bytes(), before)
 
             baseline.unlink()
+            no_baseline = self.run_guard(root, ".", "--warn", "3", "--fail", "5", "--json")
+            self.assertNotIn("baselineLoc", self.findings(no_baseline)[0])
+            self.assertNotIn("ratchetStatus", self.findings(no_baseline)[0])
+            self.assertFalse(baseline.exists())
             outside = Path(outside_temp) / "outside.py"
             write_lines(outside, 7)
             escaped = self.run_guard(root, str(outside), "--create-loc-baseline")
@@ -134,6 +148,20 @@ class LocBaselineTests(CodeGuardTestCase):
             ordinary = self.run_guard(root, ".", "--warn", "3", "--fail", "5")
             self.assertEqual(ordinary.returncode, 2)
             self.assertFalse(baseline.exists())
+
+            baseline.parent.mkdir(exist_ok=True)
+            baseline.write_text(json.dumps({
+                "version": 1,
+                "loc": {"files": [{"path": "legacy.py", "allowedLoc": 7}]},
+            }, indent=2) + "\n", encoding="utf-8")
+            config = write_config(root, {
+                "warnAt": 3,
+                "failAt": 5,
+                "allowedLargeFiles": [{"path": "*.py", "reason": "Reviewed exemption."}],
+            })
+            overlap = self.run_guard(root, ".", "--config", str(config), "--json")
+            self.assertEqual(overlap.returncode, 3)
+            self.assertIn("overlaps allowedLargeFiles", overlap.stdout)
 
 
 if __name__ == "__main__":

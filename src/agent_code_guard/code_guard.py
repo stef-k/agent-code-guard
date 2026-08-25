@@ -14,6 +14,7 @@ from pathlib import Path
 from .config_validation import validate_configuration
 from .file_selection import resolve_scope
 from .guards import callable_size, complexity, loc, markdown_document_size, markdown_section_size, nesting
+from . import loc_baseline
 from .result_model import GuardResult, aggregate_state, required_policies
 from .skill_distribution import export_skill, skill_path as installed_skill_path
 
@@ -49,7 +50,14 @@ Version reporting:
     Output: {"distribution": "agent-code-guard", "version": "<version>"}
 
 Successful version reporting exits 0. Incompatible arguments or unavailable
-metadata exit 3. --version may be combined only with --json.""",
+metadata exit 3. --version may be combined only with --json.
+
+Legacy LOC adoption:
+  code-guard [PATH ...] --create-loc-baseline [counting/configuration options]
+  code-guard [PATH ...] --update-loc-baseline [counting/configuration options]
+    Create or lower/prune the source-controlled LOC ratchet at
+    <analysis-root>/.agent-tools/code-guard.loc-baseline.json. These explicit
+    write modes do not run normal analysis and never increase an allowance.""",
     )
     value.add_argument(
         "paths", nargs="*", default=[],
@@ -79,6 +87,14 @@ metadata exit 3. --version may be combined only with --json.""",
     )
     value.add_argument("--count-blank-lines", action="store_true", help="Count blank lines for LOC.")
     value.add_argument("--ignore-comment-lines", action="store_true", help="Ignore simple comment-only lines.")
+    value.add_argument(
+        "--create-loc-baseline", action="store_true",
+        help="Create the canonical LOC legacy-adoption baseline without running analysis.",
+    )
+    value.add_argument(
+        "--update-loc-baseline", action="store_true",
+        help="Lower or prune the canonical LOC baseline without running analysis.",
+    )
     value.add_argument(
         "--skill-path", action="store_true",
         help="Print the absolute path to this distribution's bundled Code Guard skill.",
@@ -184,6 +200,45 @@ def _management_mode(args: argparse.Namespace) -> int | None:
     return 0
 
 
+def _loc_baseline_mode(args: argparse.Namespace) -> int | None:
+    if not args.create_loc_baseline and not args.update_loc_baseline:
+        return None
+    incompatible = (
+        args.create_loc_baseline and args.update_loc_baseline
+        or (bool(args.paths) and args.paths[0] == "doctor")
+        or args.json
+        or args.json_mode is not None
+        or args.ci
+        or args.version
+        or args.changed_only
+        or args.staged
+        or args.base_ref is not None
+        or args.skill_path
+        or args.export_skill is not None
+    )
+    if incompatible:
+        raise ValueError(
+            "LOC baseline write modes accept only paths and LOC counting/configuration options"
+        )
+    args.paths = args.paths or ["."]
+    invocation = Path.cwd()
+    validate_configuration(args.config, invocation)
+    scope = resolve_scope(args, invocation)
+    config = loc.load_config(args)
+    if args.create_loc_baseline:
+        count = loc_baseline.create(scope.root, scope.files, config)
+        print(f"Created LOC baseline: {loc_baseline.RELATIVE_PATH} ({count} entries).")
+    else:
+        lowered, removed, unchanged = loc_baseline.update(
+            scope.root, args.paths, invocation, config, scope.excluded_files,
+        )
+        print(
+            f"Updated LOC baseline: {loc_baseline.RELATIVE_PATH} "
+            f"({lowered} lowered, {removed} removed, {unchanged} unchanged)."
+        )
+    return 0
+
+
 @dataclass(frozen=True)
 class ScopeSummary:
     selected: int
@@ -234,12 +289,19 @@ def run_guards(scope, args: argparse.Namespace) -> list[GuardResult]:
 def run_analysis(scope, args: argparse.Namespace) -> CompletedAnalysis:
     """Load guard configuration, then construct shared syntax facts at most once."""
     loc_config = loc.load_config(args)
+    baseline = loc_baseline.load_if_present(scope.root)
+    if baseline is not None:
+        loc_baseline.validate_paths(scope.root, baseline)
+        loc_baseline.validate_overlap(baseline, loc_config)
+        for path in scope.files:
+            if not path.is_file() or not path.resolve().is_relative_to(scope.root.resolve()):
+                raise ValueError(f"baseline analysis scope is outside analysis root: {path}")
     callable_size_config = callable_size.load_config(args)
     nesting_config = nesting.load_config(args)
     complexity_config = complexity.load_config(args)
     markdown_document_config = markdown_document_size.load_config(args)
     markdown_section_config = markdown_section_size.load_config(args)
-    results = [loc.run(scope.root, loc_config, scope.files)]
+    results = [loc.run(scope.root, loc_config, scope.files, baseline)]
     analyzed_files = {
         path for path in scope.files
         if loc_config.enabled and loc.should_include(path, loc_config, scope.root)
@@ -292,10 +354,22 @@ def print_text(data: dict[str, object]) -> None:
     )
     loc_result = data["guards"]["loc"]
     for finding in loc_result["findings"]:
-        if finding["nativeStatus"] == "ok":
+        if finding["nativeStatus"] == "ok" and finding.get("baselineLoc") is None:
             continue
-        label = "EXEMPT" if finding["nativeStatus"] == "exempt" else finding["state"].upper()
-        print(f"{label}: {finding['path']} — {finding['countedLoc']} LOC (warn {finding['warnAt']}, fail {finding['failAt']})")
+        label = (
+            "RATCHET" if finding["nativeStatus"] == "grandfathered" else
+            "EXEMPT" if finding["nativeStatus"] == "exempt" else finding["state"].upper()
+        )
+        baseline_detail = ""
+        if finding.get("baselineLoc") is not None:
+            status = {
+                "within": "within", "exceeded": "exceeded", "notNeeded": "no longer needed",
+            }[finding["ratchetStatus"]]
+            baseline_detail = f"; baseline {finding['baselineLoc']}, {status}"
+        print(
+            f"{label}: {finding['path']} — {finding['countedLoc']} LOC "
+            f"(warn {finding['warnAt']}, fail {finding['failAt']}{baseline_detail})"
+        )
         if finding["overrideIndex"] is not None:
             print(f"  Threshold override: {finding['overrideIndex']}")
         if finding["reason"]:
@@ -385,6 +459,9 @@ def main() -> int:
     try:
         if args.json_mode is not None and not args.json:
             raise ValueError("--json-mode requires --json")
+        baseline_result = _loc_baseline_mode(args)
+        if baseline_result is not None:
+            return baseline_result
         doctor_result = _doctor_mode(args, raw_arguments)
         if doctor_result is not None:
             return doctor_result
@@ -403,7 +480,8 @@ def main() -> int:
             print_text(data)
         return exit_code(data["overall"], args.ci)
     except Exception as exc:
-        return _print_tool_error(str(exc), args.json)
+        write_mode = args.create_loc_baseline or args.update_loc_baseline
+        return _print_tool_error(str(exc), args.json and not write_mode)
 
 
 def gather_doctor_report() -> dict[str, object]:
