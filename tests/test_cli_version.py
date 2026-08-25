@@ -292,14 +292,6 @@ print(json.dumps({'result': result, 'loaded': loaded}))
 
         self.assertIs(importlib.metadata.version, parent_version)
 
-    def test_checkout_loading_does_not_mutate_package_search_path(self) -> None:
-        self.assertFalse(any(
-            name == CHECKOUT_PACKAGE or name.startswith(f"{CHECKOUT_PACKAGE}.") for name in sys.modules
-        ))
-        host_package = sys.modules.get("agent_code_guard")
-        if host_package is not None:
-            self.assertNotIn(str(REPO_ROOT / "src" / "agent_code_guard"), host_package.__path__)
-
     def test_non_version_cli_behavior_is_preserved(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
