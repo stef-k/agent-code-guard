@@ -153,6 +153,50 @@ Missing explicit paths, incompatible selectors, unavailable base refs, invalid
 scope, and Git selectors outside a repository are tool errors. Git-derived
 paths that no longer exist are ignored.
 
+## Legacy LOC adoption ratchet
+
+Established repositories may adopt LOC policy without accepting further growth
+in files that already exceed their effective failure threshold. Create the
+canonical source-controlled ratchet over an intentionally bounded scope:
+
+```bash
+code-guard src/legacy --create-loc-baseline
+git add .agent-tools/code-guard.loc-baseline.json
+git diff --cached
+```
+
+The file is always
+`<analysis-root>/.agent-tools/code-guard.loc-baseline.json`, where the root is
+the enclosing Git top-level or, outside Git, the resolved invocation directory.
+Normal analysis reads it automatically and never writes it. A file at its exact
+allowance, or reduced while still above ordinary `failAt`, becomes `REVIEW`
+with the human label `RATCHET`. Growth above the allowance remains `FAIL`. Once
+the count is at or below `failAt`, ordinary PASS/REVIEW behavior applies and
+the ratchet is reported as no longer needed.
+
+After reducing or deleting legacy code, explicitly lower and prune entries:
+
+```bash
+code-guard src/legacy --update-loc-baseline
+```
+
+Update bounds come only from the positional paths. Update lowers existing
+allowances, removes entries that are missing, excluded, inapplicable, or no
+longer above `failAt`, and leaves entries outside the bounds unchanged. It
+never adds a newly oversized path or raises an allowance; any attempted growth
+aborts the entire update. A rename is an old-path deletion plus a new,
+ungrandfathered destination—Git history is not consulted. Manual JSON edits
+are ordinary source-control changes and require review.
+
+This ratchet differs from LOC exclusions, threshold overrides, and
+`allowedLargeFiles`: exclusions skip LOC evaluation, overrides change ordinary
+thresholds, and `allowedLargeFiles` is a reasoned static exemption without a
+size-regression check. A ratchet entry may not overlap `allowedLargeFiles`.
+
+This workflow is only for adopting established legacy repositories. New
+projects, including Agent Code Guard itself, should meet policy directly and
+must not create a ratchet baseline.
+
 ## Results and exit codes
 
 - `PASS` means no special action and exits `0`.

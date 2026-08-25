@@ -19,10 +19,13 @@ class Finding:
     fail_at: int
     override_index: int | None = None
     reason: str | None = None
+    baseline_loc: int | None = None
+    ratchet_status: str | None = None
+    emit_baseline_fields: bool = False
 
     def to_json(self) -> dict[str, Any]:
         data = asdict(self)
-        return {
+        result = {
             "path": data["path"],
             "state": data["state"],
             "nativeStatus": data["native_status"],
@@ -32,6 +35,10 @@ class Finding:
             "overrideIndex": data["override_index"],
             "reason": data["reason"],
         }
+        if self.emit_baseline_fields:
+            result["baselineLoc"] = data["baseline_loc"]
+            result["ratchetStatus"] = data["ratchet_status"]
+        return result
 
 
 @dataclass(frozen=True)

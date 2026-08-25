@@ -167,11 +167,17 @@ def normalise_extension(value: str) -> str:
     return value if not value or value.startswith(".") else f".{value}"
 
 
-def run(root: Path, config: Config, selected_files: tuple[Path, ...]) -> GuardResult:
+def run(
+    root: Path, config: Config, selected_files: tuple[Path, ...],
+    baseline: dict[str, int] | None = None,
+) -> GuardResult:
     if not config.enabled:
         return GuardResult("loc", "pass", [])
     files = [path for path in selected_files if should_include(path, config, root)]
-    findings = [evaluate(path, config, root) for path in sorted(set(files), key=lambda p: relative_path(p, root))]
+    findings = [
+        evaluate(path, config, root, baseline)
+        for path in sorted(set(files), key=lambda p: relative_path(p, root))
+    ]
     state = "fail" if any(item.state == "fail" for item in findings) else (
         "review" if any(item.state == "review" for item in findings) else "pass"
     )
@@ -184,20 +190,36 @@ def should_include(path: Path, config: Config, root: Path) -> bool:
     )
 
 
-def evaluate(path: Path, config: Config, root: Path) -> Finding:
+def evaluate(
+    path: Path, config: Config, root: Path, baseline: dict[str, int] | None = None,
+) -> Finding:
     rel = relative_path(path, root)
     counted = count_loc(path, config)
     warn_at, fail_at, override_index = effective_thresholds(rel, config)
     allowed = next((item for item in config.allowed_large_files if matches_path_glob(rel, item.path)), None)
+    baseline_loc = baseline.get(rel) if baseline is not None else None
+    ratchet_status = None
     if allowed and counted > warn_at:
         native_status, state, reason = "exempt", "pass", allowed.reason
     elif counted > fail_at:
-        native_status, state, reason = "fail", "fail", None
+        if baseline_loc is not None and counted <= baseline_loc:
+            native_status, state, reason = "grandfathered", "review", None
+            ratchet_status = "within"
+        elif baseline_loc is not None:
+            native_status, state, reason = "ratchetExceeded", "fail", None
+            ratchet_status = "exceeded"
+        else:
+            native_status, state, reason = "fail", "fail", None
     elif counted > warn_at:
         native_status, state, reason = "warn", "review", None
     else:
         native_status, state, reason = "ok", "pass", None
-    return Finding(rel, state, native_status, counted, warn_at, fail_at, override_index, reason)
+    if baseline_loc is not None and ratchet_status is None:
+        ratchet_status = "notNeeded"
+    return Finding(
+        rel, state, native_status, counted, warn_at, fail_at, override_index, reason,
+        baseline_loc, ratchet_status, baseline is not None,
+    )
 
 
 def count_loc(path: Path, config: Config) -> int:
