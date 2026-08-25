@@ -54,7 +54,19 @@ def load(path: Path) -> dict[str, int]:
 
 def load_if_present(root: Path) -> dict[str, int] | None:
     path = baseline_path(root)
-    return load(path) if path.exists() else None
+    if not path.exists():
+        return None
+    validate_storage_path(root)
+    return load(path)
+
+
+def validate_storage_path(root: Path) -> None:
+    directory = root / ".agent-tools"
+    target = baseline_path(root)
+    if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
+        raise ValueError("LOC baseline directory must be a real directory inside the analysis root")
+    if target.is_symlink() or not is_within(directory.resolve(strict=False), root):
+        raise ValueError("LOC baseline path must not traverse a symlink or escape the analysis root")
 
 
 def validate_overlap(entries: dict[str, int], config: loc.Config) -> None:
@@ -76,8 +88,31 @@ def validate_paths(root: Path, entries: dict[str, int]) -> None:
                 raise ValueError(f"LOC baseline path traverses a symlink: {relative}")
 
 
+def validate_explicit_scope(
+    values: list[str], invocation: Path, root: Path, selected_files: tuple[Path, ...],
+) -> set[Path]:
+    """Validate raw bounds before resolution erases empty directories and file-link identity."""
+    linked_targets: set[Path] = set()
+    directly_reached: set[Path] = set()
+    for value in values or ["."]:
+        path = Path(value) if Path(value).is_absolute() else invocation / value
+        resolved = path.resolve()
+        if not is_within(resolved, root):
+            raise ValueError(f"baseline scope is outside analysis root: {value}")
+        if path.is_symlink() and path.is_file():
+            linked_targets.add(resolved)
+        elif path.is_file():
+            directly_reached.add(resolved)
+        elif path.is_dir():
+            directly_reached.update(
+                selected.resolve() for selected in selected_files if is_within(selected, resolved)
+            )
+    return linked_targets - directly_reached
+
+
 def create(root: Path, files: tuple[Path, ...], config: loc.Config) -> int:
     target = baseline_path(root)
+    validate_storage_path(root)
     if target.exists():
         raise ValueError(f"LOC baseline already exists: {RELATIVE_PATH}")
     _require_enabled(config)
@@ -97,7 +132,7 @@ def create(root: Path, files: tuple[Path, ...], config: loc.Config) -> int:
     created_directory = not target.parent.exists()
     try:
         target.parent.mkdir(exist_ok=True)
-        _atomic_replace(target, content)
+        _atomic_create(target, content)
     except Exception:
         if created_directory:
             try:
@@ -113,6 +148,7 @@ def update(
     scope_excluded: tuple[Path, ...],
 ) -> tuple[int, int, int]:
     target = baseline_path(root)
+    validate_storage_path(root)
     if not target.exists():
         raise ValueError(f"LOC baseline does not exist: {RELATIVE_PATH}")
     _require_enabled(config)
@@ -167,6 +203,30 @@ def serialize(entries: dict[str, int]) -> bytes:
 
 
 def _atomic_replace(target: Path, content: bytes) -> None:
+    temporary = _write_temporary(target, content)
+    try:
+        os.replace(temporary, target)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _atomic_create(target: Path, content: bytes) -> None:
+    temporary = _write_temporary(target, content)
+    try:
+        os.link(temporary, target)
+    except FileExistsError as exc:
+        raise ValueError(f"LOC baseline already exists: {RELATIVE_PATH}") from exc
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _write_temporary(target: Path, content: bytes) -> Path:
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
     temporary = Path(temporary_name)
     try:
@@ -174,12 +234,10 @@ def _atomic_replace(target: Path, content: bytes) -> None:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, target)
-    finally:
-        try:
-            temporary.unlink()
-        except FileNotFoundError:
-            pass
+        return temporary
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
 def _resolve_bounds(values: list[str], invocation: Path, root: Path) -> list[tuple[Path, bool]]:

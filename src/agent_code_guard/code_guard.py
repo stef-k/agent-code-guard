@@ -224,9 +224,13 @@ def _loc_baseline_mode(args: argparse.Namespace) -> int | None:
     invocation = Path.cwd()
     validate_configuration(args.config, invocation)
     scope = resolve_scope(args, invocation)
+    linked_targets = loc_baseline.validate_explicit_scope(
+        args.paths, invocation, scope.root, scope.files,
+    )
     config = loc.load_config(args)
     if args.create_loc_baseline:
-        count = loc_baseline.create(scope.root, scope.files, config)
+        files = tuple(path for path in scope.files if path.resolve() not in linked_targets)
+        count = loc_baseline.create(scope.root, files, config)
         print(f"Created LOC baseline: {loc_baseline.RELATIVE_PATH} ({count} entries).")
     else:
         lowered, removed, unchanged = loc_baseline.update(
@@ -286,16 +290,22 @@ def run_guards(scope, args: argparse.Namespace) -> list[GuardResult]:
     return run_analysis(scope, args).results
 
 
-def run_analysis(scope, args: argparse.Namespace) -> CompletedAnalysis:
+def run_analysis(
+    scope, args: argparse.Namespace, baseline_override: dict[str, int] | None = None,
+    baseline_loaded: bool = False, linked_targets: set[Path] | None = None,
+) -> CompletedAnalysis:
     """Load guard configuration, then construct shared syntax facts at most once."""
     loc_config = loc.load_config(args)
-    baseline = loc_baseline.load_if_present(scope.root)
+    baseline = baseline_override if baseline_loaded else loc_baseline.load_if_present(scope.root)
     if baseline is not None:
         loc_baseline.validate_paths(scope.root, baseline)
         loc_baseline.validate_overlap(baseline, loc_config)
         for path in scope.files:
             if not path.is_file() or not path.resolve().is_relative_to(scope.root.resolve()):
                 raise ValueError(f"baseline analysis scope is outside analysis root: {path}")
+        baseline = dict(baseline)
+        for target in linked_targets or set():
+            baseline.pop(target.relative_to(scope.root).as_posix(), None)
     callable_size_config = callable_size.load_config(args)
     nesting_config = nesting.load_config(args)
     complexity_config = complexity.load_config(args)
@@ -473,7 +483,16 @@ def main() -> int:
             return management_result
         validate_configuration(args.config, Path.cwd())
         scope = resolve_scope(args, Path.cwd())
-        data = payload(run_analysis(scope, args), args.json_mode)
+        linked_targets: set[Path] = set()
+        baseline_loaded = hasattr(scope, "root")
+        if baseline_loaded and loc_baseline.baseline_path(scope.root).exists():
+            linked_targets = loc_baseline.validate_explicit_scope(
+                args.paths, Path.cwd(), scope.root, scope.files,
+            )
+        baseline = loc_baseline.load_if_present(scope.root) if baseline_loaded else None
+        data = payload(
+            run_analysis(scope, args, baseline, baseline_loaded, linked_targets), args.json_mode,
+        )
         if args.json:
             print(json.dumps(data, indent=2))
         else:

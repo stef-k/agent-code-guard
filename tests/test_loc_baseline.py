@@ -119,6 +119,14 @@ class LocBaselineTests(CodeGuardTestCase):
             self.assertNotIn("src/lower.py", baseline.read_text(encoding="utf-8"))
             analysis = self.run_guard(root, "src/renamed.py", "--warn", "3", "--fail", "5", "--json")
             self.assertEqual(self.findings(analysis)[0]["nativeStatus"], "fail")
+            excluded = self.run_guard(
+                root, "other", "--warn", "3", "--fail", "5",
+                "--scope-exclude", "other/**", "--update-loc-baseline",
+            )
+            self.assertEqual(excluded.stdout, (
+                "Updated LOC baseline: .agent-tools/code-guard.loc-baseline.json "
+                "(0 lowered, 1 removed, 0 unchanged).\n"
+            ))
 
     def test_fail_closed_and_analysis_never_writes(self) -> None:
         with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside_temp:
@@ -138,8 +146,8 @@ class LocBaselineTests(CodeGuardTestCase):
             self.assertNotIn("baselineLoc", self.findings(no_baseline)[0])
             self.assertNotIn("ratchetStatus", self.findings(no_baseline)[0])
             self.assertFalse(baseline.exists())
-            outside = Path(outside_temp) / "outside.py"
-            write_lines(outside, 7)
+            outside = Path(outside_temp) / "empty"
+            outside.mkdir()
             escaped = self.run_guard(root, str(outside), "--create-loc-baseline")
             self.assertEqual(escaped.returncode, 3)
             self.assertFalse(baseline.exists())
@@ -162,6 +170,34 @@ class LocBaselineTests(CodeGuardTestCase):
             overlap = self.run_guard(root, ".", "--config", str(config), "--json")
             self.assertEqual(overlap.returncode, 3)
             self.assertIn("overlaps allowedLargeFiles", overlap.stdout)
+
+        with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside_temp:
+            root = Path(temp)
+            outside = Path(outside_temp)
+            init_git(root)
+            write_lines(root / "legacy.py", 7)
+            try:
+                (root / "alias.py").symlink_to(root / "legacy.py")
+            except OSError:
+                self.skipTest("file symlinks are unavailable")
+            direct_and_link = self.run_guard(
+                root, "legacy.py", "alias.py", "--warn", "3", "--fail", "5",
+                "--create-loc-baseline",
+            )
+            self.assertEqual(direct_and_link.returncode, 0)
+            stored = json.loads((root / BASELINE).read_text(encoding="utf-8"))["loc"]["files"]
+            self.assertEqual(stored, [{"path": "legacy.py", "allowedLoc": 7}])
+            (root / BASELINE).unlink()
+            (root / ".agent-tools").rmdir()
+            try:
+                (root / ".agent-tools").symlink_to(outside, target_is_directory=True)
+            except OSError:
+                self.skipTest("directory symlinks are unavailable")
+            unsafe = self.run_guard(
+                root, ".", "--warn", "3", "--fail", "5", "--create-loc-baseline",
+            )
+            self.assertEqual((unsafe.returncode, unsafe.stdout), (3, ""))
+            self.assertEqual(list(outside.iterdir()), [])
 
 
 if __name__ == "__main__":
