@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 from importlib import import_module
 from importlib.metadata import PackageNotFoundError, version as distribution_version
 import json
@@ -139,15 +140,46 @@ def _management_mode(args: argparse.Namespace) -> int | None:
     return 0
 
 
-def payload(results: list[GuardResult]) -> dict[str, object]:
+@dataclass(frozen=True)
+class ScopeSummary:
+    selected: int
+    analyzed: int
+    inapplicable: int
+    excluded: int
+
+    def to_json(self) -> dict[str, int]:
+        return {
+            "selected": self.selected,
+            "analyzed": self.analyzed,
+            "inapplicable": self.inapplicable,
+            "excluded": self.excluded,
+        }
+
+
+@dataclass(frozen=True)
+class CompletedAnalysis:
+    results: list[GuardResult]
+    scope: ScopeSummary
+
+
+def payload(analysis: CompletedAnalysis | list[GuardResult]) -> dict[str, object]:
+    """Serialize a completed run; retain the legacy result-list seam for focused guard tests."""
+    if isinstance(analysis, list):
+        analysis = CompletedAnalysis(analysis, ScopeSummary(0, 0, 0, 0))
+    results = analysis.results
     return {
         "overall": aggregate_state(results),
+        "scope": analysis.scope.to_json(),
         "requiredPolicies": required_policies(results),
         "guards": {result.guard_id: result.to_json() for result in results},
     }
 
 
 def run_guards(scope, args: argparse.Namespace) -> list[GuardResult]:
+    return run_analysis(scope, args).results
+
+
+def run_analysis(scope, args: argparse.Namespace) -> CompletedAnalysis:
     """Load guard configuration, then construct shared syntax facts at most once."""
     loc_config = loc.load_config(args)
     callable_size_config = callable_size.load_config(args)
@@ -156,9 +188,14 @@ def run_guards(scope, args: argparse.Namespace) -> list[GuardResult]:
     markdown_document_config = markdown_document_size.load_config(args)
     markdown_section_config = markdown_section_size.load_config(args)
     results = [loc.run(scope.root, loc_config, scope.files)]
+    analyzed_files = {
+        path for path in scope.files
+        if loc_config.enabled and loc.should_include(path, loc_config, scope.root)
+    }
     needs_analysis = callable_size_config.enabled or nesting_config.enabled or complexity_config.enabled
     if needs_analysis:
         analysis = import_module("agent_code_guard.analysis.pipeline")
+        analyzed_files.update(path for path in scope.files if analysis.is_applicable(path))
         facts = analysis.analyze_files(scope.files)
         if callable_size_config.enabled:
             results.append(callable_size.run(scope.root, callable_size_config, facts))
@@ -168,6 +205,7 @@ def run_guards(scope, args: argparse.Namespace) -> list[GuardResult]:
             results.append(complexity.run(scope.root, complexity_config, facts))
     needs_markdown = markdown_document_config.enabled or markdown_section_config.enabled
     markdown_files = tuple(path for path in scope.files if path.suffix.lower() == ".md") if needs_markdown else ()
+    analyzed_files.update(markdown_files)
     if markdown_files:
         markdown = import_module("agent_code_guard.markdown")
         markdown_facts = markdown.analyze_files(markdown_files)
@@ -180,7 +218,12 @@ def run_guards(scope, args: argparse.Namespace) -> list[GuardResult]:
             results.append(markdown_document_size.run(scope.root, markdown_document_config, _empty_markdown_facts()))
         if markdown_section_config.enabled:
             results.append(markdown_section_size.run(scope.root, markdown_section_config, _empty_markdown_facts()))
-    return results
+    selected = len(scope.files)
+    analyzed = len(analyzed_files)
+    return CompletedAnalysis(
+        results,
+        ScopeSummary(selected, analyzed, selected - analyzed, len(scope.excluded_files)),
+    )
 
 
 def _empty_markdown_facts():
@@ -190,7 +233,11 @@ def _empty_markdown_facts():
 
 
 def print_text(data: dict[str, object]) -> None:
-    print(str(data["overall"]).upper())
+    scope = data["scope"]
+    print(
+        f"{str(data['overall']).upper()}: {scope['selected']} selected; {scope['analyzed']} analyzed; "
+        f"{scope['inapplicable']} inapplicable; {scope['excluded']} excluded."
+    )
     loc_result = data["guards"]["loc"]
     for finding in loc_result["findings"]:
         if finding["nativeStatus"] == "ok":
@@ -292,7 +339,7 @@ def main() -> int:
             return management_result
         validate_configuration(args.config, Path.cwd())
         scope = resolve_scope(args, Path.cwd())
-        data = payload(run_guards(scope, args))
+        data = payload(run_analysis(scope, args))
         if args.json:
             print(json.dumps(data, indent=2))
         else:

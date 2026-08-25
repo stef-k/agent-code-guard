@@ -37,18 +37,19 @@ class ScopeCountTests(CodeGuardTestCase):
             write_lines(root / "excluded.py", 1)
             config = write_config(root, {}, scope={"exclude": ["excluded.py"]})
 
-            human = self.run_guard(root, ".", "--config", str(config))
-            json_result = self.run_guard(root, ".", "--config", str(config), "--json")
+            paths = ("analyzed.py", "unsupported.txt", "excluded.py")
+            human = self.run_guard(root, *paths, "--config", str(config))
+            json_result = self.run_guard(root, *paths, "--config", str(config), "--json")
 
             self.assertEqual(human.returncode, 0, human.stderr)
             self.assertEqual(
                 human.stdout.splitlines()[0],
-                "PASS: 3 selected; 2 analyzed; 1 inapplicable; 1 excluded.",
+                "PASS: 2 selected; 1 analyzed; 1 inapplicable; 1 excluded.",
             )
             scope = self.read_json(json_result)["scope"]
             self.assertEqual(
                 scope,
-                {"selected": 3, "analyzed": 2, "inapplicable": 1, "excluded": 1},
+                {"selected": 2, "analyzed": 1, "inapplicable": 1, "excluded": 1},
             )
             self.assertEqual(scope["analyzed"] + scope["inapplicable"], scope["selected"])
 

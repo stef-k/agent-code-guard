@@ -74,13 +74,16 @@ Example with one deliberate threshold change:
 ```
 
 Repeated `--scope-exclude <glob>` values add caller-supplied all-guard
-exclusions and compose with project configuration.
+exclusions and compose with project configuration. Only files removed by these
+two all-guard forms contribute to the completed result's `excluded` count.
 
 ## LOC-specific exclusions
 
 `guards.loc.exclude` applies only to the LOC guard. The repeated CLI option
 `--exclude <glob>` adds LOC-only exclusions. These do not remove files from
-callable, nesting, complexity, or Markdown analysis.
+callable, nesting, complexity, or Markdown analysis, and they do not contribute
+to the all-guard `excluded` count. A file skipped only by LOC can still be
+`analyzed` by another enabled guard or `inapplicable` when none applies.
 
 ```json
 {

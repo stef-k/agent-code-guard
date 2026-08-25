@@ -27,6 +27,7 @@ class SelectionArgs(Protocol):
 class ResolvedScope:
     root: Path
     files: tuple[Path, ...]
+    excluded_files: tuple[Path, ...] = ()
 
 
 def find_repo_root(start: Path) -> Path | None:
@@ -60,11 +61,12 @@ def resolve_scope(args: SelectionArgs, start: Path) -> ResolvedScope:
 
     normalized = tuple(dict.fromkeys(path.resolve() for path in files))
     exclusions = load_scope_exclusions(args, working_root)
-    filtered = tuple(
+    excluded = tuple(
         path for path in normalized
-        if not any(matches_path_glob(relative_or_absolute_path(path, root), pattern) for pattern in exclusions)
+        if any(matches_path_glob(relative_or_absolute_path(path, root), pattern) for pattern in exclusions)
     )
-    return ResolvedScope(root, filtered)
+    excluded_set = set(excluded)
+    return ResolvedScope(root, tuple(path for path in normalized if path not in excluded_set), excluded)
 
 
 def resolve_explicit_paths(values: list[str], working_root: Path) -> list[Path]:
