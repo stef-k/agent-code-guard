@@ -66,6 +66,36 @@ class CliVersionTests(unittest.TestCase):
         self.assertEqual(result, (0, "agent-code-guard 9.8.7+local\n", ""))
         version.assert_called_once_with(DISTRIBUTION)
 
+    def test_help_documents_version_invocations_outputs_and_exits(self) -> None:
+        help_text = checkout_code_guard.parser().format_help()
+
+        for fragment in (
+            "code-guard --version",
+            "code-guard --version --json",
+            "agent-code-guard <version>",
+            '"distribution"',
+            '"version"',
+            "exit 0",
+            "exit 3",
+            "--version may be combined only with --json",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, help_text)
+
+        stdout = StringIO()
+        stderr = StringIO()
+        with (
+            patch.object(sys, "argv", ["code-guard", "--help"]),
+            redirect_stdout(stdout),
+            redirect_stderr(stderr),
+            self.assertRaises(SystemExit) as exit_context,
+        ):
+            main()
+
+        self.assertEqual(exit_context.exception.code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertEqual(stdout.getvalue(), help_text)
+
     def test_json_version_has_exact_stable_shape(self) -> None:
         with patch.object(checkout_code_guard, "distribution_version", return_value="9.8.7"):
             code, stdout, stderr = self.run_main("--version", "--json")
@@ -218,40 +248,46 @@ print(json.dumps({'result': result, 'loaded': loaded}))
                         self.assertTrue(stderr.startswith("Code Guard error: "))
 
     def test_checkout_compatibility_runner_matches_console_behavior(self) -> None:
-        expected = subprocess.run(
-            [
-                sys.executable,
-                "-I",
-                "-c",
-                "import importlib.metadata,sys;sys.path.insert(0,sys.argv[1]);"
-                "print(importlib.metadata.version(sys.argv[2]))",
-                str(REPO_ROOT / "src"),
-                DISTRIBUTION,
-            ],
-            text=True,
-            capture_output=True,
-        )
-        self.assertEqual(expected.returncode, 0, expected.stderr)
-        expected_version = expected.stdout.rstrip("\n")
+        sentinel = "parent-metadata-sentinel-that-is-not-a-version"
         parent_version = importlib.metadata.version
-        for arguments in (["--version"], ["--version", "--json"]):
-            with self.subTest(arguments=arguments):
-                with patch.object(importlib.metadata, "version", return_value="0.0.0-parent-mismatch"):
+        with patch.object(importlib.metadata, "version", return_value=sentinel):
+            self.assertEqual(importlib.metadata.version(DISTRIBUTION), sentinel)
+            expected = subprocess.run(
+                [
+                    sys.executable,
+                    "-I",
+                    "-c",
+                    "import importlib.metadata,sys;sys.path.insert(0,sys.argv[1]);"
+                    "print(importlib.metadata.version(sys.argv[2]))",
+                    str(REPO_ROOT / "src"),
+                    DISTRIBUTION,
+                ],
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(expected.returncode, 0, expected.stderr)
+            expected_version = expected.stdout.rstrip("\n")
+            self.assertNotEqual(expected_version, sentinel)
+
+            for arguments in (["--version"], ["--version", "--json"]):
+                with self.subTest(arguments=arguments):
                     result = subprocess.run(
                         [sys.executable, "-I", str(COMPATIBILITY_RUNNER), *arguments],
                         text=True,
                         capture_output=True,
                     )
-                self.assertIs(importlib.metadata.version, parent_version)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stderr, "")
-                if "--json" in arguments:
-                    self.assertEqual(
-                        json.loads(result.stdout),
-                        {"distribution": DISTRIBUTION, "version": expected_version},
-                    )
-                else:
-                    self.assertEqual(result.stdout, f"{DISTRIBUTION} {expected_version}\n")
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stderr, "")
+                    self.assertNotIn(sentinel, result.stdout)
+                    if "--json" in arguments:
+                        self.assertEqual(
+                            json.loads(result.stdout),
+                            {"distribution": DISTRIBUTION, "version": expected_version},
+                        )
+                    else:
+                        self.assertEqual(result.stdout, f"{DISTRIBUTION} {expected_version}\n")
+
+        self.assertIs(importlib.metadata.version, parent_version)
 
     def test_checkout_loading_does_not_mutate_package_search_path(self) -> None:
         self.assertFalse(any(
