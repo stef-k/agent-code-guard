@@ -3,7 +3,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from helpers import CodeGuardTestCase, git, init_git, write_config, write_lines
+from tests.helpers import CodeGuardTestCase, git, init_git, write_config, write_lines
 
 
 class ScopeCountTests(CodeGuardTestCase):
