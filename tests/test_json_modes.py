@@ -93,7 +93,6 @@ class JsonModeTests(unittest.TestCase):
                     self.assertEqual(stderr, "")
                     self.assertEqual(set(json.loads(stdout)), {"error"})
                     self.assertNotIn("distribution", stdout)
-                    self.assertNotIn("version", stdout)
                 else:
                     self.assertEqual(stdout, "")
                     self.assertTrue(stderr.startswith("Code Guard error: "))

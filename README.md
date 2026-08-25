@@ -115,6 +115,12 @@ Pull request or branch comparison:
 code-guard . --base-ref origin/main --ci
 ```
 
+Bare `--json` remains the compatible full completed-analysis output. For
+routine agent checks, add `--json-mode compact` to omit normalized `pass`
+findings while retaining actionable `review` and `fail` findings. Use
+`--json-mode debug` as the explicit full-output form when investigating all
+measurements. Both named modes require `--json`; no detail mode exists.
+
 The actual base ref must exist or be fetched correctly in the chosen CI
 environment.
 
