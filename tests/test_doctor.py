@@ -10,6 +10,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
+
 from agent_code_guard import code_guard, doctor
 
 
@@ -58,6 +61,12 @@ class DoctorTests(unittest.TestCase):
         return report
 
     def test_healthy_human_and_json_are_exact_ordered_stdout_only_reports(self) -> None:
+        help_text = code_guard.parser().format_help()
+        for fragment in (
+            "code-guard doctor", "code-guard doctor --json", "Healthy reports exit 0",
+            "unhealthy reports exit 1", "errors exit 3",
+        ):
+            self.assertIn(fragment, help_text)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             report = self.healthy_report(root)
@@ -108,7 +117,7 @@ class DoctorTests(unittest.TestCase):
         mocks = [patch.object(code_guard, name).start() for name in forbidden]
         self.addCleanup(lambda: [patch.stopall()])
         with patch.object(code_guard, "gather_doctor_report", return_value=healthy):
-            self.assertEqual(self.run_main("doctor")[0], 0)
+            self.assertEqual(self.run_main("doctor", "--json")[0], 0)
         for mocked in mocks:
             mocked.assert_not_called()
 

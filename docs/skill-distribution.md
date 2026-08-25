@@ -31,6 +31,12 @@ copies only `SKILL.md`, `LICENSE.txt`, `agents/openai.yaml`, and the policy file
 under `references/`; the checkout-only `scripts/code_guard.py` compatibility
 runner is deliberately excluded.
 
+For read-only troubleshooting, `code-guard doctor` (or `code-guard doctor
+--json`) validates the canonical bundled payload alongside the active runtime
+and providers without exporting or updating it. Healthy diagnostics exit `0`
+and completed unhealthy diagnostics exit `1`. Reports contain resolved paths
+and environment details that may be sensitive when shared.
+
 Direct `--skill-path` use is intrinsically version-coupled to the installed
 Python distribution. An export is a snapshot and contains a generated
 `.agent-code-guard-version` marker with the producing distribution version.

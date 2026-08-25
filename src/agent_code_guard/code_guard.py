@@ -36,7 +36,13 @@ def parser() -> argparse.ArgumentParser:
         prog="code-guard",
         description="Run deterministic Code Guard checks.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""Version reporting:
+        epilog="""Diagnostics:
+  code-guard doctor
+  code-guard doctor --json
+    Inspect the active installation and current directory without running analysis.
+    Healthy reports exit 0; unhealthy reports exit 1; invocation/internal errors exit 3.
+
+Version reporting:
   code-guard --version
     Output: agent-code-guard <version>
   code-guard --version --json
@@ -47,7 +53,7 @@ metadata exit 3. --version may be combined only with --json.""",
     )
     value.add_argument(
         "paths", nargs="*", default=[],
-        help="Files or directories to inspect; bounds files selected by a Git selection mode.",
+        help="Files or directories to inspect; exact first token 'doctor' selects diagnostics mode.",
     )
     value.add_argument("--config", help="Path to code-guard.config.json.")
     value.add_argument("--warn", type=int, help="Override the global LOC warning threshold.")
@@ -82,6 +88,38 @@ metadata exit 3. --version may be combined only with --json.""",
         help="Copy this distribution's bundled Code Guard skill into an empty target directory.",
     )
     return value
+
+
+def _doctor_mode(args: argparse.Namespace, raw_arguments: list[str]) -> int | None:
+    if not raw_arguments or raw_arguments[0] != "doctor":
+        return None
+    incompatible = (
+        args.paths != ["doctor"]
+        or args.config is not None
+        or args.warn is not None
+        or args.fail is not None
+        or args.version
+        or args.json_mode is not None
+        or args.ci
+        or args.changed_only
+        or args.staged
+        or args.base_ref is not None
+        or bool(args.include)
+        or bool(args.exclude)
+        or bool(args.scope_exclude)
+        or args.count_blank_lines
+        or args.ignore_comment_lines
+        or args.skill_path
+        or args.export_skill is not None
+    )
+    if incompatible:
+        raise ValueError("doctor may be combined only with --json")
+    report = gather_doctor_report()
+    if args.json:
+        print(json.dumps(report, indent=2))
+    else:
+        print(format_doctor_report(report))
+    return 0 if report["status"] == "healthy" else 1
 
 
 def _version_mode(args: argparse.Namespace) -> int | None:
@@ -347,6 +385,9 @@ def main() -> int:
     try:
         if args.json_mode is not None and not args.json:
             raise ValueError("--json-mode requires --json")
+        doctor_result = _doctor_mode(args, raw_arguments)
+        if doctor_result is not None:
+            return doctor_result
         version_result = _version_mode(args)
         if version_result is not None:
             return version_result
@@ -363,6 +404,16 @@ def main() -> int:
         return exit_code(data["overall"], args.ci)
     except Exception as exc:
         return _print_tool_error(str(exc), args.json)
+
+
+def gather_doctor_report() -> dict[str, object]:
+    from .doctor import gather_report
+    return gather_report()
+
+
+def format_doctor_report(report: dict[str, object]) -> str:
+    from .doctor import format_human
+    return format_human(report)
 
 
 if __name__ == "__main__":
