@@ -25,7 +25,8 @@ def load(path: Path) -> dict[str, int]:
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ValueError(f"invalid LOC baseline: {exc}") from exc
     _exact_keys(document, {"version", "loc"}, "baseline")
-    if isinstance(document.get("version"), bool) or document.get("version") != 1:
+    version = document.get("version")
+    if isinstance(version, bool) or not isinstance(version, int) or version != 1:
         raise ValueError("LOC baseline version must be the integer 1")
     loc_value = document.get("loc")
     _exact_keys(loc_value, {"files"}, "baseline.loc")
@@ -54,7 +55,7 @@ def load(path: Path) -> dict[str, int]:
 
 def load_if_present(root: Path) -> dict[str, int] | None:
     path = baseline_path(root)
-    if not path.exists():
+    if not path.exists() and not path.is_symlink():
         return None
     validate_storage_path(root)
     return load(path)
