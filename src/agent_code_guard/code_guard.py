@@ -32,6 +32,7 @@ def _installed_distribution_version() -> str:
 
 def parser() -> argparse.ArgumentParser:
     value = argparse.ArgumentParser(
+        prog="code-guard",
         description="Run deterministic Code Guard checks.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Version reporting:

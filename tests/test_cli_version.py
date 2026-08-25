@@ -67,7 +67,10 @@ class CliVersionTests(unittest.TestCase):
         version.assert_called_once_with(DISTRIBUTION)
 
     def test_help_documents_version_invocations_outputs_and_exits(self) -> None:
-        help_text = checkout_code_guard.parser().format_help()
+        with patch.object(sys, "argv", ["python.exe", "-m", "unittest"]):
+            help_text = checkout_code_guard.parser().format_help()
+
+        self.assertTrue(help_text.startswith("usage: code-guard"))
 
         for fragment in (
             "code-guard --version",
