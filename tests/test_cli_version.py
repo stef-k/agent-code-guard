@@ -28,6 +28,7 @@ main = checkout_code_guard.main
 
 COMPATIBILITY_RUNNER = REPO_ROOT / "skills" / "code-guard" / "scripts" / "code_guard.py"
 DISTRIBUTION = "agent-code-guard"
+METADATA_UNAVAILABLE = f"installed distribution metadata is unavailable for {DISTRIBUTION}"
 
 
 class CliVersionTests(unittest.TestCase):
@@ -84,6 +85,41 @@ class CliVersionTests(unittest.TestCase):
                 )
                 self.assertNotIn("Traceback", stdout)
                 self.assertNotIn(str(error), stdout)
+
+    def test_unicode_decode_error_uses_deterministic_human_error(self) -> None:
+        error = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+        with patch.object(checkout_code_guard, "distribution_version", side_effect=error):
+            result = self.run_main("--version")
+
+        self.assertEqual(
+            result,
+            (3, "", "Code Guard error: installed distribution metadata is unavailable for agent-code-guard\n"),
+        )
+        self.assertNotIn(str(error), "".join(result[1:]))
+
+    def test_unicode_decode_error_uses_deterministic_json_error(self) -> None:
+        error = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+        with patch.object(checkout_code_guard, "distribution_version", side_effect=error):
+            code, stdout, stderr = self.run_main("--version", "--json")
+
+        self.assertEqual(code, 3)
+        self.assertEqual(stderr, "")
+        self.assertEqual(json.loads(stdout), {"error": METADATA_UNAVAILABLE})
+        self.assertNotIn(str(error), stdout)
+
+    def test_non_string_metadata_uses_deterministic_human_error(self) -> None:
+        with patch.object(checkout_code_guard, "distribution_version", return_value=None):
+            result = self.run_main("--version")
+
+        self.assertEqual(result, (3, "", f"Code Guard error: {METADATA_UNAVAILABLE}\n"))
+
+    def test_non_string_metadata_uses_deterministic_json_error(self) -> None:
+        with patch.object(checkout_code_guard, "distribution_version", return_value=None):
+            code, stdout, stderr = self.run_main("--version", "--json")
+
+        self.assertEqual(code, 3)
+        self.assertEqual(stderr, "")
+        self.assertEqual(json.loads(stdout), {"error": METADATA_UNAVAILABLE})
 
     def test_version_returns_before_analysis_configuration_scope_and_skill_work(self) -> None:
         forbidden_calls = [
@@ -166,14 +202,31 @@ print(json.dumps({'result': result, 'loaded': loaded}))
                         self.assertTrue(stderr.startswith("Code Guard error: "))
 
     def test_checkout_compatibility_runner_matches_console_behavior(self) -> None:
-        expected_version = importlib.metadata.version(DISTRIBUTION)
+        expected = subprocess.run(
+            [
+                sys.executable,
+                "-I",
+                "-c",
+                "import importlib.metadata,sys;sys.path.insert(0,sys.argv[1]);"
+                "print(importlib.metadata.version(sys.argv[2]))",
+                str(REPO_ROOT / "src"),
+                DISTRIBUTION,
+            ],
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(expected.returncode, 0, expected.stderr)
+        expected_version = expected.stdout.rstrip("\n")
+        parent_version = importlib.metadata.version
         for arguments in (["--version"], ["--version", "--json"]):
             with self.subTest(arguments=arguments):
-                result = subprocess.run(
-                    [sys.executable, "-I", str(COMPATIBILITY_RUNNER), *arguments],
-                    text=True,
-                    capture_output=True,
-                )
+                with patch.object(importlib.metadata, "version", return_value="0.0.0-parent-mismatch"):
+                    result = subprocess.run(
+                        [sys.executable, "-I", str(COMPATIBILITY_RUNNER), *arguments],
+                        text=True,
+                        capture_output=True,
+                    )
+                self.assertIs(importlib.metadata.version, parent_version)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stderr, "")
                 if "--json" in arguments:
@@ -183,6 +236,9 @@ print(json.dumps({'result': result, 'loaded': loaded}))
                     )
                 else:
                     self.assertEqual(result.stdout, f"{DISTRIBUTION} {expected_version}\n")
+
+    def test_checkout_loading_does_not_mutate_package_search_path(self) -> None:
+        self.assertNotIn(str(REPO_ROOT / "src" / "agent_code_guard"), agent_code_guard.__path__)
 
     def test_non_version_cli_behavior_is_preserved(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
