@@ -6,7 +6,7 @@ import time
 import unittest
 from pathlib import Path
 
-from helpers import CodeGuardTestCase, init_git, write_config, write_lines
+from tests.helpers import CodeGuardTestCase, init_git, write_config, write_lines
 
 
 BASELINE = Path(".agent-tools/code-guard.loc-baseline.json")
@@ -141,6 +141,18 @@ class LocBaselineTests(CodeGuardTestCase):
             self.assertEqual(invalid.returncode, 3)
             self.assertEqual(baseline.read_bytes(), before)
 
+            baseline.write_text('{"version":1.0,"loc":{"files":[]}}\n', encoding="utf-8")
+            wrong_version_type = baseline.read_bytes()
+            invalid_version = self.run_guard(root, ".", "--json")
+            self.assertEqual(invalid_version.returncode, 3)
+            self.assertEqual(invalid_version.stderr, "")
+            self.assertEqual(
+                self.read_json(invalid_version),
+                {"error": "LOC baseline version must be the integer 1"},
+            )
+            self.assertNotIn("guards", self.read_json(invalid_version))
+            self.assertEqual(baseline.read_bytes(), wrong_version_type)
+
             baseline.unlink()
             no_baseline = self.run_guard(root, ".", "--warn", "3", "--fail", "5", "--json")
             self.assertNotIn("baselineLoc", self.findings(no_baseline)[0])
@@ -156,6 +168,24 @@ class LocBaselineTests(CodeGuardTestCase):
             ordinary = self.run_guard(root, ".", "--warn", "3", "--fail", "5")
             self.assertEqual(ordinary.returncode, 2)
             self.assertFalse(baseline.exists())
+
+            missing_target = Path(outside_temp) / "missing-baseline.json"
+            try:
+                baseline.symlink_to(missing_target)
+            except OSError:
+                self.skipTest("file symlinks are unavailable")
+            self.assertTrue(baseline.is_symlink())
+            dangling = self.run_guard(root, ".", "--json")
+            self.assertEqual(dangling.returncode, 3)
+            self.assertEqual(dangling.stderr, "")
+            self.assertEqual(
+                self.read_json(dangling),
+                {"error": "LOC baseline path must not traverse a symlink or escape the analysis root"},
+            )
+            self.assertNotIn("guards", self.read_json(dangling))
+            self.assertTrue(baseline.is_symlink())
+            self.assertFalse(missing_target.exists())
+            baseline.unlink()
 
             baseline.parent.mkdir(exist_ok=True)
             baseline.write_text(json.dumps({
