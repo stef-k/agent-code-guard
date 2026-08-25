@@ -58,9 +58,10 @@ $ code-guard --version --json
 
 The value is read from installed metadata for the canonical
 `agent-code-guard` distribution. `--version` may be combined only with
-`--json`. Incompatible arguments exit `3`; human errors use standard error and
-JSON errors use an `error` object on standard output. If distribution metadata
-is unavailable, the error is
+`--json`. Both successful version forms exit `0`; incompatible arguments or
+unavailable metadata exit `3`. Human errors use standard error and JSON errors
+use an `error` object on standard output. If distribution metadata is
+unavailable, the error is
 `installed distribution metadata is unavailable for agent-code-guard`.
 
 ### Git changed-only

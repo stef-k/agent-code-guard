@@ -75,7 +75,7 @@ class CliVersionTests(unittest.TestCase):
             "agent-code-guard <version>",
             '"distribution"',
             '"version"',
-            "exit 0",
+            "exits 0",
             "exit 3",
             "--version may be combined only with --json",
         ):

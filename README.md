@@ -115,8 +115,9 @@ agent-code-guard <version>
 Use `code-guard --version --json` for the exact JSON shape
 `{"distribution": "agent-code-guard", "version": "<version>"}`. The version
 comes from installed `agent-code-guard` distribution metadata. Version mode may
-be combined only with `--json`; incompatible arguments or unavailable metadata
-are tool errors that exit `3` through the normal human or JSON error channel.
+be combined only with `--json`. Both successful version forms exit `0`;
+incompatible arguments or unavailable metadata are tool errors that exit `3`
+through the normal human or JSON error channel.
 
 Changed work is not a full audit. Use Git selection during normal development;
 do not repeatedly scan unrelated repository history after every edit.

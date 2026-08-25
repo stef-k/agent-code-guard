@@ -31,7 +31,18 @@ def _installed_distribution_version() -> str:
 
 
 def parser() -> argparse.ArgumentParser:
-    value = argparse.ArgumentParser(description="Run deterministic Code Guard checks.")
+    value = argparse.ArgumentParser(
+        description="Run deterministic Code Guard checks.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Version reporting:
+  code-guard --version
+    Output: agent-code-guard <version>
+  code-guard --version --json
+    Output: {"distribution": "agent-code-guard", "version": "<version>"}
+
+Successful version reporting exits 0. Incompatible arguments or unavailable
+metadata exit 3. --version may be combined only with --json.""",
+    )
     value.add_argument(
         "paths", nargs="*", default=[],
         help="Files or directories to inspect; bounds files selected by a Git selection mode.",
