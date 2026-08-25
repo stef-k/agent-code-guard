@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from .analysis.provider import TreeSitterProvider
+from .analysis.regions import PROVIDER_LANGUAGES
 from .config_validation import validate_configuration
 from .guards import callable_size, complexity, loc, markdown_document_size, markdown_section_size, nesting
 from .skill_distribution import skill_path as installed_skill_path
@@ -18,10 +19,6 @@ from .skill_distribution import skill_path as installed_skill_path
 DISTRIBUTION_NAME = "agent-code-guard"
 ENTRY_POINT_TARGET = "agent_code_guard.code_guard:main"
 PROVIDER_DISTRIBUTIONS = ("tree-sitter", "tree-sitter-language-pack")
-PROVIDER_LANGUAGES = (
-    "python", "go", "kotlin", "csharp", "java", "javascript", "typescript",
-    "tsx", "cpp", "rust", "php", "swift", "dart", "vue",
-)
 
 
 def _failure(message: str, status: str = "unavailable") -> dict[str, object]:
@@ -81,6 +78,10 @@ def _entry_point(package: object | None) -> dict[str, object]:
         candidate = Path(invoked)
         if candidate.exists():
             resolved = candidate.resolve()
+        elif platform.system() == "Windows" and not candidate.suffix:
+            executable_candidate = Path(f"{candidate}.exe")
+            if executable_candidate.exists():
+                resolved = executable_candidate.resolve()
     except (OSError, RuntimeError):
         pass
 

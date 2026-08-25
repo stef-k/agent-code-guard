@@ -18,6 +18,7 @@ LANGUAGE_BY_SUFFIX = {
     ".hpp": "cpp", ".hh": "cpp", ".hxx": "cpp",
     ".rs": "rust", ".php": "php", ".swift": "swift", ".dart": "dart",
 }
+PROVIDER_LANGUAGES = (*dict.fromkeys(LANGUAGE_BY_SUFFIX.values()), "vue")
 APPLICABLE_SUFFIXES = frozenset((*LANGUAGE_BY_SUFFIX, ".vue"))
 
 
