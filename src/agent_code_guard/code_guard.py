@@ -52,7 +52,11 @@ metadata exit 3. --version may be combined only with --json.""",
     value.add_argument("--config", help="Path to code-guard.config.json.")
     value.add_argument("--warn", type=int, help="Override the global LOC warning threshold.")
     value.add_argument("--fail", type=int, help="Override the global LOC failure threshold.")
-    value.add_argument("--json", action="store_true", help="Emit normalized JSON.")
+    value.add_argument("--json", action="store_true", help="Emit normalized full JSON.")
+    value.add_argument(
+        "--json-mode", choices=("compact", "debug"),
+        help="Completed-analysis JSON mode; requires --json. Compact omits pass findings; debug is full output.",
+    )
     value.add_argument(
         "--version", action="store_true",
         help="Print the installed agent-code-guard distribution version; may be combined only with --json.",
@@ -99,6 +103,7 @@ def _version_mode(args: argparse.Namespace) -> int | None:
         or args.ignore_comment_lines
         or args.skill_path
         or args.export_skill is not None
+        or args.json_mode is not None
     )
     if incompatible:
         raise ValueError("--version may be combined only with --json")
@@ -121,6 +126,7 @@ def _management_mode(args: argparse.Namespace) -> int | None:
         or args.warn is not None
         or args.fail is not None
         or args.json
+        or args.json_mode is not None
         or args.ci
         or args.changed_only
         or args.staged
@@ -162,17 +168,25 @@ class CompletedAnalysis:
     scope: ScopeSummary
 
 
-def payload(analysis: CompletedAnalysis | list[GuardResult]) -> dict[str, object]:
+def payload(
+    analysis: CompletedAnalysis | list[GuardResult], json_mode: str | None = None,
+) -> dict[str, object]:
     """Serialize a completed run; retain the legacy result-list seam for focused guard tests."""
     if isinstance(analysis, list):
         analysis = CompletedAnalysis(analysis, ScopeSummary(0, 0, 0, 0))
     results = analysis.results
-    return {
+    data = {
         "overall": aggregate_state(results),
         "scope": analysis.scope.to_json(),
         "requiredPolicies": required_policies(results),
         "guards": {result.guard_id: result.to_json() for result in results},
     }
+    if json_mode == "compact":
+        for guard in data["guards"].values():
+            guard["findings"] = [
+                finding for finding in guard["findings"] if finding["state"] in {"review", "fail"}
+            ]
+    return data
 
 
 def run_guards(scope, args: argparse.Namespace) -> list[GuardResult]:
@@ -331,6 +345,8 @@ def main() -> int:
         return _print_tool_error("--version may be combined only with --json", "--json" in raw_arguments)
     args = parser().parse_args()
     try:
+        if args.json_mode is not None and not args.json:
+            raise ValueError("--json-mode requires --json")
         version_result = _version_mode(args)
         if version_result is not None:
             return version_result
@@ -339,7 +355,7 @@ def main() -> int:
             return management_result
         validate_configuration(args.config, Path.cwd())
         scope = resolve_scope(args, Path.cwd())
-        data = payload(run_analysis(scope, args))
+        data = payload(run_analysis(scope, args), args.json_mode)
         if args.json:
             print(json.dumps(data, indent=2))
         else:

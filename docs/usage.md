@@ -165,9 +165,10 @@ to none of the other sets. All values are non-negative integers. Git-ignored
 files never discovered, paths outside positional bounds, and absent Git-derived
 files are not counted as exclusions.
 
-Add `--json` for stable machine-readable output. Completed `PASS`, `REVIEW`,
-and `FAIL` results add exactly one top-level summary alongside the existing
-`overall`, `requiredPolicies`, and `guards` values:
+Add `--json` for the stable, compatible full machine-readable output, including
+all passing and actionable findings. Completed `PASS`, `REVIEW`, and `FAIL`
+results include exactly one top-level summary alongside the existing `overall`,
+`requiredPolicies`, and `guards` values:
 
 ```json
 "scope": {
@@ -181,6 +182,28 @@ and `FAIL` results add exactly one top-level summary alongside the existing
 Counts do not change aggregate state, findings, required policies, or exit
 codes. Tool errors retain their existing human or JSON error form and do not
 include a successful `scope` object.
+
+Choose a completed-analysis serialization mode explicitly when needed:
+
+```bash
+code-guard . --json --json-mode compact
+code-guard . --json --json-mode debug
+```
+
+`compact` is intended for routine agent checks. It preserves `overall`, the
+complete `scope`, `requiredPolicies`, every guard and guard state, and existing
+guard and retained-finding ordering. It omits each finding whose normalized
+state is `pass` and retains unchanged findings whose state is `review` or
+`fail`. This includes omitting LOC exemptions: their native status is `exempt`,
+but their normalized state is `pass`. `debug` is an explicit name for the full
+output and is byte-for-byte identical to bare `--json` for the same completed
+analysis.
+
+Both named modes require `--json` and apply only to completed analysis output.
+They do not change analysis, scope, policies, ordering, aggregate or guard
+states, exit codes, or error shapes and channels. Version JSON supports only
+bare `--version --json`; skill-management modes are also incompatible with JSON
+analysis options. Values are exact and case-sensitive. There is no detail mode.
 
 `requiredPolicies` lists the policy identifiers needed for actionable findings.
 An agent should load only those referenced policies, preserve project intent,
