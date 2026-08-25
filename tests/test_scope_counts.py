@@ -46,6 +46,7 @@ class ScopeCountTests(CodeGuardTestCase):
                 human.stdout.splitlines()[0],
                 "PASS: 2 selected; 1 analyzed; 1 inapplicable; 1 excluded.",
             )
+            self.assertEqual(json_result.returncode, 0, json_result.stderr)
             scope = self.read_json(json_result)["scope"]
             self.assertEqual(
                 scope,
