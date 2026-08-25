@@ -19,6 +19,7 @@ package.__path__ = [str(REPO_ROOT / "src" / "agent_code_guard")]
 sys.modules[CHECKOUT_PACKAGE] = package
 code_guard = importlib.import_module(f"{CHECKOUT_PACKAGE}.code_guard")
 doctor = importlib.import_module(f"{CHECKOUT_PACKAGE}.doctor")
+regions = importlib.import_module(f"{CHECKOUT_PACKAGE}.analysis.regions")
 
 
 LANGUAGES = [
@@ -40,20 +41,21 @@ class DoctorTests(unittest.TestCase):
         return result, stdout.getvalue(), stderr.getvalue()
 
     def healthy_report(self, root: Path) -> dict[str, object]:
-        launcher = root / "code-guard"
+        launcher = root / "code-guard.exe"
         launcher.touch()
         skill = root / "skill"
         skill.mkdir()
         distribution = SimpleNamespace(
             version="1.2.3",
             entry_points=[SimpleNamespace(group="console_scripts", name="code-guard", value="agent_code_guard.code_guard:main")],
-            files=[Path("../Scripts/code-guard")],
+            files=[Path("../Scripts/code-guard.exe")],
             locate_file=lambda item: launcher,
         )
         provider = Mock()
         provider.parse.return_value = object()
         with (
-            patch.object(sys, "argv", [str(launcher), "doctor"]),
+            patch.object(sys, "argv", [str(root / "code-guard"), "doctor"]),
+            patch.object(doctor.platform, "system", return_value="Windows"),
             patch.object(doctor.metadata, "distribution", return_value=distribution),
             patch.object(doctor.metadata, "version", side_effect=["0.26.0", "1.14.3"]),
             patch.object(doctor, "installed_skill_path", return_value=skill),
@@ -95,7 +97,11 @@ class DoctorTests(unittest.TestCase):
             )
             self.assertEqual(list(report["providers"]), ["status", "message", "distributions", "languages"])
             self.assertEqual(report["status"], "healthy")
+            self.assertEqual(report["entryPoint"]["invoked"], str(root / "code-guard"))
+            self.assertEqual(report["entryPoint"]["resolvedPath"], str((root / "code-guard.exe").resolve()))
+            self.assertEqual(report["entryPoint"]["kind"], "console-script")
             self.assertEqual([item["name"] for item in report["providers"]["languages"]], LANGUAGES)
+            self.assertEqual(doctor.PROVIDER_LANGUAGES, regions.PROVIDER_LANGUAGES)
             with patch.object(code_guard, "gather_doctor_report", return_value=report):
                 human = self.run_main("doctor")
                 machine = self.run_main("doctor", "--json")
