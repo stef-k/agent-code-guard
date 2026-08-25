@@ -140,9 +140,47 @@ gamed.
 
 ## Human and JSON output
 
-Human output is the default and emphasizes actionable findings. Add `--json`
-for stable machine-readable output containing `overall`, per-guard results,
-and `requiredPolicies`.
+Human output is the default and emphasizes actionable findings. Every completed
+analysis starts with the aggregate state and exact scope counts:
+
+```text
+PASS: 3 selected; 2 analyzed; 1 inapplicable; 0 excluded.
+```
+
+The labels do not pluralize. An empty valid selection is
+`PASS: 0 selected; 0 analyzed; 0 inapplicable; 0 excluded.` and exits `0`.
+Existing finding and required-policy lines follow this summary unchanged.
+
+The counts have these meanings:
+
+- `selected`: files remaining after discovery, bounds, normalization,
+  deduplication, absent Git-derived entries, and all-guard exclusions;
+- `analyzed`: selected files applicable to at least one enabled guard;
+- `inapplicable`: selected files applicable to no enabled guard;
+- `excluded`: existing normalized files removed specifically by
+  `scope.exclude` or `--scope-exclude`.
+
+Therefore `analyzed + inapplicable == selected`, and an excluded file belongs
+to none of the other sets. All values are non-negative integers. Git-ignored
+files never discovered, paths outside positional bounds, and absent Git-derived
+files are not counted as exclusions.
+
+Add `--json` for stable machine-readable output. Completed `PASS`, `REVIEW`,
+and `FAIL` results add exactly one top-level summary alongside the existing
+`overall`, `requiredPolicies`, and `guards` values:
+
+```json
+"scope": {
+  "selected": 3,
+  "analyzed": 2,
+  "inapplicable": 1,
+  "excluded": 0
+}
+```
+
+Counts do not change aggregate state, findings, required policies, or exit
+codes. Tool errors retain their existing human or JSON error form and do not
+include a successful `scope` object.
 
 `requiredPolicies` lists the policy identifiers needed for actionable findings.
 An agent should load only those referenced policies, preserve project intent,

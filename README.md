@@ -48,6 +48,25 @@ configuration file is required.
 
 ## Result model
 
+Every completed analysis begins with a concise file-scope summary:
+
+```text
+PASS: 3 selected; 2 analyzed; 1 inapplicable; 0 excluded.
+```
+
+The state is `PASS`, `REVIEW`, or `FAIL`. JSON output adds the same counts as a
+top-level `scope` object without changing `overall`, `requiredPolicies`, or
+`guards`:
+
+```json
+"scope": {
+  "selected": 3,
+  "analyzed": 2,
+  "inapplicable": 1,
+  "excluded": 0
+}
+```
+
 - **PASS** — no special action.
 - **REVIEW** — inspect the finding and decide whether meaningful improvement is
   warranted. REVIEW is not automatic refactoring.

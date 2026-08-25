@@ -62,7 +62,10 @@ class ResultContractTests(CodeGuardTestCase):
             write_lines(root / "large.py", 700)
             config = write_config(root, {"enabled": False})
             result = self.run_guard(root, ".", "--config", str(config), "--json")
-            self.assertEqual(self.read_json(result), {"overall": "pass", "requiredPolicies": [], "guards": {
+            self.assertEqual(self.read_json(result), {
+                "overall": "pass",
+                "scope": {"selected": 2, "analyzed": 1, "inapplicable": 1, "excluded": 0},
+                "requiredPolicies": [], "guards": {
                 "loc": {"state": "pass", "findings": []},
                 "callableSize": {"state": "pass", "findings": []},
                 "nesting": {"state": "pass", "findings": []},
