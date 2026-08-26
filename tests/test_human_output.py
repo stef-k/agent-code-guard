@@ -1,67 +1,50 @@
 from __future__ import annotations
 
-import unittest
+import json
+import tempfile
 from pathlib import Path
-import sys
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "src"))
-
-from agent_code_guard.human_output import format_completed_analysis
+from helpers import CodeGuardTestCase
 
 
-class CompletedAnalysisOutputTests(unittest.TestCase):
+class CompletedAnalysisOutputTests(CodeGuardTestCase):
     def test_formats_one_complete_mixed_report_exactly(self) -> None:
-        data = {
-            "overall": "review",
-            "scope": {"selected": 3, "analyzed": 3, "inapplicable": 0, "excluded": 0},
-            "guards": {
-                "loc": {"findings": [{
-                    "path": "large.py", "countedLoc": 450, "warnAt": 400, "failAt": 600,
-                    "state": "review", "nativeStatus": "grandfathered", "baselineLoc": 460,
-                    "ratchetStatus": "within", "overrideIndex": 2, "reason": "Generated boundary",
-                }]},
-                "callableSize": {"findings": [{
-                    "path": "large.py", "range": {"startLine": 10, "endLine": 95},
-                    "callable": "large.run", "measured": 86, "state": "review",
-                    "thresholds": {"reviewAt": 80},
-                }]},
-                "nesting": {"findings": [{
-                    "path": "nested.py", "range": {"startLine": 3, "endLine": 20},
-                    "callable": "nested.walk", "measured": 5, "state": "review",
-                    "thresholds": {"reviewAt": 4}, "details": {"deepestLine": 12},
-                }]},
-                "complexity": {"findings": [{
-                    "path": "large.py", "range": {"startLine": 10, "endLine": 95},
-                    "callable": "large.run", "measured": 16, "state": "review",
-                    "thresholds": {"reviewAt": 15},
-                }]},
-                "markdownDocumentSize": {"findings": [{
-                    "path": "guide.md", "measured": 801, "state": "review",
-                    "thresholds": {"reviewAt": 800},
-                }]},
-                "markdownSectionSize": {"findings": [{
-                    "path": "guide.md", "range": {"startLine": 2, "endLine": 205},
-                    "heading": "Hé said \"hello\"", "measured": 204, "state": "review",
-                    "thresholds": {"reviewAt": 200},
-                }]},
-            },
-            "requiredPolicies": ["loc", "callableSize", "nesting", "complexity", "markdownDocumentSize"],
-        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "sample.py").write_text(
+                "def sample(value):\n    if value:\n        if value > 1:\n"
+                "            return value\n    return 0\n",
+                encoding="utf-8",
+            )
+            (root / "guide.md").write_text('# Hé said `"hello`"\nbody\nbody\n', encoding="utf-8")
+            config = root / "code-guard.config.json"
+            config.write_text(json.dumps({"version": 1, "guards": {
+                "loc": {"warnAt": 1, "failAt": 99},
+                "callableSize": {"reviewAt": 3},
+                "nesting": {"reviewAt": 1},
+                "cyclomaticComplexity": {"reviewAt": 1},
+                "markdownDocumentSize": {"reviewAt": 2},
+                "markdownSectionSize": {"reviewAt": 2},
+            }}), encoding="utf-8")
 
-        self.assertEqual(format_completed_analysis(data), "\n".join([
-            "REVIEW: 3 selected; 3 analyzed; 0 inapplicable; 0 excluded.",
-            "RATCHET: large.py — 450 LOC (warn 400, fail 600; baseline 460, within)",
-            "  Threshold override: 2", "  Reason: Generated boundary",
-            "REVIEW: large.py:10-95 — large.run is 86 LOC (review 80)",
-            "REVIEW: nested.py:3-20 — nested.walk nesting depth 5 (review 4; deepest at line 12)",
-            "REVIEW: large.py:10-95 — large.run complexity 16 (review 15)",
-            "REVIEW: guide.md — Markdown document is 801 lines (review 800)",
-            'REVIEW: guide.md:2-205 — section "Hé said \\"hello\\"" is 204 lines (review 200)',
-            "Required policies: loc, callableSize, nesting, complexity, markdownDocumentSize",
-            "Required action: inspect each actionable finding using its policy guidance.",
-        ]))
+            result = self.run_guard(root, ".", "--config", str(config))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.stderr, "")
+            self.assertEqual(result.stdout, "\n".join([
+                "REVIEW: 3 selected; 2 analyzed; 1 inapplicable; 0 excluded.",
+                "REVIEW: sample.py — 5 LOC (warn 1, fail 99)",
+                "REVIEW: sample.py:1-5 — sample.sample is 5 LOC (review 3)",
+                "REVIEW: sample.py:1-5 — sample.sample nesting depth 2 (review 1; deepest at line 3)",
+                "REVIEW: sample.py:1-5 — sample.sample complexity 3 (review 1)",
+                "REVIEW: guide.md — Markdown document is 3 lines (review 2)",
+                'REVIEW: guide.md:1-3 — section "Hé said `\\"hello`\\"" is 3 lines (review 2)',
+                "Required policies: callableSize, complexity, loc, markdownDocumentSize, markdownSectionSize, nesting",
+                "Required action: inspect each actionable finding using its policy guidance.",
+                "",
+            ]))
 
 
 if __name__ == "__main__":
+    import unittest
     unittest.main()
