@@ -7,6 +7,8 @@ from typing import Iterator
 from .language_specs import CALLABLE_TYPES
 from .regions import ExecutableRegion
 
+__all__ = ["callable_identity", "is_anonymous_callable", "callable_source_start"]
+
 
 def callable_identity(node, region: ExecutableRegion) -> str:
     if region.language in {"javascript", "typescript", "tsx"}:
