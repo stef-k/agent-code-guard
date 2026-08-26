@@ -4,17 +4,24 @@ Notable changes to Agent Code Guard are recorded here.
 
 ## Unreleased
 
+## 0.2.0 - 2026-08-27
+
 ### Added
 
-- Zero-baseline CI dogfooding through the installed console command, with visible
-  non-blocking REVIEW findings and blocking FAIL findings or tool errors.
-- Source-controlled, non-increasing LOC ratchet creation, automatic analysis,
-  and explicit lowering/pruning for established legacy repositories.
+- Zero-baseline CI dogfooding through the installed console command, with no
+  baseline for this repository, visible non-blocking REVIEW findings under
+  `--ci`, and blocking FAIL findings or tool errors.
+- Source-controlled, non-increasing LOC ratchet creation, automatic read-only
+  analysis, and explicit lowering/pruning for established legacy repositories;
+  new projects and this repository should use a zero baseline.
 - Read-only `code-guard doctor` human and JSON diagnostics for the active
   installation, bundled skill, configuration, Git context, and parser providers.
-- Compact and explicit debug completed-analysis JSON serialization modes while
-  preserving bare `--json` compatibility.
+- Compact and explicit debug completed-analysis JSON serialization modes:
+  bare `--json` remains the compatible full form, debug is byte-identical for
+  the same completed invocation, and compact removes only normalized pass
+  findings while preserving actionable findings and result structure.
 - Deterministic `code-guard --version` reporting from installed distribution
   metadata, with human and JSON output modes.
 - Concise selected, analyzed, inapplicable, and all-guard-excluded file counts
-  in every completed human and JSON analysis result.
+  in every completed human and JSON analysis result, where analyzed plus
+  inapplicable equals selected and excluded files are disjoint.
