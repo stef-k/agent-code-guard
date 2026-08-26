@@ -11,6 +11,10 @@ Deterministic guardrails for agent-assisted software development.
 [![Python 3.10–3.14](https://img.shields.io/badge/Python-3.10%E2%80%933.14-3776AB?logo=python&logoColor=white)](https://github.com/stef-k/agent-code-guard/blob/main/docs/platform-support.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/stef-k/agent-code-guard/blob/main/LICENSE)
 
+CI installs Agent Code Guard and analyzes its own real checkout. REVIEW findings
+remain visible but non-blocking, while FAIL findings and tool errors block the
+workflow; the repository intentionally uses no LOC baseline.
+
 Code Guard gives coding agents objective measurements and **PASS / REVIEW /
 FAIL** signals while leaving design decisions to agent and user judgment.
 

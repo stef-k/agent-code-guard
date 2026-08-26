@@ -23,6 +23,8 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - run: python -m pip install .
+      - run: python -c "from pathlib import Path; import sys; p = Path('.agent-tools/code-guard.loc-baseline.json'); present = p.exists() or p.is_symlink(); print('Forbidden LOC baseline present: .agent-tools/code-guard.loc-baseline.json', file=sys.stderr) if present else None; raise SystemExit(1 if present else 0)"
+      - run: code-guard . --ci
       - run: code-guard --help
       - run: python -c "from pathlib import Path; Path('package-smoke.py').write_text('value = 1\n', encoding='utf-8')"
       - run: code-guard package-smoke.py --json
