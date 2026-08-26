@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Iterator, NamedTuple
 
 from .language_specs import CONTROL_CATEGORIES, CONTROL_TYPES, DECISION_CATEGORIES, DECISION_TYPES
+from .syntax_nodes import node_text
 
 __all__ = ["control_semantics", "normalized_decisions"]
 
@@ -68,7 +69,7 @@ def _is_default_branch(node, source: bytes, language: str | None = None) -> bool
         return False
     if language == "python" and node.type == "case_clause" and node.child_by_field_name("guard") is not None:
         return False
-    return _text(node, source).lstrip().startswith(("default", "else", "case _", "case var _", "_ ->", "_ =>"))
+    return node_text(node, source).lstrip().startswith(("default", "else", "case _", "case var _", "_ ->", "_ =>"))
 
 
 def _is_meaningful_control(node, language: str) -> bool:
@@ -192,7 +193,3 @@ def _pattern_guard(node, language: str):
             if child.type == "where_keyword" and index + 1 < len(children):
                 return children[index + 1]
     return None
-
-
-def _text(node, source: bytes) -> str:
-    return source[node.start_byte:node.end_byte].decode("utf-8")

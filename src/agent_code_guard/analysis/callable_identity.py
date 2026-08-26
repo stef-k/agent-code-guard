@@ -6,6 +6,7 @@ from typing import Iterator
 
 from .language_specs import CALLABLE_TYPES
 from .regions import ExecutableRegion
+from .syntax_nodes import node_text
 
 __all__ = ["callable_identity", "is_anonymous_callable", "callable_source_start"]
 
@@ -29,7 +30,7 @@ def callable_identity(node, region: ExecutableRegion) -> str:
         if current.type in owner_types:
             name = _name_node(current, language)
             if name:
-                parts.append(_text(name, source))
+                parts.append(node_text(name, source))
     if language == "go":
         receiver_type = _go_receiver_type(node, source)
         if receiver_type:
@@ -79,7 +80,7 @@ def _javascript_identity(node, region: ExecutableRegion) -> str:
         declarator = _ancestor(node, "variable_declarator")
         if declarator and declarator.child_by_field_name("value") == node:
             name = declarator.child_by_field_name("name")
-    parts = [_text(name, source) if name else _callback_name(node, region)]
+    parts = [node_text(name, source) if name else _callback_name(node, region)]
     for current in _ancestors(node):
         owner = None
         if current.type == "class_declaration":
@@ -91,7 +92,7 @@ def _javascript_identity(node, region: ExecutableRegion) -> str:
             if lexical:
                 parts.append(lexical)
         if owner:
-            parts.append(_text(owner, source))
+            parts.append(node_text(owner, source))
     if node.type == "method_definition" and not any(value.type == "class_declaration" for value in _ancestors(node)):
         object_name = _object_assignment_name(node, source)
         if object_name:
@@ -103,13 +104,13 @@ def _javascript_identity(node, region: ExecutableRegion) -> str:
 def _name(node, language: str, source: bytes) -> str:
     name = _name_node(node, language)
     if name:
-        return _text(name, source)
+        return node_text(name, source)
     if language in {"kotlin", "csharp", "java"} and "constructor" in node.type:
         for owner in _ancestors(node):
             if owner.type in {"class_declaration", "object_declaration", "struct_declaration", "record_declaration", "enum_declaration"}:
                 owner_name = _name_node(owner, language)
                 if owner_name:
-                    return _text(owner_name, source)
+                    return node_text(owner_name, source)
     return "<anonymous>"
 
 
@@ -124,7 +125,7 @@ def _go_receiver_type(method_node, source: bytes) -> str | None:
     receiver = method_node.child_by_field_name("receiver")
     if receiver is None:
         return None
-    words = _text(receiver, source).replace("(", "").replace(")", "").replace("*", "").split()
+    words = node_text(receiver, source).replace("(", "").replace(")", "").replace("*", "").split()
     return words[-1] if words else "receiver"
 
 
@@ -178,7 +179,7 @@ def _second_wave_name(node, language: str, source: bytes) -> str | None:
         name = node.child_by_field_name("type")
     if name is None and language == "swift" and node.type == "class_declaration":
         name = next((child for child in node.named_children if child.type in {"type_identifier", "user_type"}), None)
-    return _text(name, source).lstrip("$") if name is not None else None
+    return node_text(name, source).lstrip("$") if name is not None else None
 
 
 def _dart_method_name(method_signature, source: bytes) -> str | None:
@@ -190,12 +191,12 @@ def _dart_method_name(method_signature, source: bytes) -> str | None:
     if signature.type in {"constructor_signature", "factory_constructor_signature"}:
         return _dart_constructor_name(signature, source)
     name = signature.child_by_field_name("name")
-    return _text(name, source).lstrip("$") if name is not None else None
+    return node_text(name, source).lstrip("$") if name is not None else None
 
 
 def _dart_constructor_name(signature, source: bytes) -> str | None:
     identifiers = [child for child in signature.named_children if child.type == "identifier"]
-    return ".".join(_text(child, source).lstrip("$") for child in identifiers) or None
+    return ".".join(node_text(child, source).lstrip("$") for child in identifiers) or None
 
 
 def _deep_named_child(node, types: set[str]):
@@ -254,19 +255,19 @@ def _package_or_namespace(node, language: str, source: bytes) -> str:
     types = {"go": {"package_clause"}, "kotlin": {"package_header"}, "csharp": {"file_scoped_namespace_declaration"}, "java": {"package_declaration"}}.get(language, set())
     for child in root.named_children:
         if child.type in types:
-            return _text(child, source).replace("package", "", 1).replace("namespace", "", 1).strip().rstrip(";")
+            return node_text(child, source).replace("package", "", 1).replace("namespace", "", 1).strip().rstrip(";")
     return ""
 
 
 def _javascript_lexical_name(node, source: bytes) -> str | None:
     name = node.child_by_field_name("name")
     if name:
-        return _text(name, source)
+        return node_text(name, source)
     declarator = _ancestor(node, "variable_declarator")
     if declarator and declarator.child_by_field_name("value") == node:
         target = declarator.child_by_field_name("name")
         if target and target.type in {"identifier", "property_identifier"}:
-            return _text(target, source)
+            return node_text(target, source)
     return None
 
 
@@ -292,7 +293,7 @@ def _mainstream_lambda_identity(node, region: ExecutableRegion) -> str:
         elif current.type in CALLABLE_TYPES[region.language]:
             name = _name_node(current, region.language)
             if name is not None:
-                parts.append(_text(name, region.source))
+                parts.append(node_text(name, region.source))
                 if region.language == "go" and current.type == "method_declaration":
                     receiver_type = _go_receiver_type(current, region.source)
                     if receiver_type:
@@ -300,7 +301,7 @@ def _mainstream_lambda_identity(node, region: ExecutableRegion) -> str:
         elif current.type in {"class_definition", "class_declaration", "object_declaration", "struct_declaration", "record_declaration", "enum_declaration"}:
             name = _name_node(current, region.language)
             if name is not None:
-                parts.append(_text(name, region.source))
+                parts.append(node_text(name, region.source))
     parts.append(region.original_path.stem if region.language == "python" else _package_or_namespace(node, region.language, region.source))
     return ".".join(reversed([part for part in parts if part]))
 
@@ -309,7 +310,7 @@ def _object_assignment_name(node, source: bytes) -> str | None:
     object_node = _ancestor(node, "object")
     declarator = _ancestor(object_node, "variable_declarator") if object_node else None
     target = declarator.child_by_field_name("name") if declarator else None
-    return _text(target, source) if target and target.type == "identifier" else None
+    return node_text(target, source) if target and target.type == "identifier" else None
 
 
 def _ancestor(node, node_type: str):
@@ -326,7 +327,3 @@ def _ancestors(node) -> Iterator:
     while current:
         yield current
         current = current.parent
-
-
-def _text(node, source: bytes) -> str:
-    return source[node.start_byte:node.end_byte].decode("utf-8")
