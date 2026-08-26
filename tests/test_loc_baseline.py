@@ -128,8 +128,8 @@ class LocBaselineTests(CodeGuardTestCase):
                 "(0 lowered, 1 removed, 0 unchanged).\n"
             ))
 
-    def test_fail_closed_and_analysis_never_writes(self) -> None:
-        with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside_temp:
+    def test_invalid_baseline_schema_fails_closed_and_preserves_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             init_git(root)
             write_lines(root / "legacy.py", 7)
@@ -153,22 +153,48 @@ class LocBaselineTests(CodeGuardTestCase):
             self.assertNotIn("guards", self.read_json(invalid_version))
             self.assertEqual(baseline.read_bytes(), wrong_version_type)
 
-            baseline.unlink()
+    def test_analysis_without_baseline_omits_ratchet_fields_and_never_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            init_git(root)
+            write_lines(root / "legacy.py", 7)
+            baseline = root / BASELINE
             no_baseline = self.run_guard(root, ".", "--warn", "3", "--fail", "5", "--json")
             self.assertNotIn("baselineLoc", self.findings(no_baseline)[0])
             self.assertNotIn("ratchetStatus", self.findings(no_baseline)[0])
             self.assertFalse(baseline.exists())
+
+            ordinary = self.run_guard(root, ".", "--warn", "3", "--fail", "5")
+            self.assertEqual(ordinary.returncode, 2)
+            self.assertFalse(baseline.exists())
+
+    def test_create_rejects_scope_outside_analysis_root_without_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside_temp:
+            root = Path(temp)
+            init_git(root)
+            write_lines(root / "legacy.py", 7)
+            baseline = root / BASELINE
             outside = Path(outside_temp) / "empty"
             outside.mkdir()
             escaped = self.run_guard(root, str(outside), "--create-loc-baseline")
             self.assertEqual(escaped.returncode, 3)
             self.assertFalse(baseline.exists())
+
+    def test_create_rejects_incompatible_arguments_without_stdout(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            init_git(root)
+            write_lines(root / "legacy.py", 7)
             incompatible = self.run_guard(root, ".", "--create-loc-baseline", "--json")
             self.assertEqual((incompatible.returncode, incompatible.stdout), (3, ""))
-            ordinary = self.run_guard(root, ".", "--warn", "3", "--fail", "5")
-            self.assertEqual(ordinary.returncode, 2)
-            self.assertFalse(baseline.exists())
 
+    def test_fail_closed_and_analysis_never_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside_temp:
+            root = Path(temp)
+            init_git(root)
+            write_lines(root / "legacy.py", 7)
+            baseline = root / BASELINE
+            baseline.parent.mkdir()
             missing_target = Path(outside_temp) / "missing-baseline.json"
             try:
                 baseline.symlink_to(missing_target)
