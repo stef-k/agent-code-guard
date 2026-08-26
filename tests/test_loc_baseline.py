@@ -188,7 +188,7 @@ class LocBaselineTests(CodeGuardTestCase):
             incompatible = self.run_guard(root, ".", "--create-loc-baseline", "--json")
             self.assertEqual((incompatible.returncode, incompatible.stdout), (3, ""))
 
-    def test_fail_closed_and_analysis_never_writes(self) -> None:
+    def test_dangling_baseline_symlink_fails_closed_without_target_creation(self) -> None:
         with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside_temp:
             root = Path(temp)
             init_git(root)
@@ -211,8 +211,13 @@ class LocBaselineTests(CodeGuardTestCase):
             self.assertNotIn("guards", self.read_json(dangling))
             self.assertTrue(baseline.is_symlink())
             self.assertFalse(missing_target.exists())
-            baseline.unlink()
 
+    def test_baseline_rejects_allowed_large_files_overlap(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            init_git(root)
+            write_lines(root / "legacy.py", 7)
+            baseline = root / BASELINE
             baseline.parent.mkdir(exist_ok=True)
             baseline.write_text(json.dumps({
                 "version": 1,
@@ -227,9 +232,9 @@ class LocBaselineTests(CodeGuardTestCase):
             self.assertEqual(overlap.returncode, 3)
             self.assertIn("overlaps allowedLargeFiles", overlap.stdout)
 
-        with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside_temp:
+    def test_create_deduplicates_explicit_source_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            outside = Path(outside_temp)
             init_git(root)
             write_lines(root / "legacy.py", 7)
             try:
@@ -243,8 +248,13 @@ class LocBaselineTests(CodeGuardTestCase):
             self.assertEqual(direct_and_link.returncode, 0)
             stored = json.loads((root / BASELINE).read_text(encoding="utf-8"))["loc"]["files"]
             self.assertEqual(stored, [{"path": "legacy.py", "allowedLoc": 7}])
-            (root / BASELINE).unlink()
-            (root / ".agent-tools").rmdir()
+
+    def test_create_rejects_symlinked_storage_directory_without_external_write(self) -> None:
+        with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside_temp:
+            root = Path(temp)
+            outside = Path(outside_temp)
+            init_git(root)
+            write_lines(root / "legacy.py", 7)
             try:
                 (root / ".agent-tools").symlink_to(outside, target_is_directory=True)
             except OSError:
