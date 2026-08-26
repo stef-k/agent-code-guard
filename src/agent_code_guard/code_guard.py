@@ -14,6 +14,7 @@ from pathlib import Path
 from .config_validation import validate_configuration
 from .file_selection import resolve_scope
 from .guards import callable_size, complexity, loc, markdown_document_size, markdown_section_size, nesting
+from .human_output import format_completed_analysis
 from . import loc_baseline
 from .result_model import GuardResult, aggregate_state, required_policies
 from .skill_distribution import export_skill, skill_path as installed_skill_path
@@ -357,92 +358,7 @@ def _empty_markdown_facts():
 
 
 def print_text(data: dict[str, object]) -> None:
-    scope = data["scope"]
-    print(
-        f"{str(data['overall']).upper()}: {scope['selected']} selected; {scope['analyzed']} analyzed; "
-        f"{scope['inapplicable']} inapplicable; {scope['excluded']} excluded."
-    )
-    loc_result = data["guards"]["loc"]
-    for finding in loc_result["findings"]:
-        if finding["nativeStatus"] == "ok" and finding.get("baselineLoc") is None:
-            continue
-        label = (
-            "RATCHET" if finding["nativeStatus"] == "grandfathered" else
-            "EXEMPT" if finding["nativeStatus"] == "exempt" else finding["state"].upper()
-        )
-        baseline_detail = ""
-        if finding.get("baselineLoc") is not None:
-            status = {
-                "within": "within", "exceeded": "exceeded", "notNeeded": "no longer needed",
-            }[finding["ratchetStatus"]]
-            baseline_detail = f"; baseline {finding['baselineLoc']}, {status}"
-        print(
-            f"{label}: {finding['path']} — {finding['countedLoc']} LOC "
-            f"(warn {finding['warnAt']}, fail {finding['failAt']}{baseline_detail})"
-        )
-        if finding["overrideIndex"] is not None:
-            print(f"  Threshold override: {finding['overrideIndex']}")
-        if finding["reason"]:
-            print(f"  Reason: {finding['reason']}")
-    callable_result = data["guards"].get("callableSize")
-    if callable_result:
-        for finding in callable_result["findings"]:
-            if finding["state"] != "review":
-                continue
-            print(
-                f"REVIEW: {finding['path']}:{finding['range']['startLine']}-{finding['range']['endLine']} "
-                f"— {finding['callable']} is {finding['measured']} LOC "
-                f"(review {finding['thresholds']['reviewAt']})"
-            )
-    nesting_result = data["guards"].get("nesting")
-    if nesting_result:
-        for finding in nesting_result["findings"]:
-            if finding["state"] != "review":
-                continue
-            deepest = finding.get("details", {}).get("deepestLine")
-            explanation = f"; deepest at line {deepest}" if deepest is not None else ""
-            print(
-                f"REVIEW: {finding['path']}:{finding['range']['startLine']}-{finding['range']['endLine']} "
-                f"— {finding['callable']} nesting depth {finding['measured']} "
-                f"(review {finding['thresholds']['reviewAt']}{explanation})"
-            )
-    complexity_result = data["guards"].get("complexity")
-    if complexity_result:
-        for finding in complexity_result["findings"]:
-            if finding["state"] != "review":
-                continue
-            print(
-                f"REVIEW: {finding['path']}:{finding['range']['startLine']}-{finding['range']['endLine']} "
-                f"— {finding['callable']} complexity {finding['measured']} "
-                f"(review {finding['thresholds']['reviewAt']})"
-            )
-    _print_markdown_findings(data)
-    policies = data["requiredPolicies"]
-    if policies:
-        print(f"Required policies: {', '.join(policies)}")
-        print("Required action: inspect each actionable finding using its policy guidance.")
-
-
-def _print_markdown_findings(data: dict[str, object]) -> None:
-    markdown_document_result = data["guards"].get("markdownDocumentSize")
-    if markdown_document_result:
-        for finding in markdown_document_result["findings"]:
-            if finding["state"] != "review":
-                continue
-            print(
-                f"REVIEW: {finding['path']} — Markdown document is {finding['measured']} lines "
-                f"(review {finding['thresholds']['reviewAt']})"
-            )
-    markdown_section_result = data["guards"].get("markdownSectionSize")
-    if markdown_section_result:
-        for finding in markdown_section_result["findings"]:
-            if finding["state"] != "review":
-                continue
-            print(
-                f"REVIEW: {finding['path']}:{finding['range']['startLine']}-{finding['range']['endLine']} "
-                f"— section {json.dumps(finding['heading'], ensure_ascii=False)} is {finding['measured']} lines "
-                f"(review {finding['thresholds']['reviewAt']})"
-            )
+    print(format_completed_analysis(data))
 
 
 def exit_code(overall: str, ci: bool) -> int:
