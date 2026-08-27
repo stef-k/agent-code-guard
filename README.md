@@ -61,7 +61,7 @@ code-guard doctor
 ```
 
 `--version` confirms the installed distribution identity. `doctor` checks the
-active installation's health. See the [usage guide](docs/usage.md) for virtual
+active installation's health. See the [usage guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md) for virtual
 environment, uv, and developer alternatives.
 
 ### Ask your agent to adopt it
@@ -91,7 +91,7 @@ No configuration is needed. A REVIEW asks for inspection and judgment, not an
 automatic refactor. Outside Git, pass the exact edited files instead, such as
 `code-guard src/app.py docs/guide.md`.
 
-See the [agent workflow guide](docs/agent-workflow.md) for repeated human and
+See the [agent workflow guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/agent-workflow.md) for repeated human and
 agent use.
 
 ## Recommended workflow
@@ -113,7 +113,7 @@ report the result before completion
 Use `code-guard . --changed-only --json --json-mode compact` for a structured,
 low-noise manual agent check. Hooks are optional, platform-owned, and require
 user authorization; Code Guard does not install them. The
-[workflow guide](docs/agent-workflow.md) owns the complete manual and
+[workflow guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/agent-workflow.md) owns the complete manual and
 hook-assisted process.
 
 ## Interpreting results
@@ -146,7 +146,7 @@ measurement. A REVIEW is not proof of a defect or a mandatory refactor.
 Comparisons are strictly greater-than, so equality passes. All guards except
 file LOC are REVIEW-only; only file LOC can FAIL. A new guard must provide
 distinct, deterministic value rather than duplicate conventional tooling. See
-[Guard admission](docs/guard-admission.md).
+[Guard admission](https://github.com/stef-k/agent-code-guard/blob/main/docs/guard-admission.md).
 
 ### Result and JSON reference
 
@@ -155,7 +155,7 @@ all-guard-excluded file counts. Bare `--json` is the compatible full output;
 `--json-mode debug` is byte-identical for the same completed invocation, while
 `--json-mode compact` removes only normalized `pass` findings and retains the
 result, scope, required policies, guards, ordering, and actionable findings.
-Named modes require `--json`. See [Usage](docs/usage.md) for the schema and
+Named modes require `--json`. See [Usage](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md) for the schema and
 option contract.
 
 ### Common scope commands
@@ -183,7 +183,7 @@ Markdown guards apply to `.md` files.
 Generic `.h` files are not syntax-dispatched; `.markdown` is not enabled; Vue
 template and style regions are not executable syntax input; and unsupported
 artifacts are inapplicable. Malformed applicable syntax or a required provider
-failure is a fail-closed tool error. See [Language support](docs/language-support.md).
+failure is a fail-closed tool error. See [Language support](https://github.com/stef-k/agent-code-guard/blob/main/docs/language-support.md).
 
 ### Skill integration
 
@@ -195,13 +195,13 @@ code-guard --export-skill <target-directory>
 ```
 
 Skill activation is platform-specific and is not performed by pipx or Code
-Guard. See [Skill distribution](docs/skill-distribution.md). The checkout
+Guard. See [Skill distribution](https://github.com/stef-k/agent-code-guard/blob/main/docs/skill-distribution.md). The checkout
 compatibility runner is for repository development, not normal installation.
 
 ### Configuration
 
 Built-in defaults require no configuration. Configure a project only for a
-concrete policy reason; see the [configuration guide](docs/configuration.md).
+concrete policy reason; see the [configuration guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/configuration.md).
 The LOC baseline is an explicit adoption tool for established legacy
 repositories, not an ordinary-use requirement or a way to silence findings.
 
@@ -212,24 +212,24 @@ remain visible but non-blocking, while FAIL findings and tool errors block the
 workflow; the repository intentionally uses no LOC baseline.
 
 The maintained interpreter range is **CPython 3.10–3.14**. See
-[Platform support](docs/platform-support.md) for supported binary platforms and
+[Platform support](https://github.com/stef-k/agent-code-guard/blob/main/docs/platform-support.md) for supported binary platforms and
 source-build boundaries.
 
 ## Documentation
 
-- [Documentation index](docs/README.md)
-- [Agent workflow](docs/agent-workflow.md)
-- [Usage and CLI reference](docs/usage.md)
-- [Configuration](docs/configuration.md)
-- [Language support](docs/language-support.md)
-- [Platform support](docs/platform-support.md)
-- [Skill distribution](docs/skill-distribution.md)
+- [Documentation index](https://github.com/stef-k/agent-code-guard/blob/main/docs/README.md)
+- [Agent workflow](https://github.com/stef-k/agent-code-guard/blob/main/docs/agent-workflow.md)
+- [Usage and CLI reference](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md)
+- [Configuration](https://github.com/stef-k/agent-code-guard/blob/main/docs/configuration.md)
+- [Language support](https://github.com/stef-k/agent-code-guard/blob/main/docs/language-support.md)
+- [Platform support](https://github.com/stef-k/agent-code-guard/blob/main/docs/platform-support.md)
+- [Skill distribution](https://github.com/stef-k/agent-code-guard/blob/main/docs/skill-distribution.md)
 
 ## Feedback, security, and license
 
 Report defects through the [bug report form](https://github.com/stef-k/agent-code-guard/issues/new?template=bug-report.md),
 propose measurements through the [candidate guard form](https://github.com/stef-k/agent-code-guard/issues/new?template=candidate-guard.md),
-and follow the [security policy](SECURITY.md) for vulnerabilities.
+and follow the [security policy](https://github.com/stef-k/agent-code-guard/blob/main/SECURITY.md) for vulnerabilities.
 
 Agent Code Guard grew from the Agent LOC Guard prototype and is now the
-canonical implementation. Licensed under the [MIT License](LICENSE).
+canonical implementation. Licensed under the [MIT License](https://github.com/stef-k/agent-code-guard/blob/main/LICENSE).
