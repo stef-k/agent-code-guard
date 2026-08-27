@@ -5,6 +5,7 @@ contract and the evidence behind it.
 
 ## User guides
 
+- [Human and agent workflow](agent-workflow.md) — installation, repeated changed-work checks, REVIEW judgment, and optional authorized hooks.
 - [Usage](usage.md) — installation, file selection, output, result states, and CI.
 - [Configuration](configuration.md) — zero-config defaults, guard settings, and exclusions.
 - [Language support](language-support.md) — applicable syntax languages, extensions, and mixed-content behavior.
