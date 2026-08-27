@@ -74,15 +74,22 @@ Copy this prompt to a coding agent:
 > way, preferably with `pipx install agent-code-guard`, and persistently
 > activating or exporting its installed, version-matched skill for the current
 > agent environment. Verify `code-guard --version` and run `code-guard doctor`,
-> then locate the skill with `code-guard --skill-path` and follow the documented
-> activation or export mechanism. Do not create a LOC baseline. After meaningful
-> source or Markdown edits, run
+> then locate the skill with `code-guard --skill-path`. Follow the
+> [skill activation guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/skill-distribution.md):
+> activate that installed path when the platform supports it, or export it with
+> `code-guard --export-skill <target-directory>` to the platform's documented
+> skill directory. Do not guess a target or overwrite an existing export; verify
+> that `.agent-code-guard-version` matches the installed distribution. Follow the
+> [agent workflow](https://github.com/stef-k/agent-code-guard/blob/main/docs/agent-workflow.md)
+> without creating a LOC baseline. After meaningful source or Markdown edits, run
 > `code-guard . --changed-only --json --json-mode compact`; outside Git, pass the
 > exact edited files. Inspect REVIEW and FAIL findings, make only genuine
 > improvements, rerun the check, and report the result. Never weaken thresholds,
 > exclusions, configuration, or baselines merely to silence findings. Code Guard
-> does not install hooks; ask before configuring any hook or making unrelated
-> persistent agent or platform changes.
+> does not install or enable hooks by default. Ask before configuring a post-edit
+> or post-turn hook, or making unrelated persistent agent or platform changes.
+> Finish by reporting the installed version, doctor status, activated skill
+> location, first analysis result, and any REVIEW findings you accepted.
 
 ## Five-minute start
 
