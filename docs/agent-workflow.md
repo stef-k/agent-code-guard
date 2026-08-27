@@ -53,8 +53,10 @@ declaring completion.
 PASS means continue. REVIEW means inspect and either make a genuine improvement
 or retain the code with an honest justification; it is not automatically a
 defect. FAIL blocks normal completion until corrected or covered by an
-explicitly authorized policy exception. Tool or invocation errors mean the
-analysis did not complete.
+explicitly authorized policy exception. An argparse usage or invalid-choice
+error exits `2` with usage/error text on stderr and no completed report. Other
+Code Guard tool, configuration, scope, or provider errors exit `3`; these errors
+also mean the analysis did not complete.
 
 ## Manual agent loop
 
@@ -69,9 +71,10 @@ Git supplies staged, unstaged, and untracked candidates within the positional
 bounds. The process exits are exact:
 
 - PASS: `0`
-- REVIEW: `1`
-- FAIL: `2`
-- tool or invocation error: `3`
+- REVIEW: `1`, or `0` with `--ci`
+- completed FAIL: `2`
+- argparse usage/invalid-choice error: `2`, stderr usage/error, no completed report
+- other Code Guard tool/configuration/scope/provider error: `3`
 
 The agent inspects REVIEW and FAIL findings, applies judgment, loads only the
 named required policies, and reruns after relevant correction.
@@ -96,7 +99,9 @@ code-guard . --changed-only --ci --json --json-mode compact
 ```
 
 `--ci` changes only REVIEW's process exit from `1` to `0`. REVIEW findings
-remain visible and require inspection; FAIL remains `2`, and tool or invocation
+remain visible and require inspection. Completed FAIL remains `2`; argparse
+usage or invalid-choice errors remain `2` with stderr usage/error and no
+completed report; other Code Guard tool, configuration, scope, or provider
 errors remain `3`. Hook output must not be suppressed.
 
 Hook syntax and configuration paths are platform-specific. The agent must

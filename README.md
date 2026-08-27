@@ -74,7 +74,8 @@ Copy this prompt to a coding agent:
 > installed version-matched skill with `code-guard --skill-path`, and use or
 > export only that skill through the documented mechanism. Inspect this
 > repository without creating a LOC baseline and use changed-work scope. Ask
-> before exporting into a persistent skill directory or configuring hooks.
+> before exporting into a persistent skill directory, changing persistent
+> agent or platform configuration, or configuring hooks.
 > Never weaken thresholds, exclusions, configuration, or baselines merely to
 > silence findings.
 
@@ -121,9 +122,11 @@ hook-assisted process.
 - **PASS** — no special action; exit `0`.
 - **REVIEW** — inspect and decide whether genuine structural improvement is
   warranted; normally exit `1`.
-- **FAIL** — blocks normal completion until fixed or an explicitly authorized
-  exception applies; exit `2`.
-- A tool, invocation, configuration, scope, or provider error exits `3`.
+- **Completed FAIL** — blocks normal completion until fixed or an explicitly
+  authorized exception applies; exit `2` with a completed report on stdout.
+- An argparse usage or invalid-choice error exits `2`, writes usage/error text
+  to stderr, and produces no completed report.
+- Other Code Guard tool, configuration, scope, or provider errors exit `3`.
 
 `--ci` makes REVIEW nonblocking at the process level by changing its exit to
 `0`; it does not hide the findings or change FAIL and tool-error exits.
