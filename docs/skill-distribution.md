@@ -1,45 +1,58 @@
 # Code Guard skill distribution
 
 The `agent-code-guard` Python distribution is the single versioned release
-unit. A pip, pipx, or uv tool installation receives the `code-guard` command,
-its runtime, and an inert canonical Code Guard skill payload from the same
-artifact version. Installation does not inspect or modify any agent directory
-or configuration. Installing `agent-code-guard` through pip, pipx, or uv
-provides the command, runtime, and exact version-matched skill payload.
+unit. It contains the `code-guard` CLI, runtime, and an inert,
+version-matched skill payload. Keep their lifecycle steps distinct:
 
-CLI-only use is fully supported. Install the Python distribution and run, for
-example, `code-guard . --changed-only`. The bundled skill does not affect
-startup, scope, configuration, parser loading, findings, or exit behavior, and
-it never needs to be exported for CLI-only use.
+1. Install the Python distribution with pipx, pip, or uv.
+2. Invoke the installed `code-guard` CLI.
+3. Locate the bundled skill:
 
-For skill-and-CLI use:
+   ```bash
+   code-guard --skill-path
+   ```
 
-1. Install the Python distribution by the normal pip, pipx, or uv tool flow.
-2. Run `code-guard --skill-path` to print the absolute path of that installed
-   distribution's exact skill payload, or run
-   `code-guard --export-skill <target-directory>` to copy it into exactly the
-   supplied directory.
-3. Register or install that directory using the chosen agent system's own
-   mechanism. Agent-specific destinations and configuration are outside Code
-   Guard's responsibility.
-4. The skill invokes the installed `code-guard` command.
+4. If the agent platform needs a copied payload, optionally export it:
 
-`--skill-path` performs no project discovery, configuration loading, Git work,
-or guard execution. `--export-skill` has the same isolation, creates a missing
-target, and rejects an existing non-empty target instead of overwriting it. It
-copies only `SKILL.md`, `LICENSE.txt`, `agents/openai.yaml`, and the policy files
-under `references/`; the checkout-only `scripts/code_guard.py` compatibility
-runner is deliberately excluded.
+   ```bash
+   code-guard --export-skill <target-directory>
+   ```
 
-For read-only troubleshooting, `code-guard doctor` (or `code-guard doctor
---json`) validates the canonical bundled payload alongside the active runtime
-and providers without exporting or updating it. Healthy diagnostics exit `0`
-and completed unhealthy diagnostics exit `1`. Reports contain resolved paths
-and environment details that may be sensitive when shared.
+5. Let the agent platform discover or activate that directory through its own
+   supported mechanism.
 
-Direct `--skill-path` use is intrinsically version-coupled to the installed
-Python distribution. An export is a snapshot and contains a generated
-`.agent-code-guard-version` marker with the producing distribution version.
-After upgrading Agent Code Guard, callers must replace or re-export their
-agent-installed snapshot. Code Guard performs no background or automatic agent
-updates.
+pipx installs and isolates the command; it does not register the skill with
+every agent platform. Agent Code Guard does not know a universal skill
+directory or activation API. Platform activation is separate, and exporting
+into a persistent skill directory or changing platform configuration requires
+user authorization.
+
+CLI-only use needs no skill export. For example,
+`code-guard . --changed-only` runs independently of whether a platform has
+activated the bundled skill. The skill does not affect startup, scope,
+configuration, parser loading, findings, or exits.
+
+## Discovery and export guarantees
+
+`--skill-path` prints the absolute path of the active installed
+distribution's canonical payload without project discovery, configuration
+loading, Git work, or guard execution.
+
+`--export-skill` copies into exactly the supplied directory. The target must
+be missing or empty; export rejects a non-empty target and never overwrites it.
+The export contains `SKILL.md`, `LICENSE.txt`, `agents/openai.yaml`, the
+policy files under `references/`, and a generated
+`.agent-code-guard-version` marker recording the producing distribution
+identity. After upgrading Agent Code Guard, refresh any exported snapshot so
+the platform uses the newly installed version-matched skill.
+
+The checkout compatibility runner at
+`skills/code-guard/scripts/code_guard.py` is for repository and skill
+compatibility development. It is excluded from installed skill payloads and is
+not a normal installation or execution path.
+
+For read-only troubleshooting, `code-guard doctor` or
+`code-guard doctor --json` validates the bundled payload along with the active
+runtime and providers. It does not export or activate a skill. See the
+[human and agent workflow](agent-workflow.md) for execution cadence rather than
+duplicating it here.

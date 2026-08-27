@@ -29,10 +29,12 @@ Code Guard provides deterministic measurements that act as anchors for agent jud
 
 ## Workflow
 
-With Git, run the installed Code Guard command after supported code or Markdown documentation edits:
+After each meaningful turn that edits supported source code or Markdown, run
+the installed Code Guard command. In Git, prefer changed-work scope and compact
+JSON when structured, low-noise output helps:
 
 ```bash
-code-guard . --changed-only
+code-guard . --changed-only --json --json-mode compact
 ```
 
 An installed Agent Code Guard distribution provides both the command and this
@@ -53,10 +55,11 @@ grammar is a deterministic tool error during normal zero-config syntax analysis.
 Disabling every syntax guard preserves the lazy no-Tree-sitter path. A strictly
 LOC-only result also requires both Markdown guards to be explicitly disabled.
 
-Without Git or another VCS that can provide changed scope, pass exactly the files you created or modified. You are responsible for supplying the complete edited-file set:
+Without Git, pass exactly the files you created or modified. You are
+responsible for supplying the complete edited-file set:
 
 ```bash
-code-guard src/Foo.py src/Bar.ts docs/guide.md
+code-guard src/Foo.py src/Bar.ts docs/guide.md --json --json-mode compact
 ```
 
 Do not create a manifest or temporary scope file. Specific positional files mean “inspect these artifacts.” A directory or `.` means a deliberate recursive audit when no Git selector is used. Positional files/directories bound the candidates selected by `--changed-only`, `--staged`, or `--base-ref`; Git selection fails outside a Git repository and never falls back to an audit.
@@ -72,7 +75,8 @@ project exclusions. LOC `--exclude` remains LOC-specific. Explicit files may
 intentionally inspect Git-ignored or built-in-pruned artifacts, unless Code
 Guard `scope.exclude` or `--scope-exclude` removes them.
 
-When all guards return `PASS`, no detailed policy file needs to be loaded.
+Inspect every REVIEW and FAIL. When all guards return `PASS`, no detailed
+policy file needs to be loaded.
 
 When a guard returns `REVIEW` or `FAIL`, read only the policy file named by that finding. The runner returns required policy identifiers/files in both human-readable and JSON output.
 
@@ -85,6 +89,24 @@ Policy references:
 - Markdown document/section size: `references/markdown-size-policy.md`
 
 Do not load unrelated guard policies merely because they exist.
+
+After a genuine correction, rerun Code Guard. Report every accepted REVIEW
+honestly with its justification, and run a final check over the complete
+changed scope before declaring completion.
+
+Agent Code Guard does not install or manage hooks. If the agent platform
+supports a post-edit or post-turn hook, the user has authorized persistent
+configuration, and visible output is retained, the hook may use:
+
+```bash
+code-guard . --changed-only --ci --json --json-mode compact
+```
+
+`--ci` makes REVIEW exit `0`, but REVIEW remains visible and requires
+judgment; FAIL remains `2` and tool errors remain `3`. Outside Git, a hook
+must supply the exact edited files. Do not install hooks, export into persistent
+skill directories, or modify persistent user or repository configuration
+without authorization.
 
 ## Scope
 

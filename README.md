@@ -4,84 +4,138 @@
   <img src="https://raw.githubusercontent.com/stef-k/agent-code-guard/main/assets/agent-code-guard-mark.svg" width="180" alt="Agent Code Guard project mark">
 </p>
 
-Deterministic guardrails for agent-assisted software development.
+Deterministic maintainability guardrails for source code and Markdown changed by
+a human or coding agent.
 
 [![Production Analysis](https://github.com/stef-k/agent-code-guard/actions/workflows/analysis.yml/badge.svg)](https://github.com/stef-k/agent-code-guard/actions/workflows/analysis.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-code-guard?logo=pypi&logoColor=white)](https://pypi.org/project/agent-code-guard/)
 [![Python 3.10–3.14](https://img.shields.io/badge/Python-3.10%E2%80%933.14-3776AB?logo=python&logoColor=white)](https://github.com/stef-k/agent-code-guard/blob/main/docs/platform-support.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/stef-k/agent-code-guard/blob/main/LICENSE)
 
-CI installs Agent Code Guard and analyzes its own real checkout. REVIEW findings
-remain visible but non-blocking, while FAIL findings and tool errors block the
-workflow; the repository intentionally uses no LOC baseline.
+Agent Code Guard measures file size, callable size, structural nesting,
+cyclomatic complexity, Markdown document size, and Markdown section size. It
+reports deterministic **PASS**, **REVIEW**, or **FAIL** results without
+rewriting your files.
 
-Code Guard gives coding agents objective measurements and **PASS / REVIEW /
-FAIL** signals while leaving design decisions to agent and user judgment.
+It complements rather than replaces tests, compilers, linters, formatters,
+security tools, and design judgment.
 
-```text
-deterministic measurement
-        ↓
-PASS / REVIEW / FAIL
-        ↓
-agent judgment
-```
+## Why it is useful
+
+Code Guard surfaces files and callables that are becoming difficult to review,
+deep nesting and complex decision logic, and Markdown specifications that are
+losing navigability. It gives humans and agents the same repeatable review
+point after edits and can prevent silent LOC growth beyond an explicit project
+policy.
+
+### What humans gain
+
+- Consistent signals across supported languages and Markdown, whether a change
+  came from a person or an agent.
+- A shared PASS/REVIEW/FAIL vocabulary: continue, inspect with judgment, or
+  block pending correction or an authorized exception.
+- The same checks locally and in CI, with no configuration required for
+  ordinary use and no automatic source mutation.
+
+### What agents gain
+
+- Deterministic feedback after edits and consistent process exits.
+- Changed-file scope instead of unnecessary full-repository scans.
+- Compact JSON that omits normalized pass noise while retaining actionable
+  findings and result structure.
+- Named required policies, so only relevant guidance needs to be loaded, plus a
+  version-matched bundled skill with REVIEW-judgment and anti-gaming rules.
+
+This workflow is designed to reduce unnecessary output and policy loading. It
+still requires the source context needed to understand and judge each finding;
+it makes no claim about measured token savings.
 
 ## Installation
 
-[pipx](https://pipx.pypa.io/) keeps the command isolated from project
-environments:
+[pipx](https://pipx.pypa.io/) isolates the command from project environments:
 
 ```bash
 pipx install agent-code-guard
+code-guard --version
+code-guard doctor
 ```
 
-See the [usage guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md)
-for a virtual-environment alternative and developer installation.
+`--version` confirms the installed distribution identity. `doctor` checks the
+active installation's health. See the [usage guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md) for virtual
+environment, uv, and developer alternatives.
 
-## Quick start
+### Ask your agent to adopt it
 
-Run all enabled, applicable guards over your current Git work:
+Copy this prompt to a coding agent:
+
+> Consult the official Agent Code Guard repository and documentation. Install
+> the published distribution in an isolated supported way, preferably with
+> pipx; verify `code-guard --version` and run `code-guard doctor`. Locate the
+> installed version-matched skill with `code-guard --skill-path`, and use or
+> export only that skill through the documented mechanism. Inspect this
+> repository without creating a LOC baseline and use changed-work scope. Ask
+> before exporting into a persistent skill directory, changing persistent
+> agent or platform configuration, or configuring hooks.
+> Never weaken thresholds, exclusions, configuration, or baselines merely to
+> silence findings.
+
+## Five-minute start
+
+From a Git worktree, inspect the current change:
 
 ```bash
 code-guard . --changed-only
 ```
 
-Git determines the edited-file candidates, Code Guard applies every enabled
-and applicable guard, and project or user exclusions remain authoritative. No
-configuration file is required.
+Git supplies the changed candidates; every enabled and applicable guard runs.
+No configuration is needed. A REVIEW asks for inspection and judgment, not an
+automatic refactor. Outside Git, pass the exact edited files instead, such as
+`code-guard src/app.py docs/guide.md`.
 
-## Result model
+See the [agent workflow guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/agent-workflow.md) for repeated human and
+agent use.
 
-Every completed analysis begins with a concise file-scope summary:
+## Recommended workflow
 
 ```text
-PASS: 3 selected; 2 analyzed; 1 inapplicable; 0 excluded.
+edit supported code or Markdown
+        ↓
+run Code Guard on changed scope
+        ↓
+PASS → continue
+REVIEW → inspect, justify or genuinely improve
+FAIL → fix or obtain an explicitly authorized exception
+        ↓
+rerun
+        ↓
+report the result before completion
 ```
 
-The state is `PASS`, `REVIEW`, or `FAIL`. JSON output adds the same counts as a
-top-level `scope` object without changing `overall`, `requiredPolicies`, or
-`guards`:
+Use `code-guard . --changed-only --json --json-mode compact` for a structured,
+low-noise manual agent check. Hooks are optional, platform-owned, and require
+user authorization; Code Guard does not install them. The
+[workflow guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/agent-workflow.md) owns the complete manual and
+hook-assisted process.
 
-```json
-"scope": {
-  "selected": 3,
-  "analyzed": 2,
-  "inapplicable": 1,
-  "excluded": 0
-}
-```
+## Interpreting results
 
-- **PASS** — no special action.
-- **REVIEW** — inspect the finding and decide whether meaningful improvement is
-  warranted. REVIEW is not automatic refactoring.
-- **FAIL** — blocks normal completion until fixed or an explicitly authorized
-  exception applies.
+- **PASS** — no special action; exit `0`.
+- **REVIEW** — inspect and decide whether genuine structural improvement is
+  warranted; normally exit `1`.
+- **Completed FAIL** — blocks normal completion until fixed or an explicitly
+  authorized exception applies; exit `2` with a completed report on stdout.
+- An argparse usage or invalid-choice error exits `2`, writes usage/error text
+  to stderr, and produces no completed report.
+- Other Code Guard tool, configuration, scope, or provider errors exit `3`.
 
-**Never game the metric.** Preserve clarity and useful structure; do not create
-artificial helpers, files, abstractions, formatting, or exclusions merely to
-lower a measurement.
+`--ci` makes REVIEW nonblocking at the process level by changing its exit to
+`0`; it does not hide the findings or change FAIL and tool-error exits.
 
-## Default guards
+**Never game a metric.** Do not create artificial helpers, files,
+abstractions, formatting, exclusions, or policy changes merely to lower a
+measurement. A REVIEW is not proof of a defect or a mandatory refactor.
+
+## Guard reference
 
 | Guard | Default |
 | --- | --- |
@@ -93,144 +147,92 @@ lower a measurement.
 | Markdown direct-section size | REVIEW >200 physical lines |
 
 Comparisons are strictly greater-than, so equality passes. All guards except
-file LOC are REVIEW-only; only file LOC can FAIL.
+file LOC are REVIEW-only; only file LOC can FAIL. A new guard must provide
+distinct, deterministic value rather than duplicate conventional tooling. See
+[Guard admission](https://github.com/stef-k/agent-code-guard/blob/main/docs/guard-admission.md).
 
-Agent Code Guard intentionally remains small. A new guard must provide distinct,
-deterministic agent-guardrail value rather than merely duplicate mature
-conventional tooling. See [Guard admission](https://github.com/stef-k/agent-code-guard/blob/main/docs/guard-admission.md).
+### Result and JSON reference
 
-## Common workflows
+Every completed analysis reports selected, analyzed, inapplicable, and
+all-guard-excluded file counts. Bare `--json` is the compatible full output;
+`--json-mode debug` is byte-identical for the same completed invocation, while
+`--json-mode compact` removes only normalized `pass` findings and retains the
+result, scope, required policies, guards, ordering, and actionable findings.
+Named modes require `--json`. See [Usage](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md) for the schema and
+option contract.
 
-Normal Git work:
+### Common scope commands
 
 ```bash
+# Current Git work
 code-guard . --changed-only
-```
 
-Explicit agent-owned scope without Git:
-
-```bash
-code-guard src/Foo.py src/Bar.ts docs/guide.md
-```
-
-Pull request or branch comparison:
-
-```bash
+# Pull request or branch comparison
 code-guard . --base-ref origin/main --ci
-```
 
-Bare `--json` remains the compatible full completed-analysis output. For
-routine agent checks, add `--json-mode compact` to omit normalized `pass`
-findings while retaining actionable `review` and `fail` findings. Use
-`--json-mode debug` as the explicit full-output form when investigating all
-measurements. Both named modes require `--json`; no detail mode exists.
-
-The actual base ref must exist or be fetched correctly in the chosen CI
-environment.
-
-Deliberate full audit:
-
-```bash
+# Deliberate full audit
 code-guard .
 ```
 
-Confirm the installed distribution identity without running analysis:
+The base ref must exist in the chosen environment. Changed work is not a full
+audit; do not repeatedly scan unrelated files after every edit.
 
-```text
-$ code-guard --version
-agent-code-guard <version>
-```
-
-Use `code-guard --version --json` for the exact JSON shape
-`{"distribution": "agent-code-guard", "version": "<version>"}`. The version
-comes from installed `agent-code-guard` distribution metadata. Version mode may
-be combined only with `--json`. Both successful version forms exit `0`;
-incompatible arguments or unavailable metadata are tool errors that exit `3`
-through the normal human or JSON error channel.
-
-Changed work is not a full audit. Use Git selection during normal development;
-do not repeatedly scan unrelated repository history after every edit.
-
-## Supported languages and formats
+### Supported languages and formats
 
 Syntax guards support Python, Go, Kotlin, C#, Java, JavaScript, TypeScript, JSX,
 TSX, Vue JavaScript/TypeScript script regions, C++, Rust, PHP, Swift, and Dart.
 Markdown guards apply to `.md` files.
 
-Important boundaries:
+Generic `.h` files are not syntax-dispatched; `.markdown` is not enabled; Vue
+template and style regions are not executable syntax input; and unsupported
+artifacts are inapplicable. Malformed applicable syntax or a required provider
+failure is a fail-closed tool error. See [Language support](https://github.com/stef-k/agent-code-guard/blob/main/docs/language-support.md).
 
-- Generic `.h` files are not syntax-dispatched because their language context
-  is ambiguous.
-- `.markdown` is not currently enabled for Markdown guards.
-- Vue template and style regions are not executable syntax input.
-- Unsupported artifacts are simply inapplicable.
-- Malformed applicable syntax or a required provider failure is a fail-closed
-  tool error, never heuristic partial analysis.
+### Skill integration
 
-See [Language support](https://github.com/stef-k/agent-code-guard/blob/main/docs/language-support.md)
-for extension and mixed-content details.
-
-## Agent integration
-
-CLI-only use requires no skill export. Each installed distribution also carries
-a version-matched Code Guard skill payload for agent workflows:
+An installed distribution includes the matching Code Guard skill payload:
 
 ```bash
 code-guard --skill-path
 code-guard --export-skill <target-directory>
 ```
 
-See [Skill distribution](https://github.com/stef-k/agent-code-guard/blob/main/docs/skill-distribution.md)
-for discovery, export, and integration guarantees. The checkout compatibility
-runner is for repository and skill compatibility, not primary end-user
-installation.
+Skill activation is platform-specific and is not performed by pipx or Code
+Guard. See [Skill distribution](https://github.com/stef-k/agent-code-guard/blob/main/docs/skill-distribution.md). The checkout
+compatibility runner is for repository development, not normal installation.
 
-## Configuration
+### Configuration
 
-Built-in defaults require no config. A minimal project configuration is:
+Built-in defaults require no configuration. Configure a project only for a
+concrete policy reason; see the [configuration guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/configuration.md).
+The LOC baseline is an explicit adoption tool for established legacy
+repositories, not an ordinary-use requirement or a way to silence findings.
 
-```json
-{
-  "version": 1
-}
-```
+## Trust, CI, and platform support
 
-Use configuration only when a project has a concrete policy reason to change a
-guard or scope. See the [Configuration guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/configuration.md).
+CI installs Agent Code Guard and analyzes its own real checkout. REVIEW findings
+remain visible but non-blocking, while FAIL findings and tool errors block the
+workflow; the repository intentionally uses no LOC baseline.
+
+The maintained interpreter range is **CPython 3.10–3.14**. See
+[Platform support](https://github.com/stef-k/agent-code-guard/blob/main/docs/platform-support.md) for supported binary platforms and
+source-build boundaries.
 
 ## Documentation
 
 - [Documentation index](https://github.com/stef-k/agent-code-guard/blob/main/docs/README.md)
-- [Usage](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md)
+- [Agent workflow](https://github.com/stef-k/agent-code-guard/blob/main/docs/agent-workflow.md)
+- [Usage and CLI reference](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md)
 - [Configuration](https://github.com/stef-k/agent-code-guard/blob/main/docs/configuration.md)
 - [Language support](https://github.com/stef-k/agent-code-guard/blob/main/docs/language-support.md)
 - [Platform support](https://github.com/stef-k/agent-code-guard/blob/main/docs/platform-support.md)
 - [Skill distribution](https://github.com/stef-k/agent-code-guard/blob/main/docs/skill-distribution.md)
 
-## Platform support
+## Feedback, security, and license
 
-The maintained interpreter range is **CPython 3.10–3.14**. The normal binary
-installation envelope is:
-
-- Windows x86-64 and ARM64;
-- macOS x86-64 and ARM64;
-- Linux glibc 2.34 or newer on x86-64 and ARM64.
-
-Source builds outside that binary envelope are best effort and are not
-release-supported. See [Platform support](https://github.com/stef-k/agent-code-guard/blob/main/docs/platform-support.md)
-for exact wheel and deployment boundaries.
-
-## Feedback and security
-
-Report normal defects through the [bug report form](https://github.com/stef-k/agent-code-guard/issues/new?template=bug-report.md)
-and propose new measurements through the [Candidate guard form](https://github.com/stef-k/agent-code-guard/issues/new?template=candidate-guard.md).
-For vulnerability reporting, follow the repository [Security policy](https://github.com/stef-k/agent-code-guard/blob/main/SECURITY.md).
-
-## Background and license
+Report defects through the [bug report form](https://github.com/stef-k/agent-code-guard/issues/new?template=bug-report.md),
+propose measurements through the [candidate guard form](https://github.com/stef-k/agent-code-guard/issues/new?template=candidate-guard.md),
+and follow the [security policy](https://github.com/stef-k/agent-code-guard/blob/main/SECURITY.md) for vulnerabilities.
 
 Agent Code Guard grew from the Agent LOC Guard prototype and is now the
-canonical implementation. It remains focused on deterministic measurements
-that complement—not replace—tests, compilers, formatters, linters, security
-tools, or design judgment.
-
-Licensed under the [MIT License](https://github.com/stef-k/agent-code-guard/blob/main/LICENSE).
+canonical implementation. Licensed under the [MIT License](https://github.com/stef-k/agent-code-guard/blob/main/LICENSE).
