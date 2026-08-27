@@ -282,7 +282,18 @@ has no required policy work.
 
 ## Agent integration
 
-CLI-only use needs no skill export. Installed distributions carry a
-version-matched skill payload. Locate it with `code-guard --skill-path` or copy
-it to an empty target with `code-guard --export-skill <target-directory>`.
-See [Skill distribution](skill-distribution.md) for the complete contract.
+After a meaningful editing turn in Git, the normal structured agent command is:
+
+```bash
+code-guard . --changed-only --json --json-mode compact
+```
+
+Outside Git, pass the exact edited paths instead. An optional, user-authorized
+platform hook may add `--ci`; this changes REVIEW's process exit from `1` to
+`0` without hiding its findings or changing FAIL and tool-error exits.
+Agent Code Guard does not install hooks.
+
+See the [human and agent workflow](agent-workflow.md) for the repeated manual
+and hook-assisted loop. Installed distributions also carry a version-matched
+skill payload; [skill distribution](skill-distribution.md) documents discovery,
+export, and platform activation.
