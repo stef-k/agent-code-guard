@@ -5,19 +5,10 @@ from __future__ import annotations
 
 _CONTEXTUAL_KEYWORD = b"async"
 _NEUTRAL_IDENTIFIER = b"azync"
-_EXPRESSION_PARENT_FIELDS = {
-    "argument": {None},
-    "arrow_expression_clause": {None},
-    "assignment_expression": {"left", "right"},
-    "binary_expression": {"left", "right"},
-    "conditional_expression": {"condition", "consequence", "alternative"},
-    "expression_statement": {None},
-    "invocation_expression": {"function"},
-    "parenthesized_expression": {None},
-    "postfix_unary_expression": {None},
-    "prefix_unary_expression": {None},
-    "return_statement": {None},
+_EXPRESSION_CONTAINERS = {
+    "argument", "arrow_expression_clause", "expression_statement", "return_statement",
 }
+_NON_EXPRESSION_FIELDS = {"alias", "label", "name", "type"}
 
 
 def corrected_csharp_root(provider, source: bytes, first_tree):
@@ -29,6 +20,12 @@ def corrected_csharp_root(provider, source: bytes, first_tree):
     token_offsets: set[int] = set()
     for problem in problems:
         candidates = _contained_unescaped_tokens(source, problem.start_byte, problem.end_byte)
+        if len(candidates) > 1:
+            candidates = tuple(
+                offset
+                for offset in candidates
+                if not _is_declaration_identifier(first_tree.root_node, offset)
+            )
         if len(candidates) != 1:
             return None
         token_offsets.add(candidates[0])
@@ -80,6 +77,26 @@ def _newline_offsets(source: bytes) -> tuple[int, ...]:
     return tuple(index for index, value in enumerate(source) if value == ord("\n"))
 
 
+def _is_declaration_identifier(root, offset: int) -> bool:
+    node = root.descendant_for_byte_range(offset, offset + len(_CONTEXTUAL_KEYWORD))
+    if (
+        node.type != "identifier"
+        or node.start_byte != offset
+        or node.end_byte != offset + len(_CONTEXTUAL_KEYWORD)
+        or node.parent is None
+    ):
+        return False
+    field_name = next(
+        (
+            node.parent.field_name_for_child(index)
+            for index, child in enumerate(node.parent.children)
+            if child == node
+        ),
+        None,
+    )
+    return field_name in _NON_EXPRESSION_FIELDS
+
+
 def _has_authorized_role(root, offset: int) -> bool:
     node = root.descendant_for_byte_range(offset, offset + len(_NEUTRAL_IDENTIFIER))
     if node.type != "identifier" or node.start_byte != offset or node.end_byte != offset + len(_NEUTRAL_IDENTIFIER):
@@ -93,4 +110,6 @@ def _has_authorized_role(root, offset: int) -> bool:
         (parent.field_name_for_child(index) for index, child in enumerate(parent.children) if child == node),
         None,
     )
-    return field_name in _EXPRESSION_PARENT_FIELDS.get(parent.type, set())
+    return (
+        parent.type.endswith("_expression") or parent.type in _EXPRESSION_CONTAINERS
+    ) and field_name not in _NON_EXPRESSION_FIELDS

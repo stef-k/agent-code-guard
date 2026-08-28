@@ -71,6 +71,9 @@ class CSharpContextualKeywordPublicTests(CodeGuardTestCase):
                 "bool Direct(bool async) => async; "
                 "int Binary(int async) => async + 1; "
                 "int Argument(int async) => Identity(async); "
+                "string Member(string async) => async.ToString(); "
+                "int Element(int[] async) => async[0]; "
+                "string Cast(object async) => (string)async; "
                 "int Identity(int value) => value; }\n",
                 encoding="utf-8",
             )
@@ -84,6 +87,9 @@ class CSharpContextualKeywordPublicTests(CodeGuardTestCase):
                     "ExpressionRoles.Direct",
                     "ExpressionRoles.Binary",
                     "ExpressionRoles.Argument",
+                    "ExpressionRoles.Member",
+                    "ExpressionRoles.Element",
+                    "ExpressionRoles.Cast",
                     "ExpressionRoles.Identity",
                 },
             )
