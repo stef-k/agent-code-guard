@@ -27,9 +27,16 @@ class ProviderFailureIsolationLifecycleTests(CodeGuardTestCase):
             "    return 0\n",
             encoding="utf-8",
         )
-        (root / "broken.py").write_text("def broken(:\n", encoding="utf-8")
+        (root / "broken.py").write_text(
+            "def broken(:\n    value = 1\n    value = 2\n    value = 3\n", encoding="utf-8",
+        )
         (root / "guide.md").write_text("# Guide\n\nUseful text.\n", encoding="utf-8")
-        return write_config(root, {"warnAt": 3, "failAt": 20})
+        loc_config = {"warnAt": 3, "failAt": 20}
+        return write_config(root, loc_config, guards={
+            "loc": loc_config,
+            "markdownDocumentSize": {"reviewAt": 2},
+            "markdownSectionSize": {"reviewAt": 1},
+        })
 
     def test_mixed_public_run_preserves_independent_results(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -52,15 +59,22 @@ class ProviderFailureIsolationLifecycleTests(CodeGuardTestCase):
                 [("broken.py", "python", "syntax")],
             )
             self.assertIn("embedded python syntax tree contains errors", data["unavailable"][0]["message"])
-            self.assertEqual(data["requiredPolicies"], ["loc"])
+            self.assertEqual(
+                data["requiredPolicies"], ["loc", "markdownDocumentSize", "markdownSectionSize"],
+            )
             self.assertEqual(data["guards"]["loc"]["complete"], True)
             for guard_id in ("callableSize", "nesting", "complexity"):
                 self.assertEqual(data["guards"][guard_id]["complete"], False)
                 self.assertEqual(data["guards"][guard_id]["unavailablePaths"], ["broken.py"])
             for guard_id in ("markdownDocumentSize", "markdownSectionSize"):
                 self.assertEqual(data["guards"][guard_id]["complete"], True)
-            self.assertTrue(any(item["path"] == "valid.py" for item in data["guards"]["loc"]["findings"]))
+            self.assertEqual(
+                {item["path"] for item in data["guards"]["loc"]["findings"]},
+                {"valid.py", "broken.py"},
+            )
             self.assertTrue(data["guards"]["complexity"]["findings"])
+            self.assertEqual(data["guards"]["markdownDocumentSize"]["findings"][0]["path"], "guide.md")
+            self.assertEqual(data["guards"]["markdownSectionSize"]["findings"][0]["path"], "guide.md")
 
     def test_all_output_and_ci_modes_retain_unavailable_context_and_exit_three(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -81,7 +95,12 @@ class ProviderFailureIsolationLifecycleTests(CodeGuardTestCase):
                 self.assertTrue(lines[1].startswith("UNAVAILABLE: broken.py [python syntax] - "))
                 self.assertEqual(lines[2], "Incomplete guards: callableSize, nesting, complexity.")
                 self.assertTrue(any(line.startswith("REVIEW: valid.py ") for line in lines[3:]))
-                self.assertIn("Required policies: loc", lines)
+                self.assertTrue(any(line.startswith("REVIEW: broken.py ") for line in lines[3:]))
+                self.assertTrue(any(line.startswith("REVIEW: guide.md ") for line in lines[3:]))
+                self.assertTrue(any("section \"Guide\"" in line for line in lines[3:]))
+                self.assertIn(
+                    "Required policies: loc, markdownDocumentSize, markdownSectionSize", lines,
+                )
                 for mode, mode_args in (
                     ("full", ("--json",)),
                     ("debug", ("--json", "--json-mode", "debug")),

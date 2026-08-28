@@ -230,9 +230,12 @@ and decision relationships. Tree-sitter nodes never cross the extraction boundar
 Tree-sitter 0.26.0 and tree-sitter-language-pack 1.14.3 are the pinned initial
 provider. Python 3.10+ and a compatible platform wheel/native build are required
 only when syntax analysis is invoked. Unsupported ordinary artifacts are
-inapplicable; a supported artifact with malformed syntax or an unavailable
-provider/grammar is a deterministic analysis error suitable for the existing
-runner exit-3 boundary.
+inapplicable. The strict `analyze_files` seam raises for malformed syntax or an
+unavailable provider/grammar. The runner's batch seam catches only those known
+per-file failures, returns immutable completed facts plus ordered immutable
+unavailable records, and continues independent files. Arbitrary reads,
+extraction, configuration, guard, and programming failures retain the existing
+abort boundary. An incomplete public result remains blocking with exit `3`.
 
 ## D23 — Second-wave languages preserve the production fact contract
 
