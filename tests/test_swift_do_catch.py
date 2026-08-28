@@ -283,8 +283,7 @@ class SwiftDoCatchPublicTests(CodeGuardTestCase):
             root = Path(temp)
             path = write_source(root, "broken.swift", "func broken() { do { try work() } catch {\n")
             result = self.run_guard(root, str(path), "--json")
-            self.assertEqual(result.returncode, 3)
-            self.assertEqual(set(self.read_json(result)), {"error"})
+            self.assert_syntax_unavailable(result, path.name)
 
 
 if __name__ == "__main__":

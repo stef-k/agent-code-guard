@@ -201,8 +201,7 @@ func Free() { _ = func() { if ready { work() } } }
             root = Path(temp)
             path = write_source(root, "package sample\nfunc Run() { _ = func( { }\n")
             result = self.run_guard(root, str(path), "--json")
-            self.assertEqual(result.returncode, 3)
-            self.assertEqual(set(self.read_json(result)), {"error"})
+            self.assert_syntax_unavailable(result, path.name)
 
 
 if __name__ == "__main__":

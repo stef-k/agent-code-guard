@@ -220,8 +220,8 @@ class CallableSizeRunnerTests(CodeGuardTestCase):
             source.write_text("def broken(:\n    pass\n", encoding="utf-8")
             config = write_config(root, {"enabled": False}, guards={"callableSize": {"enabled": True, "reviewAt": 80}})
             result = self.run_guard(root, str(source), "--config", str(config), "--json")
-            self.assertEqual(result.returncode, 3)
-            self.assertIn("syntax tree contains errors", self.read_json(result)["error"])
+            self.assert_syntax_unavailable(result, "broken.py")
+            self.assertIn("syntax tree contains errors", self.read_json(result)["unavailable"][0]["message"])
 
 
 if __name__ == "__main__":

@@ -319,8 +319,8 @@ class NestingRunnerTests(CodeGuardTestCase):
             source.write_text("def broken(:\n    pass\n", encoding="utf-8")
             enabled = write_config(root, {"enabled": False}, guards={"nesting": {"enabled": True, "reviewAt": 4}})
             result = self.run_guard(root, str(source), "--config", str(enabled), "--json")
-            self.assertEqual(result.returncode, 3)
-            self.assertIn("syntax tree contains errors", self.read_json(result)["error"])
+            self.assert_syntax_unavailable(result, "broken.py")
+            self.assertIn("syntax tree contains errors", self.read_json(result)["unavailable"][0]["message"])
 
             disabled = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={
                 "callableSize": {"enabled": False}, "nesting": {"enabled": False}, "cyclomaticComplexity": {"enabled": False},
