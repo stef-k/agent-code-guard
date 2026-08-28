@@ -26,6 +26,7 @@ REVIEW_GUARD_NAMES = (
 REVIEW_GUARD_KEYS = {"enabled", "reviewAt"}
 LOC_KEYS = {
     "enabled",
+    "ratchetAt",
     "warnAt",
     "failAt",
     "countBlankLines",

@@ -64,6 +64,7 @@ class Config:
     exclude: list[str]
     allowed_large_files: list[AllowedLargeFile]
     overrides: list[ThresholdOverride]
+    ratchet_at: str = "fail"
 
 
 def load_config(args: argparse.Namespace) -> Config:
@@ -89,6 +90,9 @@ def load_config(args: argparse.Namespace) -> Config:
     enabled = data.get("enabled", True)
     if not isinstance(enabled, bool):
         raise ValueError("guards.loc.enabled must be a boolean")
+    ratchet_at = data.get("ratchetAt", "fail")
+    if not isinstance(ratchet_at, str) or ratchet_at not in {"fail", "review"}:
+        raise ValueError("guards.loc.ratchetAt must be 'fail' or 'review'")
 
     warn_at = args.warn if args.warn is not None else data.get("warnAt", DEFAULT_WARN_AT)
     fail_at = args.fail if args.fail is not None else data.get("failAt", DEFAULT_FAIL_AT)
@@ -114,6 +118,7 @@ def load_config(args: argparse.Namespace) -> Config:
         False if args.ignore_comment_lines else count_comments, include_extensions, exclude,
         parse_allowed_large_files(data.get("allowedLargeFiles", [])),
         parse_overrides(data.get("overrides", [])),
+        ratchet_at,
     )
 
 
@@ -201,6 +206,20 @@ def evaluate(
     ratchet_status = None
     if allowed and counted > warn_at:
         native_status, state, reason = "exempt", "pass", allowed.reason
+    elif config.ratchet_at == "review" and baseline_loc is not None:
+        if counted > baseline_loc:
+            native_status, state = "ratchetExceeded", "fail"
+            reason = f"LOC grew above source-controlled allowance {baseline_loc}."
+            ratchet_status = "exceeded"
+        elif counted > fail_at:
+            native_status, state, reason = "grandfathered", "review", None
+            ratchet_status = "within"
+        elif counted > warn_at:
+            native_status, state, reason = "warn", "review", None
+            ratchet_status = "within"
+        else:
+            native_status, state, reason = "ok", "pass", None
+            ratchet_status = "notNeeded"
     elif counted > fail_at:
         if baseline_loc is not None and counted <= baseline_loc:
             native_status, state, reason = "grandfathered", "review", None

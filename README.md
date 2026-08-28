@@ -228,6 +228,9 @@ Built-in defaults require no configuration. Configure a project only for a
 concrete policy reason; see the [configuration guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/configuration.md).
 The LOC baseline is an explicit adoption tool for established legacy
 repositories, not an ordinary-use requirement or a way to silence findings.
+Its default `ratchetAt: "fail"` policy freezes files above `failAt`; choose
+`ratchetAt: "review"` only when every established file above `warnAt` must be
+non-increasing while ordinary findings in that range remain REVIEW.
 
 ## Trust, CI, and platform support
 
