@@ -6,7 +6,7 @@ from pathlib import Path
 from helpers import CodeGuardTestCase, REPO_ROOT, write_config
 
 
-FIXTURE = REPO_ROOT / "tests" / "fixtures" / "analyzers" / "csharp" / "ContextualKeywords.cs"
+FIXTURE = REPO_ROOT / "tests" / "fixtures" / "csharp" / "ContextualKeywords.cs"
 
 
 class CSharpContextualKeywordPublicTests(CodeGuardTestCase):
@@ -63,6 +63,29 @@ class CSharpContextualKeywordPublicTests(CodeGuardTestCase):
             self.assertEqual(
                 [item["callable"] for item in self.read_json(genuine_result)["guards"]["complexity"]["findings"]],
                 ["Genuine.Run"],
+            )
+
+            expression_roles = root / "ExpressionRoles.cs"
+            expression_roles.write_text(
+                "class ExpressionRoles { "
+                "bool Direct(bool async) => async; "
+                "int Binary(int async) => async + 1; "
+                "int Argument(int async) => Identity(async); "
+                "int Identity(int value) => value; }\n",
+                encoding="utf-8",
+            )
+            expression_result = self.run_guard(
+                root, str(expression_roles), "--config", str(config), "--json",
+            )
+            self.assertNotEqual(expression_result.returncode, 3, expression_result.stderr)
+            self.assertEqual(
+                {item["callable"] for item in self.read_json(expression_result)["guards"]["complexity"]["findings"]},
+                {
+                    "ExpressionRoles.Direct",
+                    "ExpressionRoles.Binary",
+                    "ExpressionRoles.Argument",
+                    "ExpressionRoles.Identity",
+                },
             )
 
             unsupported_role = root / "UnsupportedRole.cs"

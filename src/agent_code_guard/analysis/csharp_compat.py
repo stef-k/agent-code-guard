@@ -5,6 +5,19 @@ from __future__ import annotations
 
 _CONTEXTUAL_KEYWORD = b"async"
 _NEUTRAL_IDENTIFIER = b"azync"
+_EXPRESSION_PARENT_FIELDS = {
+    "argument": {None},
+    "arrow_expression_clause": {None},
+    "assignment_expression": {"left", "right"},
+    "binary_expression": {"left", "right"},
+    "conditional_expression": {"condition", "consequence", "alternative"},
+    "expression_statement": {None},
+    "invocation_expression": {"function"},
+    "parenthesized_expression": {None},
+    "postfix_unary_expression": {None},
+    "prefix_unary_expression": {None},
+    "return_statement": {None},
+}
 
 
 def corrected_csharp_root(provider, source: bytes, first_tree):
@@ -76,4 +89,8 @@ def _has_authorized_role(root, offset: int) -> bool:
         return False
     if parent.type == "argument" and parent.child_by_field_name("name") == node:
         return True
-    return parent.type == "conditional_expression" and parent.child_by_field_name("condition") == node
+    field_name = next(
+        (parent.field_name_for_child(index) for index, child in enumerate(parent.children) if child == node),
+        None,
+    )
+    return field_name in _EXPRESSION_PARENT_FIELDS.get(parent.type, set())

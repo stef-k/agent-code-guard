@@ -16,7 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CODE_GUARD = REPO_ROOT / "skills" / "code-guard" / "scripts" / "code_guard.py"
 SKILL_SOURCE = REPO_ROOT / "skills" / "code-guard"
 CSHARP_CONTEXTUAL_KEYWORD_FIXTURE = (
-    REPO_ROOT / "tests" / "fixtures" / "analyzers" / "csharp" / "ContextualKeywords.cs"
+    REPO_ROOT / "tests" / "fixtures" / "csharp" / "ContextualKeywords.cs"
 )
 
 
