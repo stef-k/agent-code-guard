@@ -36,6 +36,7 @@ run Code Guard on changed scope
 PASS → continue
 REVIEW → inspect, justify or genuinely improve
 FAIL → fix or obtain an explicitly authorized exception
+INCOMPLETE → preserve completed evidence and restore unavailable syntax analysis
         ↓
 rerun
         ↓
@@ -53,10 +54,12 @@ declaring completion.
 PASS means continue. REVIEW means inspect and either make a genuine improvement
 or retain the code with an honest justification; it is not automatically a
 defect. FAIL blocks normal completion until corrected or covered by an
-explicitly authorized policy exception. An argparse usage or invalid-choice
-error exits `2` with usage/error text on stderr and no completed report. Other
-Code Guard tool, configuration, scope, or provider errors exit `3`; these errors
-also mean the analysis did not complete.
+explicitly authorized policy exception. INCOMPLETE means a known per-file
+syntax or provider failure prevented some syntax evidence; independent
+completed evidence remains authoritative, but the run blocks with exit `3`.
+An argparse usage or invalid-choice error exits `2` with usage/error text on
+stderr and no completed report. Other Code Guard tool, configuration, scope,
+or unexpected errors exit `3` without an incomplete report.
 
 ## Manual agent loop
 
@@ -73,8 +76,9 @@ bounds. The process exits are exact:
 - PASS: `0`
 - REVIEW: `1`, or `0` with `--ci`
 - completed FAIL: `2`
+- INCOMPLETE: `3`, with retained completed evidence and unavailable records
 - argparse usage/invalid-choice error: `2`, stderr usage/error, no completed report
-- other Code Guard tool/configuration/scope/provider error: `3`
+- other Code Guard tool/configuration/scope/unexpected error: `3`
 
 The agent inspects REVIEW and FAIL findings, applies judgment, loads only the
 named required policies, and reruns after relevant correction.
@@ -99,10 +103,10 @@ code-guard . --changed-only --ci --json --json-mode compact
 ```
 
 `--ci` changes only REVIEW's process exit from `1` to `0`. REVIEW findings
-remain visible and require inspection. Completed FAIL remains `2`; argparse
-usage or invalid-choice errors remain `2` with stderr usage/error and no
-completed report; other Code Guard tool, configuration, scope, or provider
-errors remain `3`. Hook output must not be suppressed.
+remain visible and require inspection. Completed FAIL remains `2`; INCOMPLETE
+and other tool errors remain `3`; argparse usage or invalid-choice errors remain
+`2` with stderr usage/error and no completed report. Hook output must not be
+suppressed.
 
 Hook syntax and configuration paths are platform-specific. The agent must
 consult its platform's own documentation; no universal hook configuration is
@@ -111,7 +115,7 @@ implied. Outside Git, the integration must supply the exact edited files.
 ## Completion and CI
 
 Before completion, rerun Code Guard on the complete changed scope. Report the
-aggregate result, any FAIL or tool errors, and each accepted REVIEW with its
-reason. Then use the repository's CI integration as the final gate. Humans
+aggregate result, any FAIL, INCOMPLETE, or tool errors, and each accepted REVIEW
+with its reason. Then use the repository's CI integration as the final gate. Humans
 remain responsible for deciding whether accepted REVIEW pressure warrants
 follow-up work and for authorizing exceptions or persistent integrations.
