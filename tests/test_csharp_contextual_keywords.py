@@ -65,6 +65,15 @@ class CSharpContextualKeywordPublicTests(CodeGuardTestCase):
                 ["Genuine.Run"],
             )
 
+            unsupported_role = root / "UnsupportedRole.cs"
+            unsupported_role.write_text(
+                "class UnsupportedRole { void Run() { async: return; } }\n",
+                encoding="utf-8",
+            )
+            unsupported_result = self.run_guard(root, str(unsupported_role), "--json")
+            self.assertEqual(unsupported_result.returncode, 3)
+            self.assertEqual(set(self.read_json(unsupported_result)), {"error"})
+
 
 if __name__ == "__main__":
     import unittest

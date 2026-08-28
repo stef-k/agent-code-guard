@@ -76,8 +76,4 @@ def _has_authorized_role(root, offset: int) -> bool:
         return False
     if parent.type == "argument" and parent.child_by_field_name("name") == node:
         return True
-    field_name = next(
-        (parent.field_name_for_child(index) for index, child in enumerate(parent.children) if child == node),
-        None,
-    )
-    return field_name not in {"name", "type", "alias", "label"}
+    return parent.type == "conditional_expression" and parent.child_by_field_name("condition") == node
