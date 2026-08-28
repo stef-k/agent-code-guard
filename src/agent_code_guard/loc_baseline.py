@@ -126,8 +126,9 @@ def create(root: Path, files: tuple[Path, ...], config: loc.Config) -> int:
         if any(matches_path_glob(relative, item.path) for item in config.allowed_large_files):
             continue
         counted = loc.count_loc(path, config)
-        _, fail_at, _ = loc.effective_thresholds(relative, config)
-        if counted > fail_at:
+        warn_at, fail_at, _ = loc.effective_thresholds(relative, config)
+        threshold = warn_at if config.ratchet_at == "review" else fail_at
+        if counted > threshold:
             entries[relative] = counted
     content = serialize(entries)
     created_directory = not target.parent.exists()
@@ -178,8 +179,9 @@ def update(
             raise ValueError(
                 f"LOC baseline update would increase allowance for {relative}: {allowance} to {counted}"
             )
-        _, fail_at, _ = loc.effective_thresholds(relative, config)
-        if counted <= fail_at:
+        warn_at, fail_at, _ = loc.effective_thresholds(relative, config)
+        threshold = warn_at if config.ratchet_at == "review" else fail_at
+        if counted <= threshold:
             proposed.pop(relative)
             removed += 1
         elif counted < allowance:

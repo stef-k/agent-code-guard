@@ -8,6 +8,20 @@ from tests.helpers import CodeGuardTestCase, write_config, write_lines
 
 
 class ConfigurationValidationTests(CodeGuardTestCase):
+    def test_ratchet_at_accepts_only_exact_policy_strings_and_defaults_to_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            write_lines(root / "sample.py", 4)
+            for value in ("FAIL", "Review", "other", True, 1, None):
+                with self.subTest(value=value):
+                    config = write_config(root, {"warnAt": 3, "failAt": 6, "ratchetAt": value})
+                    result = self.run_guard(root, ".", "--config", str(config), "--json")
+                    self.assertEqual(result.returncode, 3)
+                    self.assertIn("guards.loc.ratchetAt must be 'fail' or 'review'", self.read_json(result)["error"])
+            for value in ("fail", "review"):
+                config = write_config(root, {"warnAt": 3, "failAt": 6, "ratchetAt": value})
+                self.assertEqual(self.run_guard(root, ".", "--config", str(config), "--json").returncode, 1)
+
     def test_global_thresholds_require_positive_json_integers(self) -> None:
         invalid_values = ["3", True, 3.0]
         with tempfile.TemporaryDirectory() as temp:

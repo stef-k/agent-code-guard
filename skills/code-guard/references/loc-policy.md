@@ -27,6 +27,15 @@ Existing `allowedLargeFiles` entries may be honored with their configured reason
 
 Do not infer approval from inconvenience, historical size, a nearby exemption, time pressure, or a request to finish the coding task.
 
+## Source-controlled ratchets
+
+An established repository may use `guards.loc.ratchetAt: "fail"` (the default)
+to freeze only files already above `failAt`, or `"review"` to freeze every
+recorded file above `warnAt` while retaining ordinary REVIEW semantics within
+its allowance. Growth above a recorded allowance is always FAIL. Never switch
+the policy, raise thresholds, add exclusions or exemptions, or increase/remove
+allowances merely to silence growth.
+
 ## Do not game LOC
 
 Project formatting conventions take priority. Never combine independent statements, compress control flow or expressions unusually, minify handwritten code, remove useful comments/structure, or fight the formatter merely to lower physical LOC.

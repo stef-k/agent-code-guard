@@ -155,8 +155,10 @@ paths that no longer exist are ignored.
 
 ## Legacy LOC adoption ratchet
 
-Established repositories may adopt LOC policy without accepting further growth
-in files that already exceed their effective failure threshold. Create the
+Established repositories may adopt LOC policy without accepting further growth.
+The default `guards.loc.ratchetAt: "fail"` records files above effective
+`failAt`. Use `"review"` when existing files above effective `warnAt` may remain
+but must not grow. Create the
 canonical source-controlled ratchet over an intentionally bounded scope:
 
 ```bash
@@ -168,11 +170,12 @@ git diff --cached
 The file is always
 `<analysis-root>/.agent-tools/code-guard.loc-baseline.json`, where the root is
 the enclosing Git top-level or, outside Git, the resolved invocation directory.
-Normal analysis reads it automatically and never writes it. A file at its exact
-allowance, or reduced while still above ordinary `failAt`, becomes `REVIEW`
-with the human label `RATCHET`. Growth above the allowance remains `FAIL`. Once
-the count is at or below `failAt`, ordinary PASS/REVIEW behavior applies and
-the ratchet is reported as no longer needed.
+Normal analysis reads it automatically and never writes it. Under `fail`, a file
+at its allowance, or reduced while still above `failAt`, becomes grandfathered
+`REVIEW`. Under `review`, a file within its allowance keeps ordinary `REVIEW`
+between `warnAt` and `failAt`, and is grandfathered only above `failAt`. Growth
+above either allowance is `FAIL`. At or below the selected policy threshold,
+the entry is reported as no longer needed.
 
 After reducing or deleting legacy code, explicitly lower and prune entries:
 
@@ -182,7 +185,7 @@ code-guard src/legacy --update-loc-baseline
 
 Update bounds come only from the positional paths. Update lowers existing
 allowances, removes entries that are missing, excluded, inapplicable, or no
-longer above `failAt`, and leaves entries outside the bounds unchanged. It
+longer above the selected policy threshold, and leaves entries outside the bounds unchanged. It
 never adds a newly oversized path or raises an allowance; any attempted growth
 aborts the entire update. A rename is an old-path deletion plus a new,
 ungrandfathered destination—Git history is not consulted. Manual JSON edits
@@ -196,6 +199,10 @@ size-regression check. A ratchet entry may not overlap `allowedLargeFiles`.
 This workflow is only for adopting established legacy repositories. New
 projects, including Agent Code Guard itself, should meet policy directly and
 must not create a ratchet baseline.
+
+Do not switch between `fail` and `review`, raise thresholds, add exclusions or
+exemptions, or edit allowances merely to silence a growth failure. Those are
+source-controlled policy changes and require their own substantive justification.
 
 ## Results and exit codes
 

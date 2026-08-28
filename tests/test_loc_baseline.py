@@ -13,6 +13,107 @@ BASELINE = Path(".agent-tools/code-guard.loc-baseline.json")
 
 
 class LocBaselineTests(CodeGuardTestCase):
+    def test_review_ratchet_public_lifecycle_and_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            init_git(root)
+            write_lines(root / "legacy.py", 5)
+            write_lines(root / "equal.py", 3)
+            config = write_config(root, {"warnAt": 3, "failAt": 7, "ratchetAt": "review"})
+
+            created = self.run_guard(root, ".", "--config", str(config), "--create-loc-baseline")
+            self.assertEqual((created.returncode, created.stdout), (0, (
+                "Created LOC baseline: .agent-tools/code-guard.loc-baseline.json (1 entries).\n"
+            )))
+            baseline = root / BASELINE
+            self.assertEqual(
+                json.loads(baseline.read_text(encoding="utf-8"))["loc"]["files"],
+                [{"path": "legacy.py", "allowedLoc": 5}],
+            )
+
+            unchanged = self.run_guard(root, ".", "--config", str(config), "--json")
+            by_path = {item["path"]: item for item in self.findings(unchanged)}
+            self.assertEqual(
+                (by_path["legacy.py"]["nativeStatus"], by_path["legacy.py"]["state"],
+                 by_path["legacy.py"]["ratchetStatus"]),
+                ("warn", "review", "within"),
+            )
+            self.assertEqual(by_path["equal.py"]["nativeStatus"], "ok")
+
+            write_lines(root / "legacy.py", 4)
+            reduced = self.run_guard(root, ".", "--config", str(config), "--json")
+            self.assertEqual(self.findings(reduced)[1]["state"], "review")
+            lowered = self.run_guard(root, ".", "--config", str(config), "--update-loc-baseline")
+            self.assertIn("(1 lowered, 0 removed, 0 unchanged)", lowered.stdout)
+
+            write_lines(root / "legacy.py", 6)
+            before_growth = baseline.read_bytes()
+            before_mtime = baseline.stat().st_mtime_ns
+            for ci in (False, True):
+                args = ("--ci",) if ci else ()
+                growth = self.run_guard(root, ".", "--config", str(config), *args, "--json")
+                self.assertEqual(growth.returncode, 2)
+                finding = next(item for item in self.findings(growth) if item["path"] == "legacy.py")
+                self.assertEqual(
+                    (finding["nativeStatus"], finding["state"], finding["ratchetStatus"],
+                     finding["baselineLoc"], finding["reason"]),
+                    ("ratchetExceeded", "fail", "exceeded", 4,
+                     "LOC grew above source-controlled allowance 4."),
+                )
+                self.assertEqual(self.read_json(growth)["requiredPolicies"], ["loc"])
+            human = self.run_guard(root, ".", "--config", str(config))
+            self.assertIn("LOC grew above source-controlled allowance 4.", human.stdout)
+            rejected = self.run_guard(root, ".", "--config", str(config), "--update-loc-baseline")
+            self.assertEqual(rejected.returncode, 3)
+            self.assertEqual((baseline.read_bytes(), baseline.stat().st_mtime_ns), (before_growth, before_mtime))
+
+            write_lines(root / "legacy.py", 3)
+            write_lines(root / "new.py", 5)
+            full = self.run_guard(root, ".", "--config", str(config), "--json")
+            by_path = {item["path"]: item for item in self.findings(full)}
+            self.assertEqual(
+                (by_path["legacy.py"]["nativeStatus"], by_path["legacy.py"]["state"],
+                 by_path["legacy.py"]["ratchetStatus"]),
+                ("ok", "pass", "notNeeded"),
+            )
+            self.assertEqual(
+                (by_path["new.py"]["nativeStatus"], by_path["new.py"]["state"]),
+                ("warn", "review"),
+            )
+            compact = self.run_guard(
+                root, ".", "--config", str(config), "--json", "--json-mode", "compact",
+            )
+            self.assertNotIn("legacy.py", {item["path"] for item in self.findings(compact)})
+            self.assertIn("new.py", {item["path"] for item in self.findings(compact)})
+            pruned = self.run_guard(root, ".", "--config", str(config), "--update-loc-baseline")
+            self.assertIn("(0 lowered, 1 removed, 0 unchanged)", pruned.stdout)
+            self.assertEqual(json.loads(baseline.read_text(encoding="utf-8"))["loc"]["files"], [])
+
+    def test_review_ratchet_uses_last_matching_override_for_lifecycle(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            init_git(root)
+            write_lines(root / "special.py", 5)
+            config = write_config(root, {
+                "warnAt": 10, "failAt": 20, "ratchetAt": "review",
+                "overrides": [
+                    {"match": ["*.py"], "warnAt": 4, "failAt": 8},
+                    {"match": ["special.py"], "warnAt": 3, "failAt": 6},
+                ],
+            })
+            self.assertEqual(
+                self.run_guard(root, ".", "--config", str(config), "--create-loc-baseline").returncode,
+                0,
+            )
+            finding = self.findings(self.run_guard(root, ".", "--config", str(config), "--json"))[0]
+            self.assertEqual((finding["overrideIndex"], finding["warnAt"], finding["failAt"]), (1, 3, 6))
+            write_lines(root / "special.py", 3)
+            self.assertEqual(
+                self.run_guard(root, ".", "--config", str(config), "--update-loc-baseline").returncode,
+                0,
+            )
+            self.assertEqual(json.loads((root / BASELINE).read_text(encoding="utf-8"))["loc"]["files"], [])
+
     def test_normal_analysis_ratchet_states_and_output_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

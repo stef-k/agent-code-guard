@@ -4,6 +4,12 @@ Notable changes to Agent Code Guard are recorded here.
 
 ## Unreleased
 
+### Added
+
+- Opt-in `guards.loc.ratchetAt: "review"` support freezes source-controlled LOC
+  allowances beginning above the effective review threshold, while omitted or
+  explicit `"fail"` preserves the existing failure-only lifecycle and output.
+
 ### Fixed
 
 - Known per-file syntax and provider failures now produce blocking structured

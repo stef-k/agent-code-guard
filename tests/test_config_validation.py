@@ -71,6 +71,7 @@ class ConfigurationValidationTests(CodeGuardTestCase):
             "guards": {
                 "loc": {
                     "enabled": True,
+                    "ratchetAt": "fail",
                     "warnAt": 10,
                     "failAt": 20,
                     "countBlankLines": False,

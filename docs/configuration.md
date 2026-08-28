@@ -30,7 +30,7 @@ The six guard keys and their production defaults are:
 
 | Key | Default |
 | --- | --- |
-| `loc` | `warnAt: 400`, `failAt: 600` |
+| `loc` | `warnAt: 400`, `failAt: 600`, `ratchetAt: "fail"` |
 | `callableSize` | `enabled: true`, `reviewAt: 80` |
 | `nesting` | `enabled: true`, `reviewAt: 4` |
 | `cyclomaticComplexity` | `enabled: true`, `reviewAt: 15` |
@@ -42,7 +42,7 @@ passes. The five `reviewAt` guards are REVIEW-only. Only `loc` can FAIL.
 
 Set `enabled` to `false` to disable a guard. For REVIEW-only guards, `reviewAt`
 must be a positive integer when enabled. LOC supports its established options,
-including `enabled`, `warnAt`, `failAt`, line-count settings, extension policy,
+including `enabled`, `warnAt`, `failAt`, `ratchetAt`, line-count settings, extension policy,
 allowed large files, and path-specific overrides.
 
 Example with one deliberate threshold change:
@@ -104,9 +104,11 @@ applicable guards.
 
 ## Source-controlled LOC ratchet
 
-The legacy-adoption ratchet is not a configuration property. Its only location
-is `.agent-tools/code-guard.loc-baseline.json` at the owning analysis root, and
-its complete version-1 schema is:
+The allowance data lives only in `.agent-tools/code-guard.loc-baseline.json` at
+the owning analysis root. `guards.loc.ratchetAt` controls how that unchanged
+version-1 data is interpreted: omitted or `"fail"` records and enforces files
+above effective `failAt`; `"review"` starts above effective `warnAt`. Its complete
+persisted schema is:
 
 ```json
 {
@@ -128,7 +130,8 @@ duplicate, absolute, or unsafe paths fail closed. Writers use UTF-8, two-space
 indentation, LF endings, and a final newline.
 
 `--create-loc-baseline` records only selected, applicable files currently
-strictly above their effective `failAt`, after exclusions, line-count options,
+strictly above their effective policy threshold (`failAt` for `fail`, `warnAt`
+for `review`), after exclusions, line-count options,
 CLI thresholds, and the last matching override. `allowedLargeFiles` entries are
 not recorded. `--update-loc-baseline` can only lower or remove existing entries
 within its positional bounds; it cannot add or increase one. Normal analysis
@@ -139,7 +142,10 @@ project threshold differs, and `allowedLargeFiles` for a reviewed static
 exemption. The ratchet instead preserves an exact legacy maximum and rejects
 growth; overlap with `allowedLargeFiles` is invalid. Manual ratchet edits require
 normal source-control review. This facility is for established repositories,
-not new projects, which should meet LOC policy directly.
+not new projects, which should meet LOC policy directly. Choose `fail` to freeze
+only existing hard failures; choose `review` when established review-level files
+must also be non-increasing. Never change the policy, thresholds, exclusions,
+exemptions, or stored allowances merely to silence growth.
 
 ## Fail-closed validation
 
