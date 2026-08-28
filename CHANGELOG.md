@@ -4,6 +4,8 @@ Notable changes to Agent Code Guard are recorded here.
 
 ## Unreleased
 
+## 0.3.0 - 2026-08-28
+
 ### Added
 
 - Opt-in `guards.loc.ratchetAt: "review"` support freezes source-controlled LOC
