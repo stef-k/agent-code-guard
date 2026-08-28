@@ -39,7 +39,7 @@ class TreeSitterProvider:
             self._parsers[language] = parser
         try:
             return parser.parse(source)
-        except Exception as exc:
+        except RuntimeError as exc:
             raise ProviderUnavailableError(
                 f"syntax provider failed for supported language {language!r}: {exc}; "
                 "verify the Agent Code Guard installation",

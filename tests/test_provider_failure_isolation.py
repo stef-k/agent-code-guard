@@ -155,16 +155,41 @@ class ProviderFailureIsolationPipelineTests(CodeGuardTestCase):
             )
             self.assertTrue(all(item.message == result.unavailable[0].message for item in result.unavailable))
 
-    def test_arbitrary_provider_exception_still_aborts(self) -> None:
-        class BrokenProvider:
-            def parse(self, language: str, source: bytes):
-                raise ZeroDivisionError("programming defect")
+    def test_arbitrary_concrete_parser_exception_still_aborts(self) -> None:
+        defect = ZeroDivisionError("programming defect")
+
+        class BrokenParser:
+            def parse(self, source: bytes):
+                raise defect
 
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "sample.py"
             path.write_text("value = 1\n", encoding="utf-8")
-            with self.assertRaisesRegex(ZeroDivisionError, "programming defect"):
-                analyze_files_for_runner([path], BrokenProvider())
+            with self.assertRaises(ZeroDivisionError) as caught:
+                analyze_files_for_runner(
+                    [path], TreeSitterProvider(parser_factory=lambda _: BrokenParser()),
+                )
+            self.assertIs(caught.exception, defect)
+
+    def test_concrete_parser_runtime_failure_is_unavailable(self) -> None:
+        class UnavailableParser:
+            def parse(self, source: bytes):
+                raise RuntimeError("runtime unavailable")
+
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "sample.py"
+            path.write_text("value = 1\n", encoding="utf-8")
+
+            result = analyze_files_for_runner(
+                [path], TreeSitterProvider(parser_factory=lambda _: UnavailableParser()),
+            )
+
+            self.assertEqual(result.facts.files, ())
+            self.assertEqual(
+                [(item.path, item.language, item.kind) for item in result.unavailable],
+                [(path, "python", "provider")],
+            )
+            self.assertIn("runtime unavailable", result.unavailable[0].message)
 
 
 if __name__ == "__main__":
