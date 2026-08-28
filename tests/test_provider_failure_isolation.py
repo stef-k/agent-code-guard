@@ -1,21 +1,12 @@
 from __future__ import annotations
 
 import tempfile
-from importlib import import_module
 from pathlib import Path
-import sys
-import types
 
-from tests.helpers import CodeGuardTestCase, REPO_ROOT, write_config
+from tests.helpers import CodeGuardTestCase, write_config
 
-CHECKOUT_PACKAGE = "_issue115_checkout_agent_code_guard"
-package = types.ModuleType(CHECKOUT_PACKAGE)
-package.__path__ = [str(REPO_ROOT / "src" / "agent_code_guard")]
-sys.modules[CHECKOUT_PACKAGE] = package
-pipeline = import_module(f"{CHECKOUT_PACKAGE}.analysis.pipeline")
-provider_module = import_module(f"{CHECKOUT_PACKAGE}.analysis.provider")
-analyze_files_for_runner = pipeline.analyze_files_for_runner
-TreeSitterProvider = provider_module.TreeSitterProvider
+from agent_code_guard.analysis.pipeline import analyze_files_for_runner
+from agent_code_guard.analysis.provider import TreeSitterProvider
 
 
 class ProviderFailureIsolationLifecycleTests(CodeGuardTestCase):
