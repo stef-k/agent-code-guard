@@ -106,10 +106,25 @@ def _markdown_lines(data: dict[str, object]) -> list[str]:
 def format_completed_analysis(data: dict[str, object]) -> str:
     """Return the complete human report for an existing completed payload."""
     scope = data["scope"]
-    lines = [
-        f"{str(data['overall']).upper()}: {scope['selected']} selected; {scope['analyzed']} analyzed; "
-        f"{scope['inapplicable']} inapplicable; {scope['excluded']} excluded."
-    ]
+    if data["overall"] == "incomplete":
+        lines = [
+            f"INCOMPLETE: {scope['selected']} selected; {scope['analyzed']} analyzed; "
+            f"{scope['inapplicable']} inapplicable; {scope['unavailable']} unavailable; "
+            f"{scope['excluded']} excluded. Completed findings: {str(data['completedOverall']).upper()}."
+        ]
+        lines.extend(
+            f"UNAVAILABLE: {item['path']} [{item['language']} {item['kind']}] - {item['message']}"
+            for item in data["unavailable"]
+        )
+        incomplete_guards = [
+            guard_id for guard_id, result in data["guards"].items() if not result["complete"]
+        ]
+        lines.append(f"Incomplete guards: {', '.join(incomplete_guards)}.")
+    else:
+        lines = [
+            f"{str(data['overall']).upper()}: {scope['selected']} selected; {scope['analyzed']} analyzed; "
+            f"{scope['inapplicable']} inapplicable; {scope['excluded']} excluded."
+        ]
     lines.extend(_loc_lines(data))
     lines.extend(_callable_size_lines(data))
     lines.extend(_nesting_lines(data))

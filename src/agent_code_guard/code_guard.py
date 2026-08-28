@@ -17,6 +17,7 @@ from .guards import callable_size, complexity, loc, markdown_document_size, mark
 from .human_output import format_completed_analysis
 from . import loc_baseline
 from .result_model import GuardResult, aggregate_state, required_policies
+from .reporting import reporting_path
 from .skill_distribution import export_skill, skill_path as installed_skill_path
 
 DISTRIBUTION_NAME = "agent-code-guard"
@@ -250,13 +251,31 @@ class ScopeSummary:
     analyzed: int
     inapplicable: int
     excluded: int
+    unavailable: int | None = None
 
     def to_json(self) -> dict[str, int]:
-        return {
+        data = {
             "selected": self.selected,
             "analyzed": self.analyzed,
             "inapplicable": self.inapplicable,
-            "excluded": self.excluded,
+        }
+        if self.unavailable is not None:
+            data["unavailable"] = self.unavailable
+        data["excluded"] = self.excluded
+        return data
+
+
+@dataclass(frozen=True)
+class UnavailableEntry:
+    path: str
+    language: str
+    kind: str
+    message: str
+
+    def to_json(self) -> dict[str, str]:
+        return {
+            "path": self.path, "language": self.language,
+            "kind": self.kind, "message": self.message,
         }
 
 
@@ -264,6 +283,8 @@ class ScopeSummary:
 class CompletedAnalysis:
     results: list[GuardResult]
     scope: ScopeSummary
+    unavailable: tuple[UnavailableEntry, ...] = ()
+    incomplete_guard_ids: tuple[str, ...] = ()
 
 
 def payload(
@@ -273,12 +294,28 @@ def payload(
     if isinstance(analysis, list):
         analysis = CompletedAnalysis(analysis, ScopeSummary(0, 0, 0, 0))
     results = analysis.results
+    completed_overall = aggregate_state(results)
+    incomplete = bool(analysis.unavailable)
     data = {
-        "overall": aggregate_state(results),
+        "overall": "incomplete" if incomplete else completed_overall,
         "scope": analysis.scope.to_json(),
         "requiredPolicies": required_policies(results),
         "guards": {result.guard_id: result.to_json() for result in results},
     }
+    if incomplete:
+        data = {
+            "overall": "incomplete",
+            "completedOverall": completed_overall,
+            "scope": data["scope"],
+            "unavailable": [entry.to_json() for entry in analysis.unavailable],
+            "requiredPolicies": data["requiredPolicies"],
+            "guards": data["guards"],
+        }
+        unavailable_paths = [entry.path for entry in analysis.unavailable]
+        for guard_id, guard in data["guards"].items():
+            guard["complete"] = guard_id not in analysis.incomplete_guard_ids
+            if not guard["complete"]:
+                guard["unavailablePaths"] = unavailable_paths
     if json_mode == "compact":
         for guard in data["guards"].values():
             guard["findings"] = [
@@ -321,7 +358,8 @@ def run_analysis(
     if needs_analysis:
         analysis = import_module("agent_code_guard.analysis.pipeline")
         analyzed_files.update(path for path in scope.files if analysis.is_applicable(path))
-        facts = analysis.analyze_files(scope.files)
+        batch = analysis.analyze_files_for_runner(scope.files)
+        facts = batch.facts
         if callable_size_config.enabled:
             results.append(callable_size.run(scope.root, callable_size_config, facts))
         if nesting_config.enabled:
@@ -345,9 +383,27 @@ def run_analysis(
             results.append(markdown_section_size.run(scope.root, markdown_section_config, _empty_markdown_facts()))
     selected = len(scope.files)
     analyzed = len(analyzed_files)
+    unavailable = tuple(
+        UnavailableEntry(
+            reporting_path(item.path, scope.root), item.language, item.kind, item.message,
+        )
+        for item in (batch.unavailable if needs_analysis else ())
+    )
+    incomplete_guard_ids = tuple(
+        guard_id for guard_id, enabled in (
+            ("callableSize", callable_size_config.enabled),
+            ("nesting", nesting_config.enabled),
+            ("complexity", complexity_config.enabled),
+        ) if enabled and unavailable
+    )
     return CompletedAnalysis(
         results,
-        ScopeSummary(selected, analyzed, selected - analyzed, len(scope.excluded_files)),
+        ScopeSummary(
+            selected, analyzed, selected - analyzed, len(scope.excluded_files),
+            len({entry.path for entry in unavailable}) if unavailable else None,
+        ),
+        unavailable,
+        incomplete_guard_ids,
     )
 
 
@@ -362,6 +418,8 @@ def print_text(data: dict[str, object]) -> None:
 
 
 def exit_code(overall: str, ci: bool) -> int:
+    if overall == "incomplete":
+        return 3
     if overall == "fail":
         return 2
     if overall == "review" and not ci:

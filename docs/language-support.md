@@ -59,10 +59,15 @@ documentation format, independently of syntax-language dispatch.
 ## Failure behavior
 
 Malformed applicable syntax and failures to load a required parser provider or
-grammar are fail-closed tool errors (exit `3`). Code Guard does not produce a
-partial heuristic result. Files with unsupported extensions are simply
-inapplicable to syntax or Markdown guards; other applicable guards may still
-consider them according to their own configured extension policy.
+grammar are fail-closed unavailable evidence (exit `3`). The runner records the
+affected path, embedded language, failure kind, and exact message, discards all
+syntax facts for that file, and continues independent LOC, Markdown, and other
+source-language analysis. It never manufactures partial or heuristic syntax
+metrics. Direct syntax-pipeline callers remain strict and raise the original
+error. Files with unsupported extensions are instead inapplicable to syntax or
+Markdown guards; other applicable guards may still consider them according to
+their own configured extension policy. A completed FAIL is different again: it
+is an authoritative completed guard finding, not unavailable provider evidence.
 
 Operating-system, architecture, Python-version, and native-wheel availability
 are documented separately in [Platform support](platform-support.md).

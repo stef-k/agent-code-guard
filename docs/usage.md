@@ -202,11 +202,13 @@ must not create a ratchet baseline.
 - `PASS` means no special action and exits `0`.
 - `REVIEW` means inspect findings and apply judgment; normal invocation exits `1`.
 - `FAIL` blocks normal completion and exits `2`.
-- Tool, configuration, parser/provider, or scope errors exit `3`.
+- `INCOMPLETE` retains independent completed evidence when known per-file
+  syntax/provider evidence is unavailable and exits `3`.
+- Other tool, configuration, or scope errors exit `3` without a completed report.
 
-`--ci` changes a REVIEW-only result to exit `0`. It does not suppress FAIL or
-tool errors. REVIEW is not automatic refactoring, and metrics must never be
-gamed.
+`--ci` changes a REVIEW-only result to exit `0`. It does not suppress FAIL,
+INCOMPLETE, or tool errors. REVIEW is not automatic refactoring, and metrics
+must never be gamed.
 
 ## Human and JSON output
 
@@ -253,6 +255,17 @@ Counts do not change aggregate state, findings, required policies, or exit
 codes. Tool errors retain their existing human or JSON error form and do not
 include a successful `scope` object.
 
+When a known per-file syntax or provider failure occurs, the headline is
+`INCOMPLETE`, followed by ordered unavailable context and the incomplete syntax
+guard identifiers before ordinary findings. JSON uses `overall: "incomplete"`,
+adds the authoritative completed aggregate as `completedOverall`, and includes
+ordered top-level `unavailable` records containing `path`, embedded `language`,
+`kind`, and the exact provider message. `scope.unavailable` overlaps
+`analyzed`, so `analyzed + inapplicable == selected` remains true. Every guard
+adds `complete` only on incomplete runs; incomplete syntax guards also add
+ordered `unavailablePaths`. Guard states, findings, and `requiredPolicies`
+continue to describe only completed evidence.
+
 Choose a completed-analysis serialization mode explicitly when needed:
 
 ```bash
@@ -268,6 +281,11 @@ state is `pass` and retains unchanged findings whose state is `review` or
 but their normalized state is `pass`. `debug` is an explicit name for the full
 output and is byte-for-byte identical to bare `--json` for the same completed
 analysis.
+
+For incomplete output, full and debug retain identical unavailable records;
+compact filters only ordinary passing findings and also retains those records
+unchanged. All three JSON modes, human output, normal invocation, and `--ci`
+exit `3`.
 
 Both named modes require `--json` and apply only to completed analysis output.
 They do not change analysis, scope, policies, ordering, aggregate or guard
