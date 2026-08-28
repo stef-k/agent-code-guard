@@ -4,6 +4,12 @@ Notable changes to Agent Code Guard are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- Valid C# that uses `async` as an expression identifier or named-argument name
+  now receives a narrow, coordinate-preserving parser compatibility retry while
+  unknown, ambiguous, and malformed syntax still fails closed.
+
 ## 0.2.0 - 2026-08-27
 
 ### Added

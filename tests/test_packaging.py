@@ -15,6 +15,9 @@ from agent_code_guard.code_guard import main
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CODE_GUARD = REPO_ROOT / "skills" / "code-guard" / "scripts" / "code_guard.py"
 SKILL_SOURCE = REPO_ROOT / "skills" / "code-guard"
+CSHARP_CONTEXTUAL_KEYWORD_FIXTURE = (
+    REPO_ROOT / "tests" / "fixtures" / "analyzers" / "csharp" / "ContextualKeywords.cs"
+)
 
 
 class SkillDistributionTests(unittest.TestCase):
@@ -164,19 +167,19 @@ print(json.dumps({"result": result, "loaded": loaded}))
         self.assertEqual(json.loads(lines[-1]), {"result": 0, "loaded": []})
 
     def test_installed_syntax_pipeline_loads_parser_dependency(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            path = Path(temp) / "sample.py"
-            path.write_text("def answer():\n    return 42\n", encoding="utf-8")
-            script = (
-                "import sys; from pathlib import Path; "
-                "from agent_code_guard.analysis.pipeline import analyze_files; "
-                "facts = analyze_files([Path(sys.argv[1])]); "
-                "assert [item.identity for item in facts.callables] == ['sample.answer']"
-            )
-            result = subprocess.run(
-                [sys.executable, "-c", script, str(path)], text=True, capture_output=True,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
+        script = (
+            "import sys; from pathlib import Path; "
+            "from agent_code_guard.analysis.pipeline import analyze_files; "
+            "facts = analyze_files([Path(sys.argv[1])]); "
+            "assert [item.identity for item in facts.callables] == "
+            "['Repro.Configure', 'Repro.Sync', 'Repro.Async']"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script, str(CSHARP_CONTEXTUAL_KEYWORD_FIXTURE)],
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_installed_package_exposes_production_markdown_without_research_imports(self) -> None:
         script = """

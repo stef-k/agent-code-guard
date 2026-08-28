@@ -51,6 +51,20 @@ class CSharpContextualKeywordPublicTests(CodeGuardTestCase):
                     expected_ranges,
                 )
 
+            genuine_async = root / "GenuineAsync.cs"
+            genuine_async.write_text(
+                "class Genuine { async System.Threading.Tasks.Task Run() { await Next(); } }\n",
+                encoding="utf-8",
+            )
+            genuine_result = self.run_guard(
+                root, str(genuine_async), "--config", str(config), "--json",
+            )
+            self.assertNotEqual(genuine_result.returncode, 3, genuine_result.stderr)
+            self.assertEqual(
+                [item["callable"] for item in self.read_json(genuine_result)["guards"]["complexity"]["findings"]],
+                ["Genuine.Run"],
+            )
+
 
 if __name__ == "__main__":
     import unittest

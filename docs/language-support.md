@@ -35,6 +35,21 @@ For PHP, parser-backed analysis uses one identity-mapped whole-file region, so
 facts retain their original positions in mixed-content files. The grammar's
 surrounding non-PHP markup emits no executable facts.
 
+## C# contextual keywords
+
+The upstream C# Tree-sitter grammar does not currently parse every valid use of
+`async` as a contextual identifier. When—and only when—the first C# parse has
+errors, Code Guard can retry once after replacing parser-problem `async` tokens
+used as expression identifiers or named-argument names with an equal-length
+neutral identifier. The corrected tree is accepted only when it is error-free
+and every replacement has the expected structural role; facts still use the
+original source bytes, paths, and coordinates.
+
+Unknown or ambiguous parser problems, missing or remaining syntax, and `async`
+in any other problematic role continue to fail closed with tool exit `3`.
+Already-valid C#, including genuine `async` modifiers and `await` expressions,
+uses the unchanged single parse.
+
 ## Markdown
 
 Markdown document-size and direct-section-size guards apply to `.md` files.
