@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -10,6 +11,30 @@ from agent_code_guard.analysis.provider import TreeSitterProvider
 
 
 class ProviderFailureIsolationLifecycleTests(CodeGuardTestCase):
+    def test_compact_incomplete_run_retains_loc_ratchet_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "broken.py").write_text("def broken(:\nvalue = 1\nvalue = 2\nvalue = 3\n", encoding="utf-8")
+            config = write_config(root, {"warnAt": 2, "failAt": 10, "ratchetAt": "review"})
+            baseline = root / ".agent-tools" / "code-guard.loc-baseline.json"
+            baseline.parent.mkdir()
+            baseline.write_text(json.dumps({
+                "version": 1,
+                "loc": {"files": [{"path": "broken.py", "allowedLoc": 3}]},
+            }, indent=2) + "\n", encoding="utf-8")
+            for ci in (False, True):
+                args = ("--ci",) if ci else ()
+                result = self.run_guard(
+                    root, "broken.py", "--config", str(config), *args,
+                    "--json", "--json-mode", "compact",
+                )
+                self.assertEqual(result.returncode, 3)
+                data = self.read_json(result)
+                self.assertEqual((data["overall"], data["completedOverall"]), ("incomplete", "fail"))
+                self.assertEqual(data["guards"]["loc"]["complete"], True)
+                self.assertEqual(data["requiredPolicies"], ["loc"])
+                self.assertEqual(data["guards"]["loc"]["findings"][0]["ratchetStatus"], "exceeded")
+
     def create_mixed_selection(self, root: Path) -> Path:
         (root / "valid.py").write_text(
             "def classify(value):\n"
