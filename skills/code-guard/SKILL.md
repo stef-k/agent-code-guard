@@ -15,6 +15,7 @@ Code Guard provides deterministic measurements that act as anchors for agent jud
 - `PASS` — no special action is required.
 - `REVIEW` — inspect the finding and either accept it with a meaningful justification or improve the code when doing so improves real clarity, cohesion, or boundaries.
 - `FAIL` — do not declare normal completion until the condition is fixed or an explicitly permitted/user-approved exception applies.
+- `INCOMPLETE` — known per-file syntax or provider evidence is unavailable; retain and report independent completed evidence, but do not declare normal completion.
 
 ## Universal rules
 
@@ -50,10 +51,11 @@ python3 skills/code-guard/scripts/code_guard.py . --changed-only
 ```
 
 `pyproject.toml` canonically owns the production pins. Tree-sitter remains
-dormant during LOC-only execution; failure to load a required provider or
-grammar is a deterministic tool error during normal zero-config syntax analysis.
-Disabling every syntax guard preserves the lazy no-Tree-sitter path. A strictly
-LOC-only result also requires both Markdown guards to be explicitly disabled.
+dormant during LOC-only execution. A known per-file provider, grammar, or syntax
+failure produces blocking `INCOMPLETE` output while retaining independent LOC,
+Markdown, and unaffected syntax evidence. Disabling every syntax guard preserves
+the lazy no-Tree-sitter path. A strictly LOC-only result also requires both
+Markdown guards to be explicitly disabled.
 
 Without Git, pass exactly the files you created or modified. You are
 responsible for supplying the complete edited-file set:
@@ -75,8 +77,9 @@ project exclusions. LOC `--exclude` remains LOC-specific. Explicit files may
 intentionally inspect Git-ignored or built-in-pruned artifacts, unless Code
 Guard `scope.exclude` or `--scope-exclude` removes them.
 
-Inspect every REVIEW and FAIL. When all guards return `PASS`, no detailed
-policy file needs to be loaded.
+Inspect every REVIEW and FAIL. Treat INCOMPLETE as blocking, preserve its
+completed findings, and report its unavailable paths and failure context. When
+all guards return `PASS`, no detailed policy file needs to be loaded.
 
 When a guard returns `REVIEW` or `FAIL`, read only the policy file named by that finding. The runner returns required policy identifiers/files in both human-readable and JSON output.
 
@@ -103,10 +106,10 @@ code-guard . --changed-only --ci --json --json-mode compact
 ```
 
 `--ci` makes REVIEW exit `0`, but REVIEW remains visible and requires
-judgment; FAIL remains `2` and tool errors remain `3`. Outside Git, a hook
-must supply the exact edited files. Do not install hooks, export into persistent
-skill directories, or modify persistent user or repository configuration
-without authorization.
+judgment; FAIL remains `2`, and INCOMPLETE and tool errors remain `3`. Outside
+Git, a hook must supply the exact edited files. Do not install hooks, export
+into persistent skill directories, or modify persistent user or repository
+configuration without authorization.
 
 ## Scope
 

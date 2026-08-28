@@ -25,5 +25,6 @@ Interpret results as:
 - `PASS`: no special action.
 - `REVIEW`: inspect the finding and load only the policy reference named by the guard.
 - `FAIL`: do not declare normal completion until fixed or explicitly excepted with user approval.
+- `INCOMPLETE`: preserve and report completed evidence and unavailable paths; do not declare normal completion.
 
 Never game a metric. Preserve readability and project formatting. Do not create artificial helpers, files, abstractions, dense formatting, or configuration exceptions merely to reduce a reported measurement.
