@@ -236,8 +236,8 @@ class PhpPublicComplexityTests(CodeGuardTestCase):
             self.assertEqual((first.returncode, second.returncode), (3, 3))
             payload = self.read_json(first)
             self.assertEqual(payload, self.read_json(second))
-            self.assertEqual(set(payload), {"error"})
-            self.assertIn("syntax tree contains errors", payload["error"])
+            self.assert_syntax_unavailable(first, path.name)
+            self.assertIn("syntax tree contains errors", payload["unavailable"][0]["message"])
 
     def test_below_threshold_php_complexity_requires_no_policy(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

@@ -33,13 +33,15 @@ class TreeSitterProvider:
             except (ImportError, LookupError, OSError, RuntimeError) as exc:
                 raise ProviderUnavailableError(
                     f"syntax provider unavailable for supported language {language!r}: {exc}; "
-                    "reinstall Agent Code Guard"
+                    "reinstall Agent Code Guard",
+                    language=language,
                 ) from exc
             self._parsers[language] = parser
         try:
             return parser.parse(source)
-        except Exception as exc:
+        except RuntimeError as exc:
             raise ProviderUnavailableError(
                 f"syntax provider failed for supported language {language!r}: {exc}; "
-                "verify the Agent Code Guard installation"
+                "verify the Agent Code Guard installation",
+                language=language,
             ) from exc

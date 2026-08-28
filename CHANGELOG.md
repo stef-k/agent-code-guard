@@ -6,6 +6,9 @@ Notable changes to Agent Code Guard are recorded here.
 
 ### Fixed
 
+- Known per-file syntax and provider failures now produce blocking structured
+  incomplete results while preserving independent LOC, Markdown, and unaffected
+  syntax evidence; completed output remains schema- and byte-compatible.
 - Valid C# that uses `async` as an expression identifier or named-argument name
   now receives a narrow, coordinate-preserving parser compatibility retry while
   unknown, ambiguous, and malformed syntax still fails closed.

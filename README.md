@@ -136,12 +136,14 @@ hook-assisted process.
   warranted; normally exit `1`.
 - **Completed FAIL** — blocks normal completion until fixed or an explicitly
   authorized exception applies; exit `2` with a completed report on stdout.
+- **INCOMPLETE** — one or more requested syntax analyses are unavailable;
+  independent completed findings remain authoritative, but the run exits `3`.
 - An argparse usage or invalid-choice error exits `2`, writes usage/error text
   to stderr, and produces no completed report.
-- Other Code Guard tool, configuration, scope, or provider errors exit `3`.
+- Other Code Guard tool, configuration, scope, or unexpected errors exit `3`.
 
 `--ci` makes REVIEW nonblocking at the process level by changing its exit to
-`0`; it does not hide the findings or change FAIL and tool-error exits.
+`0`; it does not hide findings or change FAIL, INCOMPLETE, and tool-error exits.
 
 **Never game a metric.** Do not create artificial helpers, files,
 abstractions, formatting, exclusions, or policy changes merely to lower a
@@ -173,6 +175,12 @@ result, scope, required policies, guards, ordering, and actionable findings.
 Named modes require `--json`. See [Usage](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md) for the schema and
 option contract.
 
+Known per-file syntax or provider failures instead produce `overall:
+"incomplete"`, ordered structured `unavailable` records, and completed guard
+evidence. Syntax guards identify unavailable paths; LOC and Markdown remain
+complete. Full, debug, and compact JSON retain unavailable records unchanged,
+and completed runs retain their existing schema.
+
 ### Common scope commands
 
 ```bash
@@ -198,7 +206,8 @@ Markdown guards apply to `.md` files.
 Generic `.h` files are not syntax-dispatched; `.markdown` is not enabled; Vue
 template and style regions are not executable syntax input; and unsupported
 artifacts are inapplicable. Malformed applicable syntax or a required provider
-failure is a fail-closed tool error. See [Language support](https://github.com/stef-k/agent-code-guard/blob/main/docs/language-support.md).
+failure is unavailable evidence, distinct from both an inapplicable file and a
+completed FAIL finding. See [Language support](https://github.com/stef-k/agent-code-guard/blob/main/docs/language-support.md).
 
 ### Skill integration
 

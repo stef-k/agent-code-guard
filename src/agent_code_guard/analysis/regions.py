@@ -65,7 +65,9 @@ def executable_regions(path: Path, provider: ParserProvider) -> tuple[Executable
 def _vue_regions(path: Path, source: bytes, provider: ParserProvider) -> tuple[ExecutableRegion, ...]:
     root = provider.parse("vue", source).root_node
     if root.has_error:
-        raise SyntaxAnalysisError(f"unable to parse {path}: Vue container syntax tree contains errors")
+        raise SyntaxAnalysisError(
+            f"unable to parse {path}: Vue container syntax tree contains errors", language="vue",
+        )
     regions: list[ExecutableRegion] = []
     for element in root.named_children:
         if element.type != "script_element":
@@ -73,7 +75,9 @@ def _vue_regions(path: Path, source: bytes, provider: ParserProvider) -> tuple[E
         start_tag = next(child for child in element.named_children if child.type == "start_tag")
         attributes = _attributes(start_tag, source)
         if "src" in attributes:
-            raise SyntaxAnalysisError(f"unable to analyze {path}: external Vue script regions are unsupported")
+            raise SyntaxAnalysisError(
+                f"unable to analyze {path}: external Vue script regions are unsupported", language="vue",
+            )
         language = _script_language(path, attributes.get("lang"))
         raw_text = next((child for child in element.named_children if child.type == "raw_text"), None)
         if raw_text is not None:
@@ -106,4 +110,6 @@ def _script_language(path: Path, value: str | None) -> str:
         return "javascript"
     if value in {"ts", "typescript"}:
         return "typescript"
-    raise SyntaxAnalysisError(f"unable to analyze {path}: unsupported Vue script language: {value}")
+    raise SyntaxAnalysisError(
+        f"unable to analyze {path}: unsupported Vue script language: {value}", language="vue",
+    )

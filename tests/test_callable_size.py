@@ -11,6 +11,7 @@ from unittest.mock import patch
 from helpers import CodeGuardTestCase, write_config
 
 from agent_code_guard.analysis import analyze_files
+from agent_code_guard.analysis.pipeline import analyze_files_for_runner
 from agent_code_guard.code_guard import run_guards
 from agent_code_guard.file_selection import ResolvedScope
 from agent_code_guard.guards import callable_size
@@ -153,7 +154,10 @@ class CallableSizeOrchestrationTests(unittest.TestCase):
                 "cyclomaticComplexity": {"enabled": False},
             })
             enabled_args = SimpleNamespace(**vars(args(config)), warn=None, fail=None, include=[], exclude=[], count_blank_lines=False, ignore_comment_lines=False)
-            with patch("agent_code_guard.analysis.pipeline.analyze_files", wraps=analyze_files) as analyze:
+            with patch(
+                "agent_code_guard.analysis.pipeline.analyze_files_for_runner",
+                wraps=analyze_files_for_runner,
+            ) as analyze:
                 results = run_guards(scope, enabled_args)
                 self.assertEqual(analyze.call_count, 1)
                 self.assertIn("callableSize", [result.guard_id for result in results])
@@ -220,8 +224,8 @@ class CallableSizeRunnerTests(CodeGuardTestCase):
             source.write_text("def broken(:\n    pass\n", encoding="utf-8")
             config = write_config(root, {"enabled": False}, guards={"callableSize": {"enabled": True, "reviewAt": 80}})
             result = self.run_guard(root, str(source), "--config", str(config), "--json")
-            self.assertEqual(result.returncode, 3)
-            self.assertIn("syntax tree contains errors", self.read_json(result)["error"])
+            self.assert_syntax_unavailable(result, "broken.py")
+            self.assertIn("syntax tree contains errors", self.read_json(result)["unavailable"][0]["message"])
 
 
 if __name__ == "__main__":

@@ -275,8 +275,7 @@ class PatternGuardPublicTests(CodeGuardTestCase):
             for name, source in sources.items():
                 with self.subTest(name=name):
                     result = self.run_guard(root, str(write_source(root, name, source)), "--json")
-                    self.assertEqual(result.returncode, 3)
-                    self.assertEqual(set(self.read_json(result)), {"error"})
+                    self.assert_syntax_unavailable(result, name)
 
 
 if __name__ == "__main__":

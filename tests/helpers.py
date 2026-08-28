@@ -51,3 +51,11 @@ class CodeGuardTestCase(unittest.TestCase):
 
     def findings(self, result: subprocess.CompletedProcess[str]) -> list[dict[str, object]]:
         return self.read_json(result)["guards"]["loc"]["findings"]
+
+    def assert_syntax_unavailable(self, result: subprocess.CompletedProcess[str], path: str) -> None:
+        data = self.read_json(result)
+        self.assertEqual(result.returncode, 3)
+        self.assertEqual(data["overall"], "incomplete")
+        self.assertEqual(data["scope"]["unavailable"], 1)
+        self.assertEqual(data["unavailable"][0]["path"], path)
+        self.assertEqual(data["unavailable"][0]["kind"], "syntax")

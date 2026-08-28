@@ -224,8 +224,8 @@ class DartNamedConstructorPublicTests(CodeGuardTestCase):
             root = Path(temp)
             (root / "broken.dart").write_text("class C { C.named( { }", encoding="utf-8")
             result = self.run_guard(root, "broken.dart", "--json")
-            self.assertEqual(result.returncode, 3)
-            self.assertIn("syntax tree contains errors", self.read_json(result)["error"])
+            self.assert_syntax_unavailable(result, "broken.dart")
+            self.assertIn("syntax tree contains errors", self.read_json(result)["unavailable"][0]["message"])
 
 
 if __name__ == "__main__":

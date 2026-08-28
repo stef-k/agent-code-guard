@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
-import io
 import json
 import os
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,8 +11,8 @@ from unittest.mock import patch
 from helpers import CodeGuardTestCase, write_config
 
 from agent_code_guard.analysis import analyze_files
-from agent_code_guard.analysis.errors import ProviderUnavailableError
-from agent_code_guard.code_guard import main, run_guards
+from agent_code_guard.analysis.pipeline import analyze_files_for_runner
+from agent_code_guard.code_guard import run_guards
 from agent_code_guard.file_selection import ResolvedScope
 from agent_code_guard.guards import nesting
 
@@ -194,7 +191,8 @@ class NestingOrchestrationTests(unittest.TestCase):
             for guards, expected_calls, expected_ids in configurations:
                 config = write_config(root, {"enabled": False}, guards=guards)
                 with self.subTest(guards=guards), patch(
-                    "agent_code_guard.analysis.pipeline.analyze_files", wraps=analyze_files
+                    "agent_code_guard.analysis.pipeline.analyze_files_for_runner",
+                    wraps=analyze_files_for_runner,
                 ) as analyze:
                     results = run_guards(scope, args(config))
                     self.assertEqual(analyze.call_count, expected_calls)
@@ -214,33 +212,6 @@ class NestingOrchestrationTests(unittest.TestCase):
                 results = run_guards(scope, args(config))
                 loader.assert_not_called()
                 self.assertEqual([result.guard_id for result in results], ["loc"])
-
-    def test_missing_provider_propagates_as_tool_error(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            source = root / "sample.py"
-            source.write_text("def sample():\n    pass\n", encoding="utf-8")
-            scope = ResolvedScope(root, (source,))
-            config = write_config(root, {"enabled": False}, guards={"nesting": {"enabled": True, "reviewAt": 4}})
-            with patch(
-                "agent_code_guard.analysis.pipeline.analyze_files",
-                side_effect=ProviderUnavailableError("provider unavailable"),
-            ), self.assertRaisesRegex(ProviderUnavailableError, "provider unavailable"):
-                run_guards(scope, args(config))
-
-    def test_default_provider_failure_is_cli_exit_three(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            source = Path(temp) / "sample.py"
-            source.write_text("def sample():\n    pass\n", encoding="utf-8")
-            output = io.StringIO()
-            with patch.object(sys, "argv", ["code-guard", str(source), "--json"]), patch(
-                "agent_code_guard.analysis.pipeline.analyze_files",
-                side_effect=ProviderUnavailableError("provider unavailable"),
-            ), redirect_stdout(output):
-                result = main()
-            self.assertEqual(result, 3)
-            self.assertEqual(json.loads(output.getvalue()), {"error": "provider unavailable"})
-
 
 class NestingRunnerTests(CodeGuardTestCase):
     def test_review_ci_json_shape_human_output_and_external_path(self) -> None:
@@ -319,8 +290,8 @@ class NestingRunnerTests(CodeGuardTestCase):
             source.write_text("def broken(:\n    pass\n", encoding="utf-8")
             enabled = write_config(root, {"enabled": False}, guards={"nesting": {"enabled": True, "reviewAt": 4}})
             result = self.run_guard(root, str(source), "--config", str(enabled), "--json")
-            self.assertEqual(result.returncode, 3)
-            self.assertIn("syntax tree contains errors", self.read_json(result)["error"])
+            self.assert_syntax_unavailable(result, "broken.py")
+            self.assertIn("syntax tree contains errors", self.read_json(result)["unavailable"][0]["message"])
 
             disabled = write_config(root, {"enabled": True, "warnAt": 10, "failAt": 20}, guards={
                 "callableSize": {"enabled": False}, "nesting": {"enabled": False}, "cyclomaticComplexity": {"enabled": False},
