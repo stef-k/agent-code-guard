@@ -169,7 +169,10 @@ class DoctorTests(unittest.TestCase):
             self.assertEqual(entry["status"], "unavailable")
 
         healthy = {"status": "healthy"}
-        forbidden = ["validate_configuration", "resolve_scope", "run_analysis", "installed_skill_path", "export_skill"]
+        forbidden = [
+            "load_configuration", "validate_configuration", "resolve_invocation",
+            "run_analysis", "installed_skill_path", "export_skill",
+        ]
         with ExitStack() as stack:
             mocks = [stack.enter_context(patch.object(code_guard, name)) for name in forbidden]
             stack.enter_context(patch.object(code_guard, "gather_doctor_report", return_value=healthy))
@@ -177,7 +180,7 @@ class DoctorTests(unittest.TestCase):
             for mocked in mocks:
                 mocked.assert_not_called()
 
-        with patch.object(code_guard, "resolve_scope", side_effect=RuntimeError("qualified path analyzed")) as resolve:
+        with patch.object(code_guard, "resolve_invocation", side_effect=RuntimeError("qualified path analyzed")) as resolve:
             self.assertEqual(self.run_main("./doctor")[0], 3)
             resolve.assert_called_once()
         self.assertEqual(self.run_main("doctor", "extra.py")[0], 3)

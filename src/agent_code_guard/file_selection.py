@@ -50,7 +50,7 @@ def find_repo_root(start: Path) -> Path | None:
             ["git", "rev-parse", "--show-toplevel"], cwd=start, check=True,
             text=True, capture_output=True,
         )
-        return Path(result.stdout.strip()).resolve()
+        return _canonicalize(Path(result.stdout.strip()))
     except Exception:
         return None
 
@@ -62,7 +62,7 @@ def resolve_scope(args: SelectionArgs, start: Path) -> ResolvedScope:
 
 
 def _resolve_scope(args: SelectionArgs, start: Path, configuration: JsonObject) -> ResolvedScope:
-    working_root = start.resolve()
+    working_root = _canonicalize(start)
     git_root = find_repo_root(working_root)
     root = git_root or working_root
     validate_selection_args(args, git_root)
@@ -77,7 +77,7 @@ def _resolve_scope(args: SelectionArgs, start: Path, configuration: JsonObject) 
     else:
         files = existing_files(expand_paths(paths, git_root))
 
-    normalized = tuple(dict.fromkeys(path.resolve() for path in files))
+    normalized = tuple(dict.fromkeys(_canonicalize(path) for path in files))
     exclusions = load_scope_exclusions(args, configuration)
     identities = tuple((path, _reporting_path(path, root)) for path in normalized)
     excluded = tuple(
@@ -107,6 +107,11 @@ def resolve_explicit_paths(values: list[str], working_root: Path) -> list[Path]:
             f"explicit directory symlink is not recursively traversed: {directory_links[0]}"
         )
     return paths
+
+
+def _canonicalize(path: Path) -> Path:
+    """Owned filesystem identity seam; never call it from guard loops."""
+    return path.resolve()
 
 
 def bound_git_candidates(candidates: list[Path], bounds: list[Path]) -> list[Path]:
