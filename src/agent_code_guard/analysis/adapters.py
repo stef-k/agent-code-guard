@@ -116,11 +116,11 @@ def _range_end_node(node, language: str):
 
 def _callable_range(node, region: ExecutableRegion) -> SourceRange:
     """Snapshot provider points once before mapping them to original source."""
-    start_row, start_column = callable_source_start(node, region.language).start_point
-    end_row, end_column = _range_end_node(node, region.language).end_point
+    start = callable_source_start(node, region.language)
+    end = _range_end_node(node, region.language)
     return SourceRange(
-        region.original_point(start_row, start_column),
-        region.original_point(end_row, end_column),
+        region.original_point_at_byte(start.start_byte),
+        region.original_point_at_byte(end.end_byte),
     )
 
 

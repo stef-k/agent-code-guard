@@ -6,7 +6,8 @@ from pathlib import Path
 
 from helpers import CodeGuardTestCase, write_config
 
-from agent_code_guard.analysis import SyntaxAnalysisError, analyze_files
+from agent_code_guard.analysis import SyntaxAnalysisError
+from helpers import analyze_source_paths as analyze_files
 
 
 def write_source(root: Path, source: str, name: str = "audit.go") -> Path:

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import argparse
-import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from ..result_model import Finding, GuardResult
-from ..path_matching import matches_path_glob, relative_or_absolute_path
+from ..invocation import JsonObject, SelectedFile, configuration_for_guard
+from ..path_matching import matches_path_glob
 
 DEFAULT_WARN_AT = 400
 DEFAULT_FAIL_AT = 600
@@ -67,25 +68,15 @@ class Config:
     ratchet_at: str = "fail"
 
 
-def load_config(args: argparse.Namespace) -> Config:
-    document: dict[str, Any] = {}
-    config_path = args.config
-    if config_path:
-        path = Path(config_path)
-        if not path.exists():
-            raise FileNotFoundError(f"config file not found: {config_path}")
-        document = json.loads(path.read_text(encoding="utf-8"))
-    else:
-        auto = Path(".agent-tools/code-guard.config.json")
-        if auto.exists():
-            document = json.loads(auto.read_text(encoding="utf-8"))
-    if not isinstance(document, dict):
+def load_config(args: argparse.Namespace, document: JsonObject | None = None) -> Config:
+    document = configuration_for_guard(args, document)
+    if not isinstance(document, Mapping):
         raise ValueError("configuration must be an object")
     guards = document.get("guards", {})
-    if not isinstance(guards, dict):
+    if not isinstance(guards, Mapping):
         raise ValueError("guards must be an object")
     data = guards.get("loc", {})
-    if not isinstance(data, dict):
+    if not isinstance(data, Mapping):
         raise ValueError("guards.loc must be an object")
     enabled = data.get("enabled", True)
     if not isinstance(enabled, bool):
@@ -101,12 +92,12 @@ def load_config(args: argparse.Namespace) -> Config:
     if warn_at >= fail_at:
         raise ValueError("guards.loc.warnAt must be lower than guards.loc.failAt")
     extensions = data.get("includeExtensions", list(DEFAULT_INCLUDE_EXTENSIONS))
-    if not isinstance(extensions, list) or any(not isinstance(value, str) for value in extensions):
+    if not _is_array(extensions) or any(not isinstance(value, str) for value in extensions):
         raise ValueError("guards.loc.includeExtensions must be an array of strings")
     include_extensions = {normalise_extension(value) for value in extensions}
     include_extensions.update(normalise_extension(value) for value in args.include)
     exclude = data.get("exclude", DEFAULT_EXCLUDES)
-    if not isinstance(exclude, list) or any(not isinstance(value, str) for value in exclude):
+    if not _is_array(exclude) or any(not isinstance(value, str) for value in exclude):
         raise ValueError("guards.loc.exclude must be an array of strings")
     exclude = list(exclude) + args.exclude
     count_blank = data.get("countBlankLines", False)
@@ -123,12 +114,12 @@ def load_config(args: argparse.Namespace) -> Config:
 
 
 def parse_allowed_large_files(value: Any) -> list[AllowedLargeFile]:
-    if not isinstance(value, list):
+    if not _is_array(value):
         raise ValueError("guards.loc.allowedLargeFiles must be an array")
     allowed = []
     for index, item in enumerate(value):
         location = f"guards.loc.allowedLargeFiles[{index}]"
-        if not isinstance(item, dict):
+        if not isinstance(item, Mapping):
             raise ValueError(f"{location} must be an object")
         path = item.get("path")
         reason = item.get("reason")
@@ -141,15 +132,15 @@ def parse_allowed_large_files(value: Any) -> list[AllowedLargeFile]:
 
 
 def parse_overrides(value: Any) -> list[ThresholdOverride]:
-    if not isinstance(value, list):
+    if not _is_array(value):
         raise ValueError("guards.loc.overrides must be an array")
     overrides = []
     for index, item in enumerate(value):
         location = f"guards.loc.overrides[{index}]"
-        if not isinstance(item, dict):
+        if not isinstance(item, Mapping):
             raise ValueError(f"{location} must be an object")
         patterns = item.get("match")
-        if not isinstance(patterns, list) or not patterns or any(
+        if not _is_array(patterns) or not patterns or any(
             not isinstance(pattern, str) or not pattern.strip() for pattern in patterns
         ):
             raise ValueError(f"{location}.match must be a non-empty array of non-empty strings")
@@ -173,15 +164,15 @@ def normalise_extension(value: str) -> str:
 
 
 def run(
-    root: Path, config: Config, selected_files: tuple[Path, ...],
+    root: Path, config: Config, selected_files: tuple[SelectedFile, ...],
     baseline: dict[str, int] | None = None,
 ) -> GuardResult:
     if not config.enabled:
         return GuardResult("loc", "pass", [])
-    files = [path for path in selected_files if should_include(path, config, root)]
+    files = [selected for selected in selected_files if should_include(selected, config)]
     findings = [
-        evaluate(path, config, root, baseline)
-        for path in sorted(set(files), key=lambda p: relative_path(p, root))
+        evaluate(selected, config, baseline)
+        for selected in sorted(set(files), key=lambda item: item.reporting_path)
     ]
     state = "fail" if any(item.state == "fail" for item in findings) else (
         "review" if any(item.state == "review" for item in findings) else "pass"
@@ -189,17 +180,17 @@ def run(
     return GuardResult("loc", state, findings)
 
 
-def should_include(path: Path, config: Config, root: Path) -> bool:
-    return path.suffix in config.include_extensions and not any(
-        matches_path_glob(relative_path(path, root), pattern) for pattern in config.exclude
+def should_include(selected: SelectedFile, config: Config) -> bool:
+    return selected.physical_path.suffix in config.include_extensions and not any(
+        matches_path_glob(selected.reporting_path, pattern) for pattern in config.exclude
     )
 
 
 def evaluate(
-    path: Path, config: Config, root: Path, baseline: dict[str, int] | None = None,
+    selected: SelectedFile, config: Config, baseline: dict[str, int] | None = None,
 ) -> Finding:
-    rel = relative_path(path, root)
-    counted = count_loc(path, config)
+    rel = selected.reporting_path
+    counted = count_loc(selected.physical_path, config)
     warn_at, fail_at, override_index = effective_thresholds(rel, config)
     allowed = next((item for item in config.allowed_large_files if matches_path_glob(rel, item.path)), None)
     baseline_loc = baseline.get(rel) if baseline is not None else None
@@ -272,5 +263,5 @@ def effective_thresholds(rel: str, config: Config) -> tuple[int, int, int | None
     return override.warn_at, override.fail_at, index
 
 
-def relative_path(path: Path, root: Path) -> str:
-    return relative_or_absolute_path(path, root)
+def _is_array(value: Any) -> bool:
+    return isinstance(value, Sequence) and not isinstance(value, (str, bytes))

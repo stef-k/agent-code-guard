@@ -10,6 +10,7 @@ from pathlib import Path
 
 from agent_code_guard.analysis import analyze_files, is_applicable
 from agent_code_guard.file_selection import resolve_scope
+from agent_code_guard.invocation import SelectedFile
 from agent_code_guard.guards.nesting import _maximum_depth
 from research.complexity_sample import _Selection, _excluded, _nearest_rank
 
@@ -77,7 +78,8 @@ def _metric_summary(rows: list[dict], metric: str, candidates: tuple[int, ...]) 
 def measure(paths: list[str], start: Path, excludes: tuple[str, ...], candidates: dict[str, tuple[int, ...]]) -> dict:
     scope = resolve_scope(_Selection(paths), start)
     files = tuple(path for path in scope.files if is_applicable(path) and not _excluded(path, scope.root, excludes))
-    result = summarize(analyze_files(files), scope.root, candidates)
+    selected = tuple(SelectedFile(path.relative_to(scope.root).as_posix(), path) for path in files)
+    result = summarize(analyze_files(selected), scope.root, candidates)
     return {"root": str(scope.root), **result}
 
 

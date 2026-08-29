@@ -10,7 +10,8 @@ from unittest.mock import patch
 from agent_code_guard.code_guard import run_guards
 from agent_code_guard.file_selection import ResolvedScope
 from agent_code_guard.guards import markdown_document_size, markdown_section_size
-from agent_code_guard.markdown import analyze_files, scan_text
+from agent_code_guard.markdown import analyze_files as production_analyze_files, scan_text
+from helpers import analyze_markdown_paths as analyze_files
 
 from helpers import CodeGuardTestCase, write_config, write_lines
 
@@ -205,7 +206,7 @@ class MarkdownRunnerTests(CodeGuardTestCase):
                     "callableSize": {"enabled": False}, "nesting": {"enabled": False},
                     "cyclomaticComplexity": {"enabled": False}, **guards,
                 })
-                with self.subTest(guards=guards), patch("agent_code_guard.markdown.analyze_files", wraps=analyze_files) as scan:
+                with self.subTest(guards=guards), patch("agent_code_guard.markdown.analyze_files", wraps=production_analyze_files) as scan:
                     run_guards(scope, args(config))
                     self.assertEqual(scan.call_count, expected)
 
@@ -213,7 +214,7 @@ class MarkdownRunnerTests(CodeGuardTestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp); source = root / "sample.py"; source.write_text("value = 1\n", encoding="utf-8")
             markdown = root / "notes.md"; markdown.write_text("# Notes\n", encoding="utf-8")
-            with patch("agent_code_guard.markdown.analyze_files", wraps=analyze_files) as scan:
+            with patch("agent_code_guard.markdown.analyze_files", wraps=production_analyze_files) as scan:
                 run_guards(ResolvedScope(root, (source,)), args())
                 self.assertEqual(scan.call_count, 0)
             config = write_config(root, {"enabled": False}, guards={

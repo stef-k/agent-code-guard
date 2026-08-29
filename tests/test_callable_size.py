@@ -8,10 +8,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from helpers import CodeGuardTestCase, write_config
+from helpers import CodeGuardTestCase, analyze_source_paths as analyze_files, analyze_source_paths_for_runner, write_config
+from agent_code_guard.analysis.pipeline import analyze_files_for_runner as production_analyze_files_for_runner
 
-from agent_code_guard.analysis import analyze_files
-from agent_code_guard.analysis.pipeline import analyze_files_for_runner
+analyze_files_for_runner = analyze_source_paths_for_runner
 from agent_code_guard.code_guard import run_guards
 from agent_code_guard.file_selection import ResolvedScope
 from agent_code_guard.guards import callable_size
@@ -156,7 +156,7 @@ class CallableSizeOrchestrationTests(unittest.TestCase):
             enabled_args = SimpleNamespace(**vars(args(config)), warn=None, fail=None, include=[], exclude=[], count_blank_lines=False, ignore_comment_lines=False)
             with patch(
                 "agent_code_guard.analysis.pipeline.analyze_files_for_runner",
-                wraps=analyze_files_for_runner,
+                wraps=production_analyze_files_for_runner,
             ) as analyze:
                 results = run_guards(scope, enabled_args)
                 self.assertEqual(analyze.call_count, 1)

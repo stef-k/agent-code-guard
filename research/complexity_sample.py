@@ -12,6 +12,7 @@ from pathlib import Path
 
 from agent_code_guard.analysis import analyze_files, is_applicable
 from agent_code_guard.file_selection import resolve_scope
+from agent_code_guard.invocation import SelectedFile
 
 
 @dataclass(frozen=True)
@@ -31,7 +32,9 @@ def measure(
     """Resolve explicit scope and aggregate existing production facts."""
     scope = resolve_scope(_Selection(paths), start)
     files = tuple(path for path in scope.files if is_applicable(path) and not _excluded(path, scope.root, excludes))
-    facts = analyze_files(files)
+    facts = analyze_files(tuple(
+        SelectedFile(path.relative_to(scope.root).as_posix(), path) for path in files
+    ))
     decisions = defaultdict(Counter)
     for decision in facts.decisions:
         if decision.category in excluded_decisions:

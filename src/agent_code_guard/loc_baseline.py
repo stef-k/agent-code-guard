@@ -10,6 +10,7 @@ from typing import Any
 
 from .file_selection import is_within
 from .guards import loc
+from .invocation import SelectedFile
 from .path_matching import matches_path_glob
 
 RELATIVE_PATH = ".agent-tools/code-guard.loc-baseline.json"
@@ -120,9 +121,10 @@ def create(root: Path, files: tuple[Path, ...], config: loc.Config) -> int:
     entries: dict[str, int] = {}
     for path in files:
         _require_regular_inside(path, root)
-        if not loc.should_include(path, config, root):
+        selected = _selected(path, root)
+        if not loc.should_include(selected, config):
             continue
-        relative = loc.relative_path(path, root)
+        relative = selected.reporting_path
         if any(matches_path_glob(relative, item.path) for item in config.allowed_large_files):
             continue
         counted = loc.count_loc(path, config)
@@ -170,7 +172,7 @@ def update(
             removed += 1
             continue
         _require_regular_inside(path, root)
-        if path.resolve() in excluded or not loc.should_include(path, config, root):
+        if path.resolve() in excluded or not loc.should_include(_selected(path, root), config):
             proposed.pop(relative)
             removed += 1
             continue
@@ -193,6 +195,11 @@ def update(
     if content != target.read_bytes():
         _atomic_replace(target, content)
     return lowered, removed, unchanged
+
+
+def _selected(path: Path, root: Path) -> SelectedFile:
+    canonical = path.resolve()
+    return SelectedFile(canonical.relative_to(root).as_posix(), canonical)
 
 
 def serialize(entries: dict[str, int]) -> bytes:

@@ -170,7 +170,8 @@ print(json.dumps({"result": result, "loaded": loaded}))
         script = (
             "import sys; from pathlib import Path; "
             "from agent_code_guard.analysis.pipeline import analyze_files; "
-            "facts = analyze_files([Path(sys.argv[1])]); "
+            "from agent_code_guard.invocation import SelectedFile; "
+            "path = Path(sys.argv[1]); facts = analyze_files([SelectedFile(path.name, path)]); "
             "assert [item.identity for item in facts.callables] == "
             "['Repro.Configure', 'Repro.Sync', 'Repro.Async']"
         )
@@ -188,7 +189,9 @@ import sys
 from pathlib import Path
 from agent_code_guard.guards import markdown_document_size, markdown_section_size
 from agent_code_guard.markdown import analyze_files
-facts = analyze_files([Path(sys.argv[1])])
+from agent_code_guard.invocation import SelectedFile
+path = Path(sys.argv[1])
+facts = analyze_files((SelectedFile(path.name, path),))
 print(json.dumps({"lines": facts.documents[0].physical_lines,
                   "research": sorted(name for name in sys.modules if name.startswith("research"))}))
 """
