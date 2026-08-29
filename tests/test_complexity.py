@@ -9,7 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from agent_code_guard.analysis.facts import AnalysisFacts, CallableFact, CallableKey, DecisionFact, FileFacts, SourcePoint, SourceRange
-from agent_code_guard.analysis import analyze_files
+from helpers import analyze_source_paths as analyze_files
 from agent_code_guard.code_guard import payload, print_text
 from agent_code_guard.guards import complexity
 from agent_code_guard.result_model import GuardResult

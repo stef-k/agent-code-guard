@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -24,15 +25,15 @@ class Config:
 
 def load_config(args: argparse.Namespace, document: JsonObject | None = None) -> Config:
     document = configuration_for_guard(args, document)
-    if not isinstance(document, dict):
+    if not isinstance(document, Mapping):
         raise ValueError("configuration must be an object")
     guards = document.get("guards", {})
-    if not isinstance(guards, dict):
+    if not isinstance(guards, Mapping):
         raise ValueError("guards must be an object")
     data = guards.get("nesting")
     if data is None:
         return Config(True, DEFAULT_REVIEW_AT)
-    if not isinstance(data, dict):
+    if not isinstance(data, Mapping):
         raise ValueError("guards.nesting must be an object")
     enabled = data.get("enabled", True)
     if not isinstance(enabled, bool):

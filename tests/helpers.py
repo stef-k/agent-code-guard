@@ -1,10 +1,41 @@
 from __future__ import annotations
 
 import json
+import dataclasses
 import subprocess
 import sys
 import unittest
 from pathlib import Path
+
+from agent_code_guard.invocation import SelectedFile
+
+
+def selected_files(paths) -> tuple[SelectedFile, ...]:
+    return tuple(SelectedFile(Path(path).as_posix(), Path(path)) for path in paths)
+
+
+def analyze_source_paths(paths, provider=None):
+    """Adapt direct test paths without adding a second production API."""
+    from agent_code_guard.analysis.pipeline import analyze_files
+    facts = analyze_files(selected_files(paths), provider)
+    return dataclasses.replace(
+        facts,
+        files=tuple(dataclasses.replace(file, reporting_path=None) for file in facts.files),
+    )
+
+
+def analyze_source_paths_for_runner(paths, provider=None):
+    from agent_code_guard.analysis.pipeline import analyze_files_for_runner
+    return analyze_files_for_runner(selected_files(paths), provider)
+
+
+def analyze_markdown_paths(paths):
+    from agent_code_guard.markdown import analyze_files
+    facts = analyze_files(selected_files(paths))
+    return dataclasses.replace(
+        facts,
+        documents=tuple(dataclasses.replace(document, reporting_path=None) for document in facts.documents),
+    )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CODE_GUARD = REPO_ROOT / "skills" / "code-guard" / "scripts" / "code_guard.py"

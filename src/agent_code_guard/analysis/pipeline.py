@@ -15,10 +15,13 @@ from .provider import ParserProvider, TreeSitterProvider
 from .regions import executable_regions, is_applicable
 
 
-def analyze_files(files: tuple[Path, ...] | list[Path], provider: ParserProvider | None = None) -> AnalysisFacts:
+def analyze_files(files: tuple[SelectedFile, ...] | list[SelectedFile], provider: ParserProvider | None = None) -> AnalysisFacts:
     """Analyze only applicable entries from the already-resolved caller scope."""
     active_provider = provider or TreeSitterProvider()
-    results = [_analyze_file(Path(path), active_provider) for path in files if is_applicable(Path(path))]
+    results = [
+        _analyze_file(selected.physical_path, active_provider, selected.reporting_path)
+        for selected in files if is_applicable(selected.physical_path)
+    ]
     return AnalysisFacts(tuple(results))
 
 
@@ -38,20 +41,18 @@ class BatchAnalysis:
 
 
 def analyze_files_for_runner(
-    files: tuple[SelectedFile, ...] | tuple[Path, ...] | list[Path], provider: ParserProvider | None = None,
+    files: tuple[SelectedFile, ...], provider: ParserProvider | None = None,
 ) -> BatchAnalysis:
     """Analyze selected files independently while retaining only known unavailable evidence."""
     active_provider = provider or TreeSitterProvider()
     results: list[FileFacts] = []
     unavailable: list[UnavailableAnalysis] = []
-    for value in files:
-        selected = value if isinstance(value, SelectedFile) else SelectedFile(value.as_posix(), value)
-        reporting_path = selected.reporting_path if isinstance(value, SelectedFile) else None
+    for selected in files:
         path = selected.physical_path
         if not is_applicable(path):
             continue
         try:
-            results.append(_analyze_file(path, active_provider, reporting_path))
+            results.append(_analyze_file(path, active_provider, selected.reporting_path))
         except (SyntaxAnalysisError, ProviderUnavailableError) as exc:
             if exc.language is None:
                 raise

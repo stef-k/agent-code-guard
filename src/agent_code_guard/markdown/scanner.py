@@ -30,23 +30,18 @@ class _Fence:
     length: int
 
 
-def analyze_files(files: tuple[SelectedFile, ...] | tuple[Path, ...] | list[Path]) -> MarkdownFacts:
-    identities = tuple(
-        (value, value.reporting_path) if isinstance(value, SelectedFile)
-        else (SelectedFile(value.as_posix(), value), None)
-        for value in files
-    )
+def analyze_files(files: tuple[SelectedFile, ...]) -> MarkdownFacts:
     applicable = sorted(
-        ((selected, report) for selected, report in identities if selected.physical_path.suffix.lower() == ".md"),
-        key=lambda item: item[0].physical_path.as_posix(),
+        (selected for selected in files if selected.physical_path.suffix.lower() == ".md"),
+        key=lambda selected: selected.reporting_path,
     )
     return MarkdownFacts(tuple(
         scan_text(
             selected.physical_path,
             selected.physical_path.read_text(encoding="utf-8"),
-            report,
+            selected.reporting_path,
         )
-        for selected, report in applicable
+        for selected in applicable
     ))
 
 

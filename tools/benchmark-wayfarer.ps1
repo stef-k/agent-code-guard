@@ -22,10 +22,22 @@ $before = (& git -C $target status --porcelain=v1 --untracked-files=all) -join "
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 
 $base = Get-Content -LiteralPath $config -Raw | ConvertFrom-Json -AsHashtable
+$guardNames = @("loc", "callableSize", "nesting", "cyclomaticComplexity", "markdownDocumentSize", "markdownSectionSize")
+if ($base -isnot [hashtable] -or $base.guards -isnot [hashtable]) {
+    throw "Normal benchmark configuration must contain a guards object."
+}
+$configuredGuardNames = @($base.guards.Keys | Sort-Object)
+if (Compare-Object -ReferenceObject @($guardNames | Sort-Object) -DifferenceObject $configuredGuardNames) {
+    throw "Normal benchmark configuration must contain exactly the six shipped guard sections."
+}
+foreach ($guard in $guardNames) {
+    if ($base.guards[$guard] -isnot [hashtable] -or $base.guards[$guard].enabled -ne $true) {
+        throw "Normal benchmark configuration must explicitly enable guards.$guard."
+    }
+}
 function New-Variant([string]$name, [hashtable]$enabled) {
     $copy = $base | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
-    foreach ($guard in @("loc", "callableSize", "nesting", "cyclomaticComplexity", "markdownDocumentSize", "markdownSectionSize")) {
-        if (-not $copy.guards.ContainsKey($guard)) { $copy.guards[$guard] = @{} }
+    foreach ($guard in $guardNames) {
         $copy.guards[$guard].enabled = [bool]$enabled[$guard]
     }
     $path = Join-Path $output "$name.config.json"
@@ -62,6 +74,7 @@ function Measure-Variant([string]$name, [string]$variantConfig) {
             "-m", "agent_code_guard.code_guard", ".", "--config", $variantConfig, "--json", "--ci"
         ) -WorkingDirectory $target -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
         $watch.Stop()
+        if ($process.ExitCode -ne 0) { throw "$name sample $sample failed with exit $($process.ExitCode)." }
         $samples += [ordered]@{ sample=$sample; seconds=$watch.Elapsed.TotalSeconds; exitCode=$process.ExitCode; stdout=$stdout; stderr=$stderr }
     }
     $ordered = @($samples.seconds | Sort-Object)
@@ -82,6 +95,7 @@ $profileStderr = Join-Path $output "normal.profile.stderr.txt"
 $profileProcess = Start-Process -FilePath $Python -ArgumentList @(
     "-m", "cProfile", "-o", $profile, "-m", "agent_code_guard.code_guard", ".", "--config", $config, "--json", "--ci"
 ) -WorkingDirectory $target -Wait -PassThru -NoNewWindow -RedirectStandardOutput $profileStdout -RedirectStandardError $profileStderr
+if ($profileProcess.ExitCode -ne 0) { throw "Normal profile failed with exit $($profileProcess.ExitCode)." }
 $metadata.profile = [ordered]@{ command="$Python -m cProfile -o `"$profile`" -m agent_code_guard.code_guard . --config `"$config`" --json --ci"; exitCode=$profileProcess.ExitCode; output=$profile; stdout=$profileStdout; stderr=$profileStderr }
 
 $after = (& git -C $target status --porcelain=v1 --untracked-files=all) -join "`n"

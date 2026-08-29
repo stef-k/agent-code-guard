@@ -4,9 +4,8 @@ import json
 import tempfile
 from pathlib import Path
 
-from tests.helpers import CodeGuardTestCase, write_config
+from tests.helpers import CodeGuardTestCase, analyze_source_paths_for_runner as analyze_files_for_runner, write_config
 
-from agent_code_guard.analysis.pipeline import analyze_files_for_runner
 from agent_code_guard.analysis.provider import TreeSitterProvider
 
 

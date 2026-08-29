@@ -5,28 +5,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Mapping
 
 
 JsonObject = Mapping[str, Any]
-
-
-class FrozenDict(dict):
-    """A JSON object retaining normal validation compatibility without mutation."""
-
-    def _immutable(self, *args, **kwargs):
-        raise TypeError("configuration document is immutable")
-
-    __setitem__ = __delitem__ = clear = pop = popitem = setdefault = update = _immutable
-
-
-class FrozenList(list):
-    """A JSON array retaining normal validation compatibility without mutation."""
-
-    def _immutable(self, *args, **kwargs):
-        raise TypeError("configuration document is immutable")
-
-    __setitem__ = __delitem__ = __iadd__ = __imul__ = append = clear = extend = insert = pop = remove = reverse = sort = _immutable
 
 
 @dataclass(frozen=True, order=True)
@@ -65,7 +48,7 @@ def configuration_for_guard(args, document: JsonObject | None) -> JsonObject:
 
 def _freeze(value: Any) -> Any:
     if isinstance(value, dict):
-        return FrozenDict({key: _freeze(item) for key, item in value.items()})
+        return MappingProxyType({key: _freeze(item) for key, item in value.items()})
     if isinstance(value, list):
-        return FrozenList(_freeze(item) for item in value)
+        return tuple(_freeze(item) for item in value)
     return value

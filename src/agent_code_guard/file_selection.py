@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -128,10 +129,10 @@ def bound_git_candidates(candidates: list[Path], bounds: list[Path]) -> list[Pat
 
 def load_scope_exclusions(args: SelectionArgs, document: JsonObject) -> list[str]:
     scope = document.get("scope", {})
-    if not isinstance(scope, dict):
+    if not isinstance(scope, Mapping):
         raise ValueError("scope must be an object")
     exclude = scope.get("exclude", [])
-    if not isinstance(exclude, list) or any(not isinstance(pattern, str) for pattern in exclude):
+    if not isinstance(exclude, Sequence) or isinstance(exclude, (str, bytes)) or any(not isinstance(pattern, str) for pattern in exclude):
         raise ValueError("scope.exclude must be an array of strings")
     combined = [*exclude, *getattr(args, "scope_exclude", [])]
     if any(not isinstance(pattern, str) or not pattern.strip() for pattern in combined):

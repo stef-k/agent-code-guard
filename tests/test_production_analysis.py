@@ -6,10 +6,10 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from helpers import REPO_ROOT
+from helpers import REPO_ROOT, analyze_source_paths as analyze_files
 
 from agent_code_guard.analysis import (
-    ProviderUnavailableError, SyntaxAnalysisError, TreeSitterProvider, analyze_files,
+    ProviderUnavailableError, SyntaxAnalysisError, TreeSitterProvider,
 )
 from agent_code_guard.analysis.adapters import _callable_range
 from agent_code_guard.analysis.facts import SourcePoint

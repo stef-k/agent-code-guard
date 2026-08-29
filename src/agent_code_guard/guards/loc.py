@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from ..result_model import Finding, GuardResult
 from ..invocation import JsonObject, SelectedFile, configuration_for_guard
-from ..path_matching import matches_path_glob, relative_or_absolute_path
+from ..path_matching import matches_path_glob
 
 DEFAULT_WARN_AT = 400
 DEFAULT_FAIL_AT = 600
@@ -69,13 +70,13 @@ class Config:
 
 def load_config(args: argparse.Namespace, document: JsonObject | None = None) -> Config:
     document = configuration_for_guard(args, document)
-    if not isinstance(document, dict):
+    if not isinstance(document, Mapping):
         raise ValueError("configuration must be an object")
     guards = document.get("guards", {})
-    if not isinstance(guards, dict):
+    if not isinstance(guards, Mapping):
         raise ValueError("guards must be an object")
     data = guards.get("loc", {})
-    if not isinstance(data, dict):
+    if not isinstance(data, Mapping):
         raise ValueError("guards.loc must be an object")
     enabled = data.get("enabled", True)
     if not isinstance(enabled, bool):
@@ -91,12 +92,12 @@ def load_config(args: argparse.Namespace, document: JsonObject | None = None) ->
     if warn_at >= fail_at:
         raise ValueError("guards.loc.warnAt must be lower than guards.loc.failAt")
     extensions = data.get("includeExtensions", list(DEFAULT_INCLUDE_EXTENSIONS))
-    if not isinstance(extensions, list) or any(not isinstance(value, str) for value in extensions):
+    if not _is_array(extensions) or any(not isinstance(value, str) for value in extensions):
         raise ValueError("guards.loc.includeExtensions must be an array of strings")
     include_extensions = {normalise_extension(value) for value in extensions}
     include_extensions.update(normalise_extension(value) for value in args.include)
     exclude = data.get("exclude", DEFAULT_EXCLUDES)
-    if not isinstance(exclude, list) or any(not isinstance(value, str) for value in exclude):
+    if not _is_array(exclude) or any(not isinstance(value, str) for value in exclude):
         raise ValueError("guards.loc.exclude must be an array of strings")
     exclude = list(exclude) + args.exclude
     count_blank = data.get("countBlankLines", False)
@@ -113,12 +114,12 @@ def load_config(args: argparse.Namespace, document: JsonObject | None = None) ->
 
 
 def parse_allowed_large_files(value: Any) -> list[AllowedLargeFile]:
-    if not isinstance(value, list):
+    if not _is_array(value):
         raise ValueError("guards.loc.allowedLargeFiles must be an array")
     allowed = []
     for index, item in enumerate(value):
         location = f"guards.loc.allowedLargeFiles[{index}]"
-        if not isinstance(item, dict):
+        if not isinstance(item, Mapping):
             raise ValueError(f"{location} must be an object")
         path = item.get("path")
         reason = item.get("reason")
@@ -131,15 +132,15 @@ def parse_allowed_large_files(value: Any) -> list[AllowedLargeFile]:
 
 
 def parse_overrides(value: Any) -> list[ThresholdOverride]:
-    if not isinstance(value, list):
+    if not _is_array(value):
         raise ValueError("guards.loc.overrides must be an array")
     overrides = []
     for index, item in enumerate(value):
         location = f"guards.loc.overrides[{index}]"
-        if not isinstance(item, dict):
+        if not isinstance(item, Mapping):
             raise ValueError(f"{location} must be an object")
         patterns = item.get("match")
-        if not isinstance(patterns, list) or not patterns or any(
+        if not _is_array(patterns) or not patterns or any(
             not isinstance(pattern, str) or not pattern.strip() for pattern in patterns
         ):
             raise ValueError(f"{location}.match must be a non-empty array of non-empty strings")
@@ -163,13 +164,12 @@ def normalise_extension(value: str) -> str:
 
 
 def run(
-    root: Path, config: Config, selected_files: tuple[SelectedFile, ...] | tuple[Path, ...],
+    root: Path, config: Config, selected_files: tuple[SelectedFile, ...],
     baseline: dict[str, int] | None = None,
 ) -> GuardResult:
     if not config.enabled:
         return GuardResult("loc", "pass", [])
-    identities = tuple(_selected(value, root) for value in selected_files)
-    files = [selected for selected in identities if should_include(selected, config)]
+    files = [selected for selected in selected_files if should_include(selected, config)]
     findings = [
         evaluate(selected, config, baseline)
         for selected in sorted(set(files), key=lambda item: item.reporting_path)
@@ -180,21 +180,15 @@ def run(
     return GuardResult("loc", state, findings)
 
 
-def should_include(selected: SelectedFile | Path, config: Config, root: Path | None = None) -> bool:
-    selected = _selected(selected, root)
+def should_include(selected: SelectedFile, config: Config) -> bool:
     return selected.physical_path.suffix in config.include_extensions and not any(
         matches_path_glob(selected.reporting_path, pattern) for pattern in config.exclude
     )
 
 
 def evaluate(
-    selected: SelectedFile | Path, config: Config, root_or_baseline=None,
-    baseline: dict[str, int] | None = None,
+    selected: SelectedFile, config: Config, baseline: dict[str, int] | None = None,
 ) -> Finding:
-    root = root_or_baseline if isinstance(root_or_baseline, Path) else None
-    if isinstance(root_or_baseline, dict):
-        baseline = root_or_baseline
-    selected = _selected(selected, root)
     rel = selected.reporting_path
     counted = count_loc(selected.physical_path, config)
     warn_at, fail_at, override_index = effective_thresholds(rel, config)
@@ -269,13 +263,5 @@ def effective_thresholds(rel: str, config: Config) -> tuple[int, int, int | None
     return override.warn_at, override.fail_at, index
 
 
-def relative_path(path: Path, root: Path) -> str:
-    return relative_or_absolute_path(path, root)
-
-
-def _selected(value: SelectedFile | Path, root: Path | None) -> SelectedFile:
-    if isinstance(value, SelectedFile):
-        return value
-    if root is None:
-        raise TypeError("raw paths require an analysis root")
-    return SelectedFile(relative_path(value, root), value)
+def _is_array(value: Any) -> bool:
+    return isinstance(value, Sequence) and not isinstance(value, (str, bytes))

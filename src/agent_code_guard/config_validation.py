@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Mapping
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from .invocation import load_configuration
 
@@ -50,13 +51,13 @@ def validate_configuration(
     _validate_object_keys(document.get("scope"), SCOPE_KEYS, "scope")
 
     guards = document.get("guards")
-    if not isinstance(guards, dict):
+    if not isinstance(guards, Mapping):
         return document
     _reject_unknown(guards, GUARD_KEYS, "guards")
     for guard_name in REVIEW_GUARD_NAMES:
         _validate_object_keys(guards.get(guard_name), REVIEW_GUARD_KEYS, f"guards.{guard_name}")
     loc = guards.get("loc")
-    if not isinstance(loc, dict):
+    if not isinstance(loc, Mapping):
         return document
     _reject_unknown(loc, LOC_KEYS, "guards.loc")
     _validate_items(
@@ -69,15 +70,15 @@ def validate_configuration(
 
 
 def _validate_object_keys(value: Any, allowed: set[str], path: str) -> None:
-    if isinstance(value, dict):
+    if isinstance(value, Mapping):
         _reject_unknown(value, allowed, path)
 
 
 def _validate_items(value: Any, allowed: set[str], path: str) -> None:
-    if not isinstance(value, list):
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         return
     for index, item in enumerate(value):
-        if isinstance(item, dict):
+        if isinstance(item, Mapping):
             _reject_unknown(item, allowed, f"{path}[{index}]")
 
 

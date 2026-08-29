@@ -48,6 +48,8 @@ class SharedInvocationTests(unittest.TestCase):
             context = resolve_invocation(args, root, document)
             with self.assertRaises(TypeError):
                 document["guards"]["loc"]["warnAt"] = 10
+            with self.assertRaises(TypeError):
+                document["guards"] |= {"futureGuard": {}}
             with patch.object(Path, "read_text", side_effect=AssertionError("configuration reread")):
                 config = loc.load_config(args, document)
                 result = loc.run(context.root, config, context.selected_files)

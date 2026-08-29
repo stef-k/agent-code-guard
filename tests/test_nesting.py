@@ -8,10 +8,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from helpers import CodeGuardTestCase, write_config
+from helpers import CodeGuardTestCase, analyze_source_paths as analyze_files, analyze_source_paths_for_runner, write_config
+from agent_code_guard.analysis.pipeline import analyze_files_for_runner as production_analyze_files_for_runner
 
-from agent_code_guard.analysis import analyze_files
-from agent_code_guard.analysis.pipeline import analyze_files_for_runner
+analyze_files_for_runner = analyze_source_paths_for_runner
 from agent_code_guard.code_guard import run_guards
 from agent_code_guard.file_selection import ResolvedScope
 from agent_code_guard.guards import nesting
@@ -192,7 +192,7 @@ class NestingOrchestrationTests(unittest.TestCase):
                 config = write_config(root, {"enabled": False}, guards=guards)
                 with self.subTest(guards=guards), patch(
                     "agent_code_guard.analysis.pipeline.analyze_files_for_runner",
-                    wraps=analyze_files_for_runner,
+                wraps=production_analyze_files_for_runner,
                 ) as analyze:
                     results = run_guards(scope, args(config))
                     self.assertEqual(analyze.call_count, expected_calls)
