@@ -48,6 +48,12 @@ $metadata = [ordered]@{
 }
 function Measure-Variant([string]$name, [string]$variantConfig) {
     $samples = @()
+    $warmupStdout = Join-Path $output "$name.warmup.json"
+    $warmupStderr = Join-Path $output "$name.warmup.stderr.txt"
+    $warmup = Start-Process -FilePath $Python -ArgumentList @(
+        "-m", "agent_code_guard.code_guard", ".", "--config", $variantConfig, "--json", "--ci"
+    ) -WorkingDirectory $target -Wait -PassThru -NoNewWindow -RedirectStandardOutput $warmupStdout -RedirectStandardError $warmupStderr
+    if ($warmup.ExitCode -ne 0) { throw "$name warmup failed with exit $($warmup.ExitCode)." }
     for ($sample = 1; $sample -le 3; $sample++) {
         $stdout = Join-Path $output "$name.sample-$sample.json"
         $stderr = Join-Path $output "$name.sample-$sample.stderr.txt"
@@ -59,7 +65,12 @@ function Measure-Variant([string]$name, [string]$variantConfig) {
         $samples += [ordered]@{ sample=$sample; seconds=$watch.Elapsed.TotalSeconds; exitCode=$process.ExitCode; stdout=$stdout; stderr=$stderr }
     }
     $ordered = @($samples.seconds | Sort-Object)
-    $metadata.samples[$name] = [ordered]@{ command="$Python -m agent_code_guard.code_guard . --config `"$variantConfig`" --json --ci"; runs=$samples; medianSeconds=$ordered[1] }
+    $metadata.samples[$name] = [ordered]@{
+        command="$Python -m agent_code_guard.code_guard . --config `"$variantConfig`" --json --ci"
+        warmup=[ordered]@{ exitCode=$warmup.ExitCode; stdout=$warmupStdout; stderr=$warmupStderr }
+        runs=$samples
+        medianSeconds=$ordered[1]
+    }
 }
 Measure-Variant "loc-only" $locOnly
 Measure-Variant "syntax-only" $syntaxOnly
