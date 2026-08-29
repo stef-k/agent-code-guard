@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
+from typing import Mapping
 
 
 @dataclass(frozen=True, order=True)
@@ -88,6 +90,14 @@ class FileFacts:
 @dataclass(frozen=True)
 class AnalysisFacts:
     files: tuple[FileFacts, ...]
+    _reporting_paths: Mapping[Path, str] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_reporting_paths", MappingProxyType({
+            file.path: file.reporting_path
+            for file in self.files
+            if file.reporting_path is not None
+        }))
 
     @property
     def callables(self) -> tuple[CallableFact, ...]:
@@ -102,10 +112,7 @@ class AnalysisFacts:
         return tuple(fact for file in self.files for fact in file.decisions)
 
     def reporting_path_for(self, path: Path, root: Path | None = None) -> str:
-        stored = next(
-            (file.reporting_path for file in self.files if file.path == path and file.reporting_path is not None),
-            None,
-        )
+        stored = self._reporting_paths.get(path)
         if stored is not None:
             return stored
         try:

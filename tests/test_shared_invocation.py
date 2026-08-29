@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from agent_code_guard.analysis.provider import TreeSitterProvider
 from agent_code_guard.analysis.regions import executable_regions
+from agent_code_guard.analysis.facts import AnalysisFacts, FileFacts
 from agent_code_guard.file_selection import resolve_invocation
 from agent_code_guard.guards import callable_size, loc
 from agent_code_guard.invocation import load_configuration
@@ -68,6 +69,24 @@ class SharedInvocationTests(unittest.TestCase):
             self.assertIs(regions[0].original_line_starts, regions[1].original_line_starts)
             point = regions[0].original_point(1, len("const label = '".encode("utf-8")) + 2)
             self.assertEqual((point.line, point.byte_column), (2, 18))
+
+    def test_reporting_path_lookups_do_not_rescan_analyzed_files(self):
+        class CountingFiles(tuple):
+            iterations = 0
+
+            def __iter__(self):
+                self.iterations += 1
+                return super().__iter__()
+
+        files = CountingFiles(
+            FileFacts(Path(f"file-{index}.py"), (), (), (), 1, f"src/file-{index}.py")
+            for index in range(100)
+        )
+        facts = AnalysisFacts(files)
+        construction_iterations = files.iterations
+        for _ in range(100):
+            self.assertEqual(facts.reporting_path_for(Path("file-99.py")), "src/file-99.py")
+        self.assertEqual(files.iterations, construction_iterations)
 
 
 if __name__ == "__main__":
