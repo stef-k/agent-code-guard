@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from bisect import bisect_right
 from pathlib import Path
 
 from .errors import SyntaxAnalysisError
@@ -29,13 +30,20 @@ class ExecutableRegion:
     source: bytes
     original_source: bytes
     original_byte_offset: int = 0
+    original_line_starts: tuple[int, ...] | None = None
+    local_line_starts: tuple[int, ...] | None = None
+
+    def __post_init__(self) -> None:
+        if self.original_line_starts is None:
+            object.__setattr__(self, "original_line_starts", _line_starts(self.original_source))
+        if self.local_line_starts is None:
+            object.__setattr__(self, "local_line_starts", _line_starts(self.source))
 
     def original_point(self, local_row: int, local_byte_column: int) -> SourcePoint:
-        absolute = self.original_byte_offset + _byte_at_point(self.source, local_row, local_byte_column)
-        prefix = self.original_source[:absolute]
-        line = prefix.count(b"\n") + 1
-        newline = prefix.rfind(b"\n")
-        byte_column = absolute + 1 if newline < 0 else absolute - newline
+        absolute = self.original_byte_offset + self.local_line_starts[local_row] + local_byte_column
+        row = bisect_right(self.original_line_starts, absolute) - 1
+        line = row + 1
+        byte_column = absolute - self.original_line_starts[row] + 1
         return SourcePoint(line, byte_column, absolute)
 
     def original_range(self, node) -> SourceRange:
@@ -69,6 +77,7 @@ def _vue_regions(path: Path, source: bytes, provider: ParserProvider) -> tuple[E
             f"unable to parse {path}: Vue container syntax tree contains errors", language="vue",
         )
     regions: list[ExecutableRegion] = []
+    original_line_starts = _line_starts(source)
     for element in root.named_children:
         if element.type != "script_element":
             continue
@@ -83,15 +92,13 @@ def _vue_regions(path: Path, source: bytes, provider: ParserProvider) -> tuple[E
         if raw_text is not None:
             regions.append(ExecutableRegion(
                 path, language, source[raw_text.start_byte:raw_text.end_byte], source, raw_text.start_byte,
+                original_line_starts,
             ))
     return tuple(regions)
 
 
-def _byte_at_point(source: bytes, row: int, column: int) -> int:
-    position = 0
-    for _ in range(row):
-        position = source.index(b"\n", position) + 1
-    return position + column
+def _line_starts(source: bytes) -> tuple[int, ...]:
+    return (0, *(index + 1 for index, value in enumerate(source) if value == 10))
 
 
 def _attributes(start_tag, source: bytes) -> dict[str, str | None]:

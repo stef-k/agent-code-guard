@@ -12,12 +12,12 @@ import sys
 from pathlib import Path
 
 from .config_validation import validate_configuration
-from .file_selection import resolve_scope
+from .file_selection import ResolvedScope, resolve_invocation, resolve_scope
 from .guards import callable_size, complexity, loc, markdown_document_size, markdown_section_size, nesting
 from .human_output import format_completed_analysis
 from . import loc_baseline
 from .result_model import GuardResult, aggregate_state, required_policies
-from .reporting import reporting_path
+from .invocation import AnalysisContext, SelectedFile, load_configuration
 from .skill_distribution import export_skill, skill_path as installed_skill_path
 
 DISTRIBUTION_NAME = "agent-code-guard"
@@ -329,63 +329,64 @@ def run_guards(scope, args: argparse.Namespace) -> list[GuardResult]:
 
 
 def run_analysis(
-    scope, args: argparse.Namespace, baseline_override: dict[str, int] | None = None,
+    scope: AnalysisContext | ResolvedScope, args: argparse.Namespace, baseline_override: dict[str, int] | None = None,
     baseline_loaded: bool = False, linked_targets: set[Path] | None = None,
 ) -> CompletedAnalysis:
     """Load guard configuration, then construct shared syntax facts at most once."""
-    loc_config = loc.load_config(args)
-    baseline = baseline_override if baseline_loaded else loc_baseline.load_if_present(scope.root)
+    context = scope if isinstance(scope, AnalysisContext) else _legacy_context(scope, args)
+    loc_config = loc.load_config(args, context.configuration)
+    baseline = baseline_override if baseline_loaded else loc_baseline.load_if_present(context.root)
     if baseline is not None:
-        loc_baseline.validate_paths(scope.root, baseline)
+        loc_baseline.validate_paths(context.root, baseline)
         loc_baseline.validate_overlap(baseline, loc_config)
-        for path in scope.files:
-            if not path.is_file() or not path.resolve().is_relative_to(scope.root.resolve()):
-                raise ValueError(f"baseline analysis scope is outside analysis root: {path}")
+        for selected in context.selected_files:
+            if not selected.physical_path.is_file() or not selected.physical_path.is_relative_to(context.root):
+                raise ValueError(f"baseline analysis scope is outside analysis root: {selected.physical_path}")
         baseline = dict(baseline)
         for target in linked_targets or set():
-            baseline.pop(target.relative_to(scope.root).as_posix(), None)
-    callable_size_config = callable_size.load_config(args)
-    nesting_config = nesting.load_config(args)
-    complexity_config = complexity.load_config(args)
-    markdown_document_config = markdown_document_size.load_config(args)
-    markdown_section_config = markdown_section_size.load_config(args)
-    results = [loc.run(scope.root, loc_config, scope.files, baseline)]
+            baseline.pop(target.relative_to(context.root).as_posix(), None)
+    callable_size_config = callable_size.load_config(args, context.configuration)
+    nesting_config = nesting.load_config(args, context.configuration)
+    complexity_config = complexity.load_config(args, context.configuration)
+    markdown_document_config = markdown_document_size.load_config(args, context.configuration)
+    markdown_section_config = markdown_section_size.load_config(args, context.configuration)
+    results = [loc.run(context.root, loc_config, context.selected_files, baseline)]
     analyzed_files = {
-        path for path in scope.files
-        if loc_config.enabled and loc.should_include(path, loc_config, scope.root)
+        selected.reporting_path for selected in context.selected_files
+        if loc_config.enabled and loc.should_include(selected, loc_config)
     }
     needs_analysis = callable_size_config.enabled or nesting_config.enabled or complexity_config.enabled
     if needs_analysis:
         analysis = import_module("agent_code_guard.analysis.pipeline")
-        analyzed_files.update(path for path in scope.files if analysis.is_applicable(path))
-        batch = analysis.analyze_files_for_runner(scope.files)
+        analyzed_files.update(selected.reporting_path for selected in context.selected_files if analysis.is_applicable(selected.physical_path))
+        batch = analysis.analyze_files_for_runner(context.selected_files)
         facts = batch.facts
         if callable_size_config.enabled:
-            results.append(callable_size.run(scope.root, callable_size_config, facts))
+            results.append(callable_size.run(context.root, callable_size_config, facts))
         if nesting_config.enabled:
-            results.append(nesting.run(scope.root, nesting_config, facts))
+            results.append(nesting.run(context.root, nesting_config, facts))
         if complexity_config.enabled:
-            results.append(complexity.run(scope.root, complexity_config, facts))
+            results.append(complexity.run(context.root, complexity_config, facts))
     needs_markdown = markdown_document_config.enabled or markdown_section_config.enabled
-    markdown_files = tuple(path for path in scope.files if path.suffix.lower() == ".md") if needs_markdown else ()
-    analyzed_files.update(markdown_files)
+    markdown_files = tuple(selected for selected in context.selected_files if selected.physical_path.suffix.lower() == ".md") if needs_markdown else ()
+    analyzed_files.update(selected.reporting_path for selected in markdown_files)
     if markdown_files:
         markdown = import_module("agent_code_guard.markdown")
         markdown_facts = markdown.analyze_files(markdown_files)
         if markdown_document_config.enabled:
-            results.append(markdown_document_size.run(scope.root, markdown_document_config, markdown_facts))
+            results.append(markdown_document_size.run(context.root, markdown_document_config, markdown_facts))
         if markdown_section_config.enabled:
-            results.append(markdown_section_size.run(scope.root, markdown_section_config, markdown_facts))
+            results.append(markdown_section_size.run(context.root, markdown_section_config, markdown_facts))
     else:
         if markdown_document_config.enabled:
-            results.append(markdown_document_size.run(scope.root, markdown_document_config, _empty_markdown_facts()))
+            results.append(markdown_document_size.run(context.root, markdown_document_config, _empty_markdown_facts()))
         if markdown_section_config.enabled:
-            results.append(markdown_section_size.run(scope.root, markdown_section_config, _empty_markdown_facts()))
-    selected = len(scope.files)
+            results.append(markdown_section_size.run(context.root, markdown_section_config, _empty_markdown_facts()))
+    selected = len(context.selected_files)
     analyzed = len(analyzed_files)
     unavailable = tuple(
         UnavailableEntry(
-            reporting_path(item.path, scope.root), item.language, item.kind, item.message,
+            item.reporting_path, item.language, item.kind, item.message,
         )
         for item in (batch.unavailable if needs_analysis else ())
     )
@@ -399,11 +400,26 @@ def run_analysis(
     return CompletedAnalysis(
         results,
         ScopeSummary(
-            selected, analyzed, selected - analyzed, len(scope.excluded_files),
+            selected, analyzed, selected - analyzed, len(context.excluded_files),
             len({entry.path for entry in unavailable}) if unavailable else None,
         ),
         unavailable,
         incomplete_guard_ids,
+    )
+
+
+def _legacy_context(scope: ResolvedScope, args: argparse.Namespace) -> AnalysisContext:
+    """Focused-test adapter; the production runner constructs identities during selection."""
+    document = validate_configuration(args.config, Path.cwd())
+    def selected(path: Path) -> SelectedFile:
+        try:
+            report = path.relative_to(scope.root).as_posix()
+        except ValueError:
+            report = path.as_posix()
+        return SelectedFile(report, path)
+    return AnalysisContext(
+        scope.root, document, tuple(selected(path) for path in scope.files),
+        tuple(selected(path) for path in scope.excluded_files),
     )
 
 
@@ -455,13 +471,16 @@ def main() -> int:
         management_result = _management_mode(args)
         if management_result is not None:
             return management_result
-        validate_configuration(args.config, Path.cwd())
-        scope = resolve_scope(args, Path.cwd())
+        invocation = Path.cwd()
+        configuration = load_configuration(args.config, invocation)
+        validate_configuration(args.config, invocation, configuration)
+        scope = resolve_invocation(args, invocation, configuration)
         linked_targets: set[Path] = set()
         baseline_loaded = hasattr(scope, "root")
         if baseline_loaded and loc_baseline.baseline_path(scope.root).exists():
             linked_targets = loc_baseline.validate_explicit_scope(
-                args.paths, Path.cwd(), scope.root, scope.files,
+                args.paths, invocation, scope.root,
+                tuple(selected.physical_path for selected in scope.selected_files),
             )
         baseline = loc_baseline.load_if_present(scope.root) if baseline_loaded else None
         data = payload(

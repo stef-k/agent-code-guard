@@ -82,6 +82,7 @@ class FileFacts:
     controls: tuple[ControlFlowFact, ...]
     decisions: tuple[DecisionFact, ...]
     region_count: int
+    reporting_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -99,3 +100,15 @@ class AnalysisFacts:
     @property
     def decisions(self) -> tuple[DecisionFact, ...]:
         return tuple(fact for file in self.files for fact in file.decisions)
+
+    def reporting_path_for(self, path: Path, root: Path | None = None) -> str:
+        stored = next(
+            (file.reporting_path for file in self.files if file.path == path and file.reporting_path is not None),
+            None,
+        )
+        if stored is not None:
+            return stored
+        try:
+            return path.relative_to(root).as_posix() if root is not None else path.as_posix()
+        except ValueError:
+            return path.as_posix()

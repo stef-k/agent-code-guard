@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..invocation import SelectedFile
+
 from .adapters import extract_facts
 from .csharp_compat import corrected_csharp_root
 from .errors import ProviderUnavailableError, SyntaxAnalysisError
@@ -23,6 +25,7 @@ def analyze_files(files: tuple[Path, ...] | list[Path], provider: ParserProvider
 @dataclass(frozen=True)
 class UnavailableAnalysis:
     path: Path
+    reporting_path: str
     language: str
     kind: str
     message: str
@@ -35,27 +38,29 @@ class BatchAnalysis:
 
 
 def analyze_files_for_runner(
-    files: tuple[Path, ...] | list[Path], provider: ParserProvider | None = None,
+    files: tuple[SelectedFile, ...] | tuple[Path, ...] | list[Path], provider: ParserProvider | None = None,
 ) -> BatchAnalysis:
     """Analyze selected files independently while retaining only known unavailable evidence."""
     active_provider = provider or TreeSitterProvider()
     results: list[FileFacts] = []
     unavailable: list[UnavailableAnalysis] = []
     for value in files:
-        path = Path(value)
+        selected = value if isinstance(value, SelectedFile) else SelectedFile(value.as_posix(), value)
+        reporting_path = selected.reporting_path if isinstance(value, SelectedFile) else None
+        path = selected.physical_path
         if not is_applicable(path):
             continue
         try:
-            results.append(_analyze_file(path, active_provider))
+            results.append(_analyze_file(path, active_provider, reporting_path))
         except (SyntaxAnalysisError, ProviderUnavailableError) as exc:
             if exc.language is None:
                 raise
             kind = "syntax" if isinstance(exc, SyntaxAnalysisError) else "provider"
-            unavailable.append(UnavailableAnalysis(path, exc.language, kind, str(exc)))
+            unavailable.append(UnavailableAnalysis(path, selected.reporting_path, exc.language, kind, str(exc)))
     return BatchAnalysis(AnalysisFacts(tuple(results)), tuple(unavailable))
 
 
-def _analyze_file(path: Path, provider: ParserProvider) -> FileFacts:
+def _analyze_file(path: Path, provider: ParserProvider, reporting_path: str | None = None) -> FileFacts:
     callables = []
     controls = []
     decisions = []
@@ -83,4 +88,4 @@ def _analyze_file(path: Path, provider: ParserProvider) -> FileFacts:
         callables.extend(region_callables)
         controls.extend(region_controls)
         decisions.extend(region_decisions)
-    return FileFacts(path, tuple(callables), tuple(controls), tuple(decisions), len(regions))
+    return FileFacts(path, tuple(callables), tuple(controls), tuple(decisions), len(regions), reporting_path)

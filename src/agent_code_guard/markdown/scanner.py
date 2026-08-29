@@ -6,6 +6,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..invocation import SelectedFile
+
 from .facts import MarkdownDocumentFact, MarkdownFacts, MarkdownSectionFact
 
 _ATX = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+(.*?)|[ \t]*)$")
@@ -28,15 +30,27 @@ class _Fence:
     length: int
 
 
-def analyze_files(files: tuple[Path, ...] | list[Path]) -> MarkdownFacts:
-    applicable = sorted(
-        {path.resolve() for path in files if path.suffix.lower() == ".md"},
-        key=lambda path: path.as_posix(),
+def analyze_files(files: tuple[SelectedFile, ...] | tuple[Path, ...] | list[Path]) -> MarkdownFacts:
+    identities = tuple(
+        (value, value.reporting_path) if isinstance(value, SelectedFile)
+        else (SelectedFile(value.as_posix(), value), None)
+        for value in files
     )
-    return MarkdownFacts(tuple(scan_text(path, path.read_text(encoding="utf-8")) for path in applicable))
+    applicable = sorted(
+        ((selected, report) for selected, report in identities if selected.physical_path.suffix.lower() == ".md"),
+        key=lambda item: item[0].physical_path.as_posix(),
+    )
+    return MarkdownFacts(tuple(
+        scan_text(
+            selected.physical_path,
+            selected.physical_path.read_text(encoding="utf-8"),
+            report,
+        )
+        for selected, report in applicable
+    ))
 
 
-def scan_text(path: Path, text: str) -> MarkdownDocumentFact:
+def scan_text(path: Path, text: str, reporting_path: str | None = None) -> MarkdownDocumentFact:
     lines = text.splitlines()
     headings = _scan_headings(lines)
     sections = []
@@ -46,7 +60,7 @@ def scan_text(path: Path, text: str) -> MarkdownDocumentFact:
             heading.text, heading.level, heading.start_line, end_line,
             end_line - heading.start_line + 1,
         ))
-    return MarkdownDocumentFact(path, len(lines), tuple(sections))
+    return MarkdownDocumentFact(path, len(lines), tuple(sections), reporting_path)
 
 
 def _scan_headings(lines: list[str]) -> list[_Heading]:

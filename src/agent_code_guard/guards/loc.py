@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import argparse
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from ..result_model import Finding, GuardResult
+from ..invocation import JsonObject, SelectedFile, configuration_for_guard
 from ..path_matching import matches_path_glob, relative_or_absolute_path
 
 DEFAULT_WARN_AT = 400
@@ -67,18 +67,8 @@ class Config:
     ratchet_at: str = "fail"
 
 
-def load_config(args: argparse.Namespace) -> Config:
-    document: dict[str, Any] = {}
-    config_path = args.config
-    if config_path:
-        path = Path(config_path)
-        if not path.exists():
-            raise FileNotFoundError(f"config file not found: {config_path}")
-        document = json.loads(path.read_text(encoding="utf-8"))
-    else:
-        auto = Path(".agent-tools/code-guard.config.json")
-        if auto.exists():
-            document = json.loads(auto.read_text(encoding="utf-8"))
+def load_config(args: argparse.Namespace, document: JsonObject | None = None) -> Config:
+    document = configuration_for_guard(args, document)
     if not isinstance(document, dict):
         raise ValueError("configuration must be an object")
     guards = document.get("guards", {})
@@ -173,15 +163,16 @@ def normalise_extension(value: str) -> str:
 
 
 def run(
-    root: Path, config: Config, selected_files: tuple[Path, ...],
+    root: Path, config: Config, selected_files: tuple[SelectedFile, ...] | tuple[Path, ...],
     baseline: dict[str, int] | None = None,
 ) -> GuardResult:
     if not config.enabled:
         return GuardResult("loc", "pass", [])
-    files = [path for path in selected_files if should_include(path, config, root)]
+    identities = tuple(_selected(value, root) for value in selected_files)
+    files = [selected for selected in identities if should_include(selected, config)]
     findings = [
-        evaluate(path, config, root, baseline)
-        for path in sorted(set(files), key=lambda p: relative_path(p, root))
+        evaluate(selected, config, baseline)
+        for selected in sorted(set(files), key=lambda item: item.reporting_path)
     ]
     state = "fail" if any(item.state == "fail" for item in findings) else (
         "review" if any(item.state == "review" for item in findings) else "pass"
@@ -189,17 +180,23 @@ def run(
     return GuardResult("loc", state, findings)
 
 
-def should_include(path: Path, config: Config, root: Path) -> bool:
-    return path.suffix in config.include_extensions and not any(
-        matches_path_glob(relative_path(path, root), pattern) for pattern in config.exclude
+def should_include(selected: SelectedFile | Path, config: Config, root: Path | None = None) -> bool:
+    selected = _selected(selected, root)
+    return selected.physical_path.suffix in config.include_extensions and not any(
+        matches_path_glob(selected.reporting_path, pattern) for pattern in config.exclude
     )
 
 
 def evaluate(
-    path: Path, config: Config, root: Path, baseline: dict[str, int] | None = None,
+    selected: SelectedFile | Path, config: Config, root_or_baseline=None,
+    baseline: dict[str, int] | None = None,
 ) -> Finding:
-    rel = relative_path(path, root)
-    counted = count_loc(path, config)
+    root = root_or_baseline if isinstance(root_or_baseline, Path) else None
+    if isinstance(root_or_baseline, dict):
+        baseline = root_or_baseline
+    selected = _selected(selected, root)
+    rel = selected.reporting_path
+    counted = count_loc(selected.physical_path, config)
     warn_at, fail_at, override_index = effective_thresholds(rel, config)
     allowed = next((item for item in config.allowed_large_files if matches_path_glob(rel, item.path)), None)
     baseline_loc = baseline.get(rel) if baseline is not None else None
@@ -274,3 +271,11 @@ def effective_thresholds(rel: str, config: Config) -> tuple[int, int, int | None
 
 def relative_path(path: Path, root: Path) -> str:
     return relative_or_absolute_path(path, root)
+
+
+def _selected(value: SelectedFile | Path, root: Path | None) -> SelectedFile:
+    if isinstance(value, SelectedFile):
+        return value
+    if root is None:
+        raise TypeError("raw paths require an analysis root")
+    return SelectedFile(relative_path(value, root), value)

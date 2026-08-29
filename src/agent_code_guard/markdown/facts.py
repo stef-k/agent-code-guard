@@ -20,6 +20,7 @@ class MarkdownDocumentFact:
     path: Path
     physical_lines: int
     sections: tuple[MarkdownSectionFact, ...]
+    reporting_path: str | None = None
 
 
 @dataclass(frozen=True)

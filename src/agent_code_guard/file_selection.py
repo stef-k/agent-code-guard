@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from .invocation import AnalysisContext, JsonObject, SelectedFile
 from .path_matching import matches_path_glob, relative_or_absolute_path
 
 BUILTIN_PRUNED_DIRECTORIES = {".git", "node_modules", "bin", "obj"}
@@ -30,6 +30,19 @@ class ResolvedScope:
     excluded_files: tuple[Path, ...] = ()
 
 
+def resolve_invocation(
+    args: SelectionArgs, start: Path, configuration: JsonObject,
+) -> AnalysisContext:
+    """Resolve every physical/reporting identity once for one invocation."""
+    scope = _resolve_scope(args, start, configuration)
+    return AnalysisContext(
+        scope.root,
+        configuration,
+        tuple(SelectedFile(_reporting_path(path, scope.root), path) for path in scope.files),
+        tuple(SelectedFile(_reporting_path(path, scope.root), path) for path in scope.excluded_files),
+    )
+
+
 def find_repo_root(start: Path) -> Path | None:
     """Return the enclosing Git root, without inventing one when Git is absent."""
     try:
@@ -44,6 +57,11 @@ def find_repo_root(start: Path) -> Path | None:
 
 def resolve_scope(args: SelectionArgs, start: Path) -> ResolvedScope:
     """Resolve and normalize the complete file scope shared by all guards."""
+    from .invocation import load_configuration
+    return _resolve_scope(args, start, load_configuration(getattr(args, "config", None), start))
+
+
+def _resolve_scope(args: SelectionArgs, start: Path, configuration: JsonObject) -> ResolvedScope:
     working_root = start.resolve()
     git_root = find_repo_root(working_root)
     root = git_root or working_root
@@ -60,13 +78,21 @@ def resolve_scope(args: SelectionArgs, start: Path) -> ResolvedScope:
         files = existing_files(expand_paths(paths, git_root))
 
     normalized = tuple(dict.fromkeys(path.resolve() for path in files))
-    exclusions = load_scope_exclusions(args, working_root)
+    exclusions = load_scope_exclusions(args, configuration)
+    identities = tuple((path, _reporting_path(path, root)) for path in normalized)
     excluded = tuple(
-        path for path in normalized
-        if any(matches_path_glob(relative_or_absolute_path(path, root), pattern) for pattern in exclusions)
+        path for path, reporting_path in identities
+        if any(matches_path_glob(reporting_path, pattern) for pattern in exclusions)
     )
     excluded_set = set(excluded)
     return ResolvedScope(root, tuple(path for path in normalized if path not in excluded_set), excluded)
+
+
+def _reporting_path(canonical_path: Path, canonical_root: Path) -> str:
+    try:
+        return canonical_path.relative_to(canonical_root).as_posix()
+    except ValueError:
+        return canonical_path.as_posix()
 
 
 def resolve_explicit_paths(values: list[str], working_root: Path) -> list[Path]:
@@ -95,14 +121,7 @@ def bound_git_candidates(candidates: list[Path], bounds: list[Path]) -> list[Pat
     ]
 
 
-def load_scope_exclusions(args: SelectionArgs, start: Path) -> list[str]:
-    explicit_config = getattr(args, "config", None)
-    config_path = Path(explicit_config) if explicit_config else start / ".agent-tools" / "code-guard.config.json"
-    if explicit_config and not config_path.exists():
-        raise FileNotFoundError(f"config file not found: {explicit_config}")
-    document = json.loads(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
-    if not isinstance(document, dict):
-        raise ValueError("configuration must be an object")
+def load_scope_exclusions(args: SelectionArgs, document: JsonObject) -> list[str]:
     scope = document.get("scope", {})
     if not isinstance(scope, dict):
         raise ValueError("scope must be an object")

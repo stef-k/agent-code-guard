@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import argparse
-import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from ..reporting import reporting_path
+from ..invocation import JsonObject, configuration_for_guard
 from ..result_model import GuardResult, MarkdownSectionFinding
 
 if TYPE_CHECKING:
@@ -23,17 +22,8 @@ class Config:
     review_at: int | None = None
 
 
-def load_config(args: argparse.Namespace) -> Config:
-    document: dict[str, Any] = {}
-    if args.config:
-        path = Path(args.config)
-        if not path.exists():
-            raise FileNotFoundError(f"config file not found: {args.config}")
-        document = json.loads(path.read_text(encoding="utf-8"))
-    else:
-        auto = Path(".agent-tools/code-guard.config.json")
-        if auto.exists():
-            document = json.loads(auto.read_text(encoding="utf-8"))
+def load_config(args: argparse.Namespace, document: JsonObject | None = None) -> Config:
+    document = configuration_for_guard(args, document)
     if not isinstance(document, dict):
         raise ValueError("configuration must be an object")
     guards = document.get("guards", {})
@@ -58,9 +48,16 @@ def load_config(args: argparse.Namespace) -> Config:
 def run(root: Path, config: Config, facts: MarkdownFacts) -> GuardResult:
     assert config.review_at is not None
     findings = [MarkdownSectionFinding(
-        reporting_path(document.path, root), section.heading, section.level,
+        document.reporting_path or _path(document.path, root), section.heading, section.level,
         section.start_line, section.end_line, section.physical_lines,
         "review" if section.physical_lines > config.review_at else "pass", {"reviewAt": config.review_at},
     ) for document in facts.documents for section in document.sections]
     findings.sort(key=lambda finding: (finding.path, finding.start_line, finding.end_line, finding.heading))
     return GuardResult("markdownSectionSize", "review" if any(item.state == "review" for item in findings) else "pass", findings)
+
+
+def _path(path: Path, root: Path) -> str:
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return path.as_posix()
