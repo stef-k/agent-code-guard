@@ -4,8 +4,16 @@ Notable changes to Agent Code Guard are recorded here.
 
 ## Unreleased
 
+## 0.3.1 - 2026-08-29
+
+### Changed
+
 - Reuse one immutable invocation context for configuration and canonical selected-file identities during ordinary multi-guard analysis, and use shared source line indexes for constant-time syntax location mapping.
 - Add a reproducible, non-CI Wayfarer benchmark harness for LOC-only, syntax-only, normal, and profiled scans.
+
+### Fixed
+
+- Restore fresh physical containment validation for baseline-enabled analysis and make benchmark output and Git-status verification fail closed.
 
 ## 0.3.0 - 2026-08-28
 
