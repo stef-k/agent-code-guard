@@ -4,7 +4,7 @@ Notable changes to Agent Code Guard are recorded here.
 
 ## Unreleased
 
-- Reuse one immutable invocation context for configuration and canonical selected-file identities across all guards, and use shared source line indexes for constant-time syntax location mapping.
+- Reuse one immutable invocation context for configuration and canonical selected-file identities during ordinary multi-guard analysis, and use shared source line indexes for constant-time syntax location mapping.
 - Add a reproducible, non-CI Wayfarer benchmark harness for LOC-only, syntax-only, normal, and profiled scans.
 
 ## 0.3.0 - 2026-08-28

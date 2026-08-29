@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from agent_code_guard import code_guard
 from agent_code_guard.analysis.provider import TreeSitterProvider
 from agent_code_guard.analysis.regions import executable_regions
 from agent_code_guard.analysis.facts import AnalysisFacts, FileFacts
@@ -87,6 +88,42 @@ class SharedInvocationTests(unittest.TestCase):
         for _ in range(100):
             self.assertEqual(facts.reporting_path_for(Path("file-99.py")), "src/file-99.py")
         self.assertEqual(files.iterations, construction_iterations)
+
+    def test_loaded_baseline_rejects_selected_path_swapped_to_external_symlink(self):
+        with tempfile.TemporaryDirectory() as value, tempfile.TemporaryDirectory() as outside_value:
+            root = Path(value)
+            source = root / "sample.py"
+            outside = Path(outside_value) / "outside.py"
+            source.write_text("inside = 1\n", encoding="utf-8")
+            outside.write_text("outside = 1\n", encoding="utf-8")
+            args = code_guard.parser().parse_args(["."])
+            with patch("agent_code_guard.file_selection.find_repo_root", return_value=None):
+                context = resolve_invocation(args, root, {})
+            source.unlink()
+            try:
+                source.symlink_to(outside)
+            except OSError as exc:
+                self.skipTest(f"symlink creation is unavailable: {exc}")
+
+            with patch.object(code_guard.loc, "run", side_effect=AssertionError("outside file analyzed")):
+                with self.assertRaisesRegex(ValueError, "baseline analysis scope is outside analysis root"):
+                    code_guard.run_analysis(
+                        context, args, baseline_override={}, baseline_loaded=True,
+                    )
+
+    def test_loaded_baseline_accepts_unchanged_selected_file(self):
+        with tempfile.TemporaryDirectory() as value:
+            root = Path(value)
+            (root / "sample.py").write_text("inside = 1\n", encoding="utf-8")
+            args = code_guard.parser().parse_args(["."])
+            with patch("agent_code_guard.file_selection.find_repo_root", return_value=None):
+                context = resolve_invocation(args, root, {})
+
+            completed = code_guard.run_analysis(
+                context, args, baseline_override={}, baseline_loaded=True,
+            )
+
+            self.assertEqual(completed.results[0].findings[0].path, "sample.py")
 
 
 if __name__ == "__main__":

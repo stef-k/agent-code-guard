@@ -325,23 +325,20 @@ export, and platform activation.
 ## Performance benchmarking
 
 Performance changes can be measured against the fixed Wayfarer workload with
-`tools/benchmark-wayfarer.ps1`. The caller supplies a disposable checkout at
+`tools/benchmark_wayfarer.py`. The caller supplies a disposable checkout at
 commit `679ddae9717bf78681a2cfbf794f687127b23b5d`, its exact project config, and
 an output directory outside that checkout:
 
-```powershell
-.\tools\benchmark-wayfarer.ps1 `
-  -WayfarerPath C:\bench\Wayfarer `
-  -ConfigPath C:\bench\wayfarer-code-guard.config.json `
-  -OutputDirectory C:\bench\results\after `
-  -InstallationMode "editable wheel from issue 122 branch"
+```console
+python tools/benchmark_wayfarer.py --wayfarer-path C:\bench\Wayfarer --config-path C:\bench\wayfarer-code-guard.config.json --output-directory C:\bench\results\after --installation-mode "editable wheel from issue 122 branch"
 ```
 
 The script validates the source commit, records Python and Code Guard versions,
 the configuration hash, exact commands, three fresh sequential warm-process
 samples and medians for LOC-only, syntax-only, and normal six-guard scans, plus
-a normal-run cProfile file. It compares complete Git status before and after the
-run and fails if analysis creates repository metadata. It never clones or writes
-to the target checkout and is intentionally not a CI test. Run the same script
-and installation mode against the before and after revisions, retaining both
-result directories for comparison.
+a normal-run cProfile file. It requires successful complete Git-status checks
+before and after the run, and fails if verification fails or analysis creates
+repository metadata. It rejects output paths equal to or beneath the target,
+never clones or writes to the target checkout, and is intentionally not a CI
+test. Run the same script and installation mode against the before and after
+revisions, retaining both result directories for comparison.
