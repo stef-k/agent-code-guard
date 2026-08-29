@@ -339,9 +339,23 @@ def run_analysis(
     if baseline is not None:
         loc_baseline.validate_paths(context.root, baseline)
         loc_baseline.validate_overlap(baseline, loc_config)
+        error = "baseline analysis scope is outside analysis root"
+        try:
+            current_root = context.root.resolve(strict=True)
+        except OSError as exc:
+            raise ValueError(f"{error}: {context.root}") from exc
         for selected in context.selected_files:
-            if not selected.physical_path.is_file() or not selected.physical_path.is_relative_to(context.root):
-                raise ValueError(f"baseline analysis scope is outside analysis root: {selected.physical_path}")
+            try:
+                current_path = selected.physical_path.resolve(strict=True)
+                valid = (
+                    not selected.physical_path.is_symlink()
+                    and current_path.is_file()
+                    and current_path.is_relative_to(current_root)
+                )
+            except OSError:
+                valid = False
+            if not valid:
+                raise ValueError(f"{error}: {selected.physical_path}")
         baseline = dict(baseline)
         for target in linked_targets or set():
             baseline.pop(target.relative_to(context.root).as_posix(), None)
