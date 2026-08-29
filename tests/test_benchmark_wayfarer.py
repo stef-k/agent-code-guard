@@ -44,6 +44,21 @@ class BenchmarkWayfarerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "outside the disposable Wayfarer checkout"):
                 benchmark_wayfarer.validate_output_directory(target, target / "results")
 
+    def test_external_symlink_into_target_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as value:
+            parent = Path(value)
+            target = parent / "Wayfarer"
+            sink = target / "sink"
+            sink.mkdir(parents=True)
+            link = parent / "external-link"
+            try:
+                link.symlink_to(sink, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"directory symlink creation is unavailable: {exc}")
+
+            with self.assertRaisesRegex(ValueError, "outside the disposable Wayfarer checkout"):
+                benchmark_wayfarer.validate_output_directory(target, link / "results")
+
     def test_failed_pre_run_git_status_is_rejected(self) -> None:
         failed = subprocess.CompletedProcess([], 1, stdout="possibly clean", stderr="failure")
         with patch.object(benchmark_wayfarer.subprocess, "run", return_value=failed):

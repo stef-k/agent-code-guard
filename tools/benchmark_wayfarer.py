@@ -26,14 +26,18 @@ GUARD_NAMES = (
 
 def validate_output_directory(target: Path, output: Path) -> Path:
     """Return a normalized output path only when it is outside the target."""
-    target_text = os.path.normcase(os.path.abspath(target))
     output_path = Path(os.path.abspath(output))
-    output_text = os.path.normcase(str(output_path))
-    try:
-        contained = os.path.commonpath((target_text, output_text)) == target_text
-    except ValueError:
-        contained = False
-    if contained:
+    target_path = target.resolve(strict=True)
+
+    def is_contained(candidate: Path) -> bool:
+        target_text = os.path.normcase(str(target_path))
+        candidate_text = os.path.normcase(str(candidate))
+        try:
+            return os.path.commonpath((target_text, candidate_text)) == target_text
+        except ValueError:
+            return False
+
+    if is_contained(output_path) or is_contained(output_path.resolve(strict=False)):
         raise ValueError("OutputDirectory must be outside the disposable Wayfarer checkout.")
     return output_path
 
