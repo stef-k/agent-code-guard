@@ -283,25 +283,25 @@ class RegionAndVueTests(unittest.TestCase):
 
 
 class ProviderContractTests(unittest.TestCase):
-    def test_callable_range_snapshots_each_native_point_once(self) -> None:
+    def test_callable_range_uses_each_native_byte_offset_once(self) -> None:
         class Node:
             start_reads = 0
             end_reads = 0
 
             @property
-            def start_point(self):
+            def start_byte(self):
                 self.start_reads += 1
-                return 2, 3
+                return 17
 
             @property
-            def end_point(self):
+            def end_byte(self):
                 self.end_reads += 1
-                return 4, 5
+                return 33
 
         node = Node()
         region = SimpleNamespace(
             language="csharp",
-            original_point=lambda row, column: SourcePoint(row + 1, column + 1, row * 10 + column),
+            original_point_at_byte=lambda offset: SourcePoint(offset // 7 + 1, offset % 7 + 1, offset),
         )
 
         source_range = _callable_range(node, region)

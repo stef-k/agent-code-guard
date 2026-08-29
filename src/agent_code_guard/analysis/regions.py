@@ -40,18 +40,21 @@ class ExecutableRegion:
             object.__setattr__(self, "local_line_starts", _line_starts(self.source))
 
     def original_point(self, local_row: int, local_byte_column: int) -> SourcePoint:
-        absolute = self.original_byte_offset + self.local_line_starts[local_row] + local_byte_column
+        local_offset = self.local_line_starts[local_row] + local_byte_column
+        return self.original_point_at_byte(local_offset)
+
+    def original_point_at_byte(self, local_byte_offset: int) -> SourcePoint:
+        """Map a parser byte offset without reconstructing its local row prefix."""
+        absolute = self.original_byte_offset + local_byte_offset
         row = bisect_right(self.original_line_starts, absolute) - 1
         line = row + 1
         byte_column = absolute - self.original_line_starts[row] + 1
         return SourcePoint(line, byte_column, absolute)
 
     def original_range(self, node) -> SourceRange:
-        start_row, start_column = node.start_point
-        end_row, end_column = node.end_point
         return SourceRange(
-            self.original_point(start_row, start_column),
-            self.original_point(end_row, end_column),
+            self.original_point_at_byte(node.start_byte),
+            self.original_point_at_byte(node.end_byte),
         )
 
 
