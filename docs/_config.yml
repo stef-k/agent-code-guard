@@ -1,0 +1,16 @@
+remote_theme: stef-k/.github@main
+
+plugins:
+  - jekyll-remote-theme
+
+title: Agent Code Guard
+description: Deterministic maintainability checks for source code and Markdown.
+url: https://stef-k.github.io
+baseurl: /agent-code-guard
+repository: stef-k/agent-code-guard
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: documentation

@@ -126,7 +126,7 @@ class InstalledPackageTests(unittest.TestCase):
             ],
         )
         self.assertIn(
-            "https://github.com/stef-k/agent-code-guard/blob/main/docs/guard-admission.md",
+            "https://stef-k.github.io/agent-code-guard/guard-admission.html",
             metadata.get_payload(),
         )
         self.assertNotIn("](docs/", metadata.get_payload())

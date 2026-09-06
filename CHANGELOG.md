@@ -4,12 +4,21 @@ Notable changes to Agent Code Guard are recorded here.
 
 ## Unreleased
 
+## 0.4.0 - 2026-09-06
+
 ### Added
 
 - Explicit source-controlled Markdown document-size ratchets: create accepted
   physical-line allowances and update them only downward or by pruning. Accepted
   documents pass without repeated REVIEW; growth returns REVIEW, while section
   findings remain independent. Normal analysis never writes a baseline.
+
+### Changed
+
+- Give the documentation site a practical introduction, quick start, and agent
+  setup guidance, using the shared dark Primer theme. Add GitHub and documentation
+  navigation and link the project README directly to the published guides.
+- Bundle the updated Markdown ratchet instructions and policy with the skill.
 
 ## 0.3.1 - 2026-08-29
 

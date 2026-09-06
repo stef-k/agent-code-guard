@@ -7,9 +7,13 @@
 Deterministic maintainability guardrails for source code and Markdown changed by
 a human or coding agent.
 
+[Documentation](https://stef-k.github.io/agent-code-guard/) ·
+[Get started](https://stef-k.github.io/agent-code-guard/#get-started) ·
+[Releases](https://github.com/stef-k/agent-code-guard/releases)
+
 [![Production Analysis](https://github.com/stef-k/agent-code-guard/actions/workflows/analysis.yml/badge.svg)](https://github.com/stef-k/agent-code-guard/actions/workflows/analysis.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-code-guard?logo=pypi&logoColor=white)](https://pypi.org/project/agent-code-guard/)
-[![Python 3.10–3.14](https://img.shields.io/badge/Python-3.10%E2%80%933.14-3776AB?logo=python&logoColor=white)](https://github.com/stef-k/agent-code-guard/blob/main/docs/platform-support.md)
+[![Python 3.10–3.14](https://img.shields.io/badge/Python-3.10%E2%80%933.14-3776AB?logo=python&logoColor=white)](https://stef-k.github.io/agent-code-guard/platform-support.html)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/stef-k/agent-code-guard/blob/main/LICENSE)
 
 Agent Code Guard measures file size, callable size, structural nesting,
@@ -61,7 +65,7 @@ code-guard doctor
 ```
 
 `--version` confirms the installed distribution identity. `doctor` checks the
-active installation's health. See the [usage guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md) for virtual
+active installation's health. See the [usage guide](https://stef-k.github.io/agent-code-guard/usage.html) for virtual
 environment, uv, and developer alternatives.
 
 ### Ask your agent to adopt it
@@ -75,12 +79,12 @@ Copy this prompt to a coding agent:
 > activating or exporting its installed, version-matched skill for the current
 > agent environment. Verify `code-guard --version` and run `code-guard doctor`,
 > then locate the skill with `code-guard --skill-path`. Follow the
-> [skill activation guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/skill-distribution.md):
+> [skill activation guide](https://stef-k.github.io/agent-code-guard/skill-distribution.html):
 > activate that installed path when the platform supports it, or export it with
 > `code-guard --export-skill <target-directory>` to the platform's documented
 > skill directory. Do not guess a target or overwrite an existing export; verify
 > that `.agent-code-guard-version` matches the installed distribution. Follow the
-> [agent workflow](https://github.com/stef-k/agent-code-guard/blob/main/docs/agent-workflow.md)
+> [agent workflow](https://stef-k.github.io/agent-code-guard/agent-workflow.html)
 > without creating an adoption baseline. After meaningful source or Markdown edits, run
 > `code-guard . --changed-only --json --json-mode compact`; outside Git, pass the
 > exact edited files. Inspect REVIEW and FAIL findings, make only genuine
@@ -104,7 +108,7 @@ No configuration is needed. A REVIEW asks for inspection and judgment, not an
 automatic refactor. Outside Git, pass the exact edited files instead, such as
 `code-guard src/app.py docs/guide.md`.
 
-See the [agent workflow guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/agent-workflow.md) for repeated human and
+See the [agent workflow guide](https://stef-k.github.io/agent-code-guard/agent-workflow.html) for repeated human and
 agent use.
 
 ## Recommended workflow
@@ -126,7 +130,7 @@ report the result before completion
 Use `code-guard . --changed-only --json --json-mode compact` for a structured,
 low-noise manual agent check. Hooks are optional, platform-owned, and require
 user authorization; Code Guard does not install them. The
-[workflow guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/agent-workflow.md) owns the complete manual and
+[workflow guide](https://stef-k.github.io/agent-code-guard/agent-workflow.html) owns the complete manual and
 hook-assisted process.
 
 ## Interpreting results
@@ -163,7 +167,7 @@ measurement. A REVIEW is not proof of a defect or a mandatory refactor.
 Comparisons are strictly greater-than, so equality passes. All guards except
 file LOC are REVIEW-only; only file LOC can FAIL. A new guard must provide
 distinct, deterministic value rather than duplicate conventional tooling. See
-[Guard admission](https://github.com/stef-k/agent-code-guard/blob/main/docs/guard-admission.md).
+[Guard admission](https://stef-k.github.io/agent-code-guard/guard-admission.html).
 
 ### Result and JSON reference
 
@@ -172,7 +176,7 @@ all-guard-excluded file counts. Bare `--json` is the compatible full output;
 `--json-mode debug` is byte-identical for the same completed invocation, while
 `--json-mode compact` removes only normalized `pass` findings and retains the
 result, scope, required policies, guards, ordering, and actionable findings.
-Named modes require `--json`. See [Usage](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md) for the schema and
+Named modes require `--json`. See [Usage](https://stef-k.github.io/agent-code-guard/usage.html) for the schema and
 option contract.
 
 Known per-file syntax or provider failures instead produce `overall:
@@ -207,7 +211,7 @@ Generic `.h` files are not syntax-dispatched; `.markdown` is not enabled; Vue
 template and style regions are not executable syntax input; and unsupported
 artifacts are inapplicable. Malformed applicable syntax or a required provider
 failure is unavailable evidence, distinct from both an inapplicable file and a
-completed FAIL finding. See [Language support](https://github.com/stef-k/agent-code-guard/blob/main/docs/language-support.md).
+completed FAIL finding. See [Language support](https://stef-k.github.io/agent-code-guard/language-support.html).
 
 ### Skill integration
 
@@ -219,13 +223,13 @@ code-guard --export-skill <target-directory>
 ```
 
 Skill activation is platform-specific and is not performed by pipx or Code
-Guard. See [Skill distribution](https://github.com/stef-k/agent-code-guard/blob/main/docs/skill-distribution.md). The checkout
+Guard. See [Skill distribution](https://stef-k.github.io/agent-code-guard/skill-distribution.html). The checkout
 compatibility runner is for repository development, not normal installation.
 
 ### Configuration
 
 Built-in defaults require no configuration. Configure a project only for a
-concrete policy reason; see the [configuration guide](https://github.com/stef-k/agent-code-guard/blob/main/docs/configuration.md).
+concrete policy reason; see the [configuration guide](https://stef-k.github.io/agent-code-guard/configuration.html).
 The LOC baseline is an explicit adoption tool for established legacy
 repositories, not an ordinary-use requirement or a way to silence findings.
 Its default `ratchetAt: "fail"` policy freezes files above `failAt`; choose
@@ -233,7 +237,7 @@ Its default `ratchetAt: "fail"` policy freezes files above `failAt`; choose
 non-increasing while ordinary findings in that range remain REVIEW.
 
 Reviewed oversized Markdown documents have a separate, explicit
-[document-size ratchet](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md#reviewed-markdown-document-ratchet).
+[document-size ratchet](https://stef-k.github.io/agent-code-guard/usage.html#reviewed-markdown-document-ratchet).
 `--create-markdown-baseline` records accepted physical-line counts;
 `--update-markdown-baseline` only lowers or prunes them. Documents within their
 allowance pass the document-size guard; growth produces REVIEW. Section
@@ -246,18 +250,18 @@ remain visible but non-blocking, while FAIL findings and tool errors block the
 workflow; the repository intentionally uses no adoption baseline.
 
 The maintained interpreter range is **CPython 3.10–3.14**. See
-[Platform support](https://github.com/stef-k/agent-code-guard/blob/main/docs/platform-support.md) for supported binary platforms and
+[Platform support](https://stef-k.github.io/agent-code-guard/platform-support.html) for supported binary platforms and
 source-build boundaries.
 
 ## Documentation
 
-- [Documentation index](https://github.com/stef-k/agent-code-guard/blob/main/docs/README.md)
-- [Agent workflow](https://github.com/stef-k/agent-code-guard/blob/main/docs/agent-workflow.md)
-- [Usage and CLI reference](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md)
-- [Configuration](https://github.com/stef-k/agent-code-guard/blob/main/docs/configuration.md)
-- [Language support](https://github.com/stef-k/agent-code-guard/blob/main/docs/language-support.md)
-- [Platform support](https://github.com/stef-k/agent-code-guard/blob/main/docs/platform-support.md)
-- [Skill distribution](https://github.com/stef-k/agent-code-guard/blob/main/docs/skill-distribution.md)
+- [Documentation index](https://stef-k.github.io/agent-code-guard/)
+- [Agent workflow](https://stef-k.github.io/agent-code-guard/agent-workflow.html)
+- [Usage and CLI reference](https://stef-k.github.io/agent-code-guard/usage.html)
+- [Configuration](https://stef-k.github.io/agent-code-guard/configuration.html)
+- [Language support](https://stef-k.github.io/agent-code-guard/language-support.html)
+- [Platform support](https://stef-k.github.io/agent-code-guard/platform-support.html)
+- [Skill distribution](https://stef-k.github.io/agent-code-guard/skill-distribution.html)
 
 ## Feedback, security, and license
 
