@@ -81,7 +81,7 @@ Copy this prompt to a coding agent:
 > skill directory. Do not guess a target or overwrite an existing export; verify
 > that `.agent-code-guard-version` matches the installed distribution. Follow the
 > [agent workflow](https://github.com/stef-k/agent-code-guard/blob/main/docs/agent-workflow.md)
-> without creating a LOC baseline. After meaningful source or Markdown edits, run
+> without creating an adoption baseline. After meaningful source or Markdown edits, run
 > `code-guard . --changed-only --json --json-mode compact`; outside Git, pass the
 > exact edited files. Inspect REVIEW and FAIL findings, make only genuine
 > improvements, rerun the check, and report the result. Never weaken thresholds,
@@ -232,11 +232,18 @@ Its default `ratchetAt: "fail"` policy freezes files above `failAt`; choose
 `ratchetAt: "review"` only when every established file above `warnAt` must be
 non-increasing while ordinary findings in that range remain REVIEW.
 
+Reviewed oversized Markdown documents have a separate, explicit
+[document-size ratchet](https://github.com/stef-k/agent-code-guard/blob/main/docs/usage.md#reviewed-markdown-document-ratchet).
+`--create-markdown-baseline` records accepted physical-line counts;
+`--update-markdown-baseline` only lowers or prunes them. Documents within their
+allowance pass the document-size guard; growth produces REVIEW. Section
+findings remain active, and ordinary analysis never writes either baseline.
+
 ## Trust, CI, and platform support
 
 CI installs Agent Code Guard and analyzes its own real checkout. REVIEW findings
 remain visible but non-blocking, while FAIL findings and tool errors block the
-workflow; the repository intentionally uses no LOC baseline.
+workflow; the repository intentionally uses no adoption baseline.
 
 The maintained interpreter range is **CPython 3.10–3.14**. See
 [Platform support](https://github.com/stef-k/agent-code-guard/blob/main/docs/platform-support.md) for supported binary platforms and

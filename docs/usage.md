@@ -198,11 +198,79 @@ size-regression check. A ratchet entry may not overlap `allowedLargeFiles`.
 
 This workflow is only for adopting established legacy repositories. New
 projects, including Agent Code Guard itself, should meet policy directly and
-must not create a ratchet baseline.
+must not create a LOC ratchet baseline.
 
 Do not switch between `fail` and `review`, raise thresholds, add exclusions or
 exemptions, or edit allowances merely to silence a growth failure. Those are
 source-controlled policy changes and require their own substantive justification.
+
+## Reviewed Markdown document ratchet
+
+After reviewing an oversized, cohesive Markdown document, explicitly record its
+accepted physical-line count over a deliberately bounded scope:
+
+```bash
+code-guard docs/architecture.md --create-markdown-baseline
+git add .agent-tools/code-guard.markdown-baseline.json
+git diff --cached
+```
+
+This creates `<analysis-root>/.agent-tools/code-guard.markdown-baseline.json`.
+The analysis root is the enclosing Git top-level or, outside Git, the resolved
+invocation directory. Creation requires an enabled `markdownDocumentSize` guard
+and records only selected `.md` files strictly above its effective `reviewAt`.
+An existing baseline is never overwritten by create. Review and commit the
+baseline as the explicit acceptance decision; it is not part of ordinary setup.
+
+Normal analysis reads the baseline automatically without writing it. With the
+default 800-line threshold and an accepted allowance of 845 document lines:
+
+| Current document | Document-size result |
+| --- | --- |
+| Same path, 845 lines | PASS, within allowance |
+| Same path, 840 lines | PASS, within allowance |
+| Same path, 846 lines | REVIEW, allowance exceeded |
+| New or renamed path, 845 lines | REVIEW, no allowance |
+| Any document at or below 800 lines | PASS, no allowance needed |
+
+This ratchet applies only to `markdownDocumentSize`. It does not change the
+threshold, exclude Markdown from analysis, or suppress `markdownSectionSize`.
+An accepted document can still have section REVIEW findings. Growth remains
+REVIEW (exit `1`, or `0` with `--ci`), not FAIL.
+
+After shortening or deleting documents, explicitly lower or prune entries:
+
+```bash
+code-guard docs --update-markdown-baseline
+```
+
+Update requires an existing baseline and an enabled document guard. It lowers
+existing allowances within positional bounds, removes deleted or scope-excluded
+paths and entries at or below the effective threshold, and preserves entries
+outside those bounds. It never adds an entry or increases an allowance. Growth
+in a retained entry aborts the entire update without changing the baseline.
+A rename is a deletion plus an unaccepted new path. Manual baseline changes
+require source-control review; do not rebaseline merely to hide growth.
+
+Both write modes accept paths, `--config`, and repeated `--scope-exclude`.
+They reject other baseline modes, LOC counting/threshold options, Git selectors,
+JSON/CI analysis options, diagnostics, version reporting, and skill management.
+Writes do not run normal analysis. Successful writes exit `0`; invalid inputs
+or unsafe baselines produce tool errors (exit `3`, stderr, no completed report).
+Normal analysis and creation do not grant allowances through an explicitly
+supplied file symlink; updates reject symlink bounds. Baseline storage and
+entries must not traverse symlinks, and baseline-enabled scopes must stay
+inside the analysis root.
+
+Human output shows the accepted allowance and `within`, `exceeded`, or
+`no longer needed`. Full/debug JSON retains document measurements and the
+unchanged `thresholds.reviewAt`; entries matched by path add `baselineLines`
+and `ratchetStatus` (`within`, `exceeded`, or `notNeeded`). Unmatched findings
+retain their original shape. Compact JSON omits accepted PASS findings like
+other passes. Accepted documents do not require the document-size policy;
+independent section findings still require their own policy.
+
+See the [persisted schema](configuration.md#source-controlled-markdown-document-ratchet).
 
 ## Results and exit codes
 

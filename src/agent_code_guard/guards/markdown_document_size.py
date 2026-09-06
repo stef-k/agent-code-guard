@@ -46,13 +46,27 @@ def load_config(args: argparse.Namespace, document: JsonObject | None = None) ->
     return Config(True, review_at)
 
 
-def run(root: Path, config: Config, facts: MarkdownFacts) -> GuardResult:
+def run(
+    root: Path, config: Config, facts: MarkdownFacts, baseline: dict[str, int] | None = None,
+) -> GuardResult:
     assert config.review_at is not None
-    findings = [MarkdownDocumentFinding(
-        fact.reporting_path or _path(fact.path, root), fact.physical_lines,
-        "review" if fact.physical_lines > config.review_at else "pass",
-        {"reviewAt": config.review_at},
-    ) for fact in facts.documents]
+    findings = []
+    for fact in facts.documents:
+        path = fact.reporting_path or _path(fact.path, root)
+        allowance = baseline.get(path) if baseline is not None else None
+        state = "review" if fact.physical_lines > config.review_at else "pass"
+        ratchet_status = None
+        if allowance is not None:
+            if fact.physical_lines <= config.review_at:
+                ratchet_status = "notNeeded"
+            elif fact.physical_lines <= allowance:
+                state, ratchet_status = "pass", "within"
+            else:
+                ratchet_status = "exceeded"
+        findings.append(MarkdownDocumentFinding(
+            path, fact.physical_lines, state, {"reviewAt": config.review_at},
+            allowance, ratchet_status,
+        ))
     findings.sort(key=lambda finding: finding.path)
     return GuardResult("markdownDocumentSize", "review" if any(item.state == "review" for item in findings) else "pass", findings)
 

@@ -78,13 +78,21 @@ class MarkdownDocumentFinding:
     state: str
     thresholds: dict[str, int]
 
+    baseline_lines: int | None = None
+    ratchet_status: str | None = None
+
     def to_json(self) -> dict[str, Any]:
-        return {
+        result = {
             "path": self.path,
             "measured": self.measured,
             "state": self.state,
             "thresholds": self.thresholds,
         }
+
+        if self.baseline_lines is not None:
+            result["baselineLines"] = self.baseline_lines
+            result["ratchetStatus"] = self.ratchet_status
+        return result
 
 
 @dataclass(frozen=True)

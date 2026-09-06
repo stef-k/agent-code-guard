@@ -198,8 +198,12 @@ sys.path.insert(0, sys.argv[1])
 from agent_code_guard.code_guard import main
 with patch.object(sys, 'argv', ['code-guard', '--version']):
     result = main()
-loaded = sorted(name for name in sys.modules if name.startswith(
-    ('agent_code_guard.analysis', 'agent_code_guard.markdown', 'tree_sitter')
+provider_packages = (
+    'agent_code_guard.analysis', 'agent_code_guard.markdown',
+    'tree_sitter', 'tree_sitter_language_pack',
+)
+loaded = sorted(name for name in sys.modules if any(
+    name == package or name.startswith(package + '.') for package in provider_packages
 ))
 print(json.dumps({'result': result, 'loaded': loaded}))
 """

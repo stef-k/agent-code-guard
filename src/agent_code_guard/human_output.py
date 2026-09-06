@@ -84,11 +84,16 @@ def _markdown_lines(data: dict[str, object]) -> list[str]:
     document_result = data["guards"].get("markdownDocumentSize")
     if document_result:
         for finding in document_result["findings"]:
-            if finding["state"] != "review":
+            allowance = finding.get("baselineLines")
+            if finding["state"] != "review" and allowance is None:
                 continue
+            detail = ""
+            if allowance is not None:
+                status = "no longer needed" if finding["ratchetStatus"] == "notNeeded" else finding["ratchetStatus"]
+                detail = f"; baseline {allowance}, {status}"
             lines.append(
-                f"REVIEW: {finding['path']} — Markdown document is {finding['measured']} lines "
-                f"(review {finding['thresholds']['reviewAt']})"
+                f"{finding['state'].upper()}: {finding['path']} — Markdown document is {finding['measured']} lines "
+                f"(review {finding['thresholds']['reviewAt']}{detail})"
             )
     section_result = data["guards"].get("markdownSectionSize")
     if section_result:

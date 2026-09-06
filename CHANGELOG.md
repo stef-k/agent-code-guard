@@ -4,6 +4,13 @@ Notable changes to Agent Code Guard are recorded here.
 
 ## Unreleased
 
+### Added
+
+- Explicit source-controlled Markdown document-size ratchets: create accepted
+  physical-line allowances and update them only downward or by pruning. Accepted
+  documents pass without repeated REVIEW; growth returns REVIEW, while section
+  findings remain independent. Normal analysis never writes a baseline.
+
 ## 0.3.1 - 2026-08-29
 
 ### Changed
