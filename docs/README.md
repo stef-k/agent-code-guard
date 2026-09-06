@@ -6,8 +6,8 @@ contract and the evidence behind it.
 ## User guides
 
 - [Human and agent workflow](agent-workflow.md) — installation, repeated changed-work checks, REVIEW judgment, and optional authorized hooks.
-- [Usage](usage.md) — installation, file selection, output, result states, and CI.
-- [Configuration](configuration.md) — zero-config defaults, guard settings, and exclusions.
+- [Usage](usage.md) — installation, file selection, output, adoption ratchets, result states, and CI.
+- [Configuration](configuration.md) — zero-config defaults, guard settings, exclusions, and baseline schemas.
 - [Language support](language-support.md) — applicable syntax languages, extensions, and mixed-content behavior.
 - [Platform support](platform-support.md) — maintained Python versions and native-wheel boundaries.
 - [Skill distribution](skill-distribution.md) — version-matched agent skill discovery and export.

@@ -147,6 +147,51 @@ only existing hard failures; choose `review` when established review-level files
 must also be non-increasing. Never change the policy, thresholds, exclusions,
 exemptions, or stored allowances merely to silence growth.
 
+## Source-controlled Markdown document ratchet
+
+Reviewed document allowances live separately from LOC in
+`<analysis-root>/.agent-tools/code-guard.markdown-baseline.json`:
+
+```json
+{
+  "version": 1,
+  "markdownDocumentSize": {
+    "files": [
+      {
+        "path": "docs/architecture.md",
+        "allowedLines": 845
+      }
+    ]
+  }
+}
+```
+
+The version must be integer `1`. Paths are exact, normalized root-relative `/`
+paths to `.md` documents (extension matching is case-insensitive); allowances
+are positive integer physical-line counts, including blank and comment lines.
+Keys are closed, entries must be sorted by path, and duplicate keys or paths,
+non-integer values, unsafe/absolute paths, and symlink traversal fail closed.
+Writers use UTF-8, two-space indentation, LF endings, and a final newline.
+Creation cannot overwrite a baseline; updates replace it atomically only after
+all entries in scope have been checked. A no-op update preserves the file.
+
+There are no new guard configuration keys. `markdownDocumentSize.reviewAt`
+remains 800 by default and `markdownSectionSize.reviewAt` remains 200.
+`guards.loc.ratchetAt` has no effect on Markdown. The document-size guard accepts
+an exact-path allowance while the document stays at or below that count;
+growth above the allowance reviews whenever it also exceeds `reviewAt`.
+Documents at or below `reviewAt` pass without needing a baseline.
+
+`--create-markdown-baseline` records only selected documents above the effective
+threshold. `--update-markdown-baseline` only lowers or prunes existing entries
+within positional bounds; it never adds or increases allowances. Normal
+analysis never mutates this file. Section analysis remains independent, and
+section baselines are not supported. These are explicit reviewed-document
+acceptances, not default setup or permission to hide growth with exclusions,
+threshold changes, or replacement allowances.
+
+See the [workflow and output contract](usage.md#reviewed-markdown-document-ratchet).
+
 ## Fail-closed validation
 
 Malformed JSON, invalid types or thresholds, unknown top-level properties,

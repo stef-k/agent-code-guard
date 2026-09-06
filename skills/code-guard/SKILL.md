@@ -148,8 +148,9 @@ reviews and never fails. Load `references/complexity-policy.md` only when
 
 Markdown document and direct-section size count all physical lines. Sections
 run from a supported heading through the line before the next heading of any
-level, or EOF. Exact effective thresholds pass; greater measurements review and
-never fail. Load `references/markdown-size-policy.md` when either
+level, or EOF. Exact effective thresholds pass; greater measurements normally
+review and never fail. A document measurement within an explicitly accepted
+Markdown document baseline passes the document-size guard. Load `references/markdown-size-policy.md` when either
 `markdownDocumentSize` or `markdownSectionSize` appears in `requiredPolicies`.
 Review navigation and responsibility without mechanically splitting coherent
 specifications or gaming headings/formatting.
@@ -161,3 +162,20 @@ REVIEW requires inspection and justification, not mandatory refactoring.
 Agent Code Guard is the canonical LOC implementation. Agent LOC Guard is the completed prototype/reference whose mature behavior was migrated from commit `75ab39d261dbc65f78815836fac90add16d265d1`.
 
 Project-specific architecture rules, framework-specific checks, arbitrary style preferences, security scanners, and dependency auditing are outside the universal core.
+
+## Reviewed Markdown document baselines
+
+After explicit acceptance of a cohesive oversized document, use
+`code-guard docs/architecture.md --create-markdown-baseline` to record its current
+physical-line count in `.agent-tools/code-guard.markdown-baseline.json` at the
+analysis root. Normal analysis reads this file without writing. Unchanged or
+smaller accepted documents pass `markdownDocumentSize`; growth above both the
+allowance and effective threshold returns REVIEW. `markdownSectionSize` remains
+independent and has no baseline support.
+
+`--update-markdown-baseline` only lowers or prunes existing allowances within
+positional bounds; it never adds or increases one. Neither write command is
+part of routine checks. Do not create, replace, remove, or increase allowances
+merely to silence findings. Review and commit explicit acceptance decisions.
+Human/full JSON output retains acceptance context; compact omits accepted PASS
+findings. Load the Markdown policy for actionable document or section reviews.

@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from pathlib import Path
 from typing import Any
 
 from .file_selection import is_within
+from .baseline_files import (
+    atomic_create as _atomic_create,
+    atomic_replace as _atomic_replace,
+    canonical_path as _canonical_path,
+    in_bounds as _in_bounds,
+    require_regular_inside as _require_regular_inside,
+    resolve_bounds as _resolve_bounds,
+    validate_explicit_scope,
+    validate_paths,
+)
 from .guards import loc
 from .invocation import SelectedFile
 from .path_matching import matches_path_glob
@@ -75,41 +83,6 @@ def validate_overlap(entries: dict[str, int], config: loc.Config) -> None:
     for path in entries:
         if any(matches_path_glob(path, item.path) for item in config.allowed_large_files):
             raise ValueError(f"LOC baseline path overlaps allowedLargeFiles: {path}")
-
-
-def validate_paths(root: Path, entries: dict[str, int]) -> None:
-    for relative in entries:
-        candidate = root / Path(relative)
-        resolved = candidate.resolve(strict=False)
-        if not is_within(resolved, root):
-            raise ValueError(f"LOC baseline path escapes analysis root: {relative}")
-        current = root
-        for part in Path(relative).parts:
-            current = current / part
-            if current.is_symlink():
-                raise ValueError(f"LOC baseline path traverses a symlink: {relative}")
-
-
-def validate_explicit_scope(
-    values: list[str], invocation: Path, root: Path, selected_files: tuple[Path, ...],
-) -> set[Path]:
-    """Validate raw bounds before resolution erases empty directories and file-link identity."""
-    linked_targets: set[Path] = set()
-    directly_reached: set[Path] = set()
-    for value in values or ["."]:
-        path = Path(value) if Path(value).is_absolute() else invocation / value
-        resolved = path.resolve()
-        if not is_within(resolved, root):
-            raise ValueError(f"baseline scope is outside analysis root: {value}")
-        if path.is_symlink() and path.is_file():
-            linked_targets.add(resolved)
-        elif path.is_file():
-            directly_reached.add(resolved)
-        elif path.is_dir():
-            directly_reached.update(
-                selected.resolve() for selected in selected_files if is_within(selected, resolved)
-            )
-    return linked_targets - directly_reached
 
 
 def create(root: Path, files: tuple[Path, ...], config: loc.Config) -> int:
@@ -212,72 +185,6 @@ def serialize(entries: dict[str, int]) -> bytes:
     return (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
 
 
-def _atomic_replace(target: Path, content: bytes) -> None:
-    temporary = _write_temporary(target, content)
-    try:
-        os.replace(temporary, target)
-    finally:
-        try:
-            temporary.unlink()
-        except FileNotFoundError:
-            pass
-
-
-def _atomic_create(target: Path, content: bytes) -> None:
-    temporary = _write_temporary(target, content)
-    try:
-        os.link(temporary, target)
-    except FileExistsError as exc:
-        raise ValueError(f"LOC baseline already exists: {RELATIVE_PATH}") from exc
-    finally:
-        try:
-            temporary.unlink()
-        except FileNotFoundError:
-            pass
-
-
-def _write_temporary(target: Path, content: bytes) -> Path:
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
-    temporary = Path(temporary_name)
-    try:
-        with os.fdopen(descriptor, "wb") as handle:
-            handle.write(content)
-            handle.flush()
-            os.fsync(handle.fileno())
-        return temporary
-    except Exception:
-        temporary.unlink(missing_ok=True)
-        raise
-
-
-def _resolve_bounds(values: list[str], invocation: Path, root: Path) -> list[tuple[Path, bool]]:
-    bounds = []
-    for value in values or ["."]:
-        path = Path(value) if Path(value).is_absolute() else invocation / value
-        if not path.exists():
-            raise FileNotFoundError(f"explicit path does not exist: {value}")
-        if path.is_symlink():
-            raise ValueError(f"baseline bounds may not be symlinks: {value}")
-        resolved = path.resolve()
-        if not is_within(resolved, root):
-            raise ValueError(f"baseline scope is outside analysis root: {value}")
-        bounds.append((resolved, path.is_dir()))
-    return bounds
-
-
-def _in_bounds(relative: str, bounds: list[tuple[Path, bool]], root: Path) -> bool:
-    candidate = (root / Path(relative)).resolve(strict=False)
-    return any(
-        is_within(candidate, bound) if is_directory else candidate == bound
-        for bound, is_directory in bounds
-    )
-
-
-def _require_regular_inside(path: Path, root: Path) -> None:
-    if path.is_symlink() or not path.is_file() or not is_within(path, root):
-        raise ValueError(f"baseline scope contains an unsafe or outside-root path: {path}")
-
-
 def _require_enabled(config: loc.Config) -> None:
     if not config.enabled:
         raise ValueError("LOC guard must be enabled for baseline writes")
@@ -293,12 +200,3 @@ def _exact_keys(value: Any, expected: set[str], location: str) -> None:
         if missing:
             raise ValueError(f"missing LOC baseline property: {location}.{missing[0]}")
         raise ValueError(f"unknown LOC baseline property: {location}.{unknown[0]}")
-
-
-def _canonical_path(value: str) -> bool:
-    if not value or "\\" in value or value.endswith("/") or "//" in value:
-        return False
-    path = Path(value)
-    if path.is_absolute() or path.drive or value.startswith("//"):
-        return False
-    return all(part not in {"", ".", ".."} for part in value.split("/"))

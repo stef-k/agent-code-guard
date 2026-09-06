@@ -467,3 +467,21 @@ span. Style facts must use a separate family-specific pass over final
 discovery, or justify generic artifact/plugin infrastructure. Full corpus,
 provider, recovery, boundary, and gaming evidence is recorded in
 `docs/style-guard-evidence.md`.
+
+## D35 — Reviewed Markdown documents use a separate non-increasing ratchet
+
+A cohesive oversized Markdown document can retain an explicitly reviewed
+physical-line allowance at its exact root-relative path. The separate
+`.agent-tools/code-guard.markdown-baseline.json` keeps this acceptance independent
+of LOC policy: unchanged or smaller documents pass the document-size guard;
+growth above the allowance and ordinary threshold returns REVIEW, never FAIL.
+Normal analysis reads without writing. Explicit creation records current
+oversized documents; updates only lower or prune existing allowances.
+
+The baseline changes acceptance, not measurement, global thresholds, or scope.
+Section findings remain independent. Sections have headings and line ranges,
+but no stable identity across duplicate headings, renames, and edits. Section
+ratchets are deferred to avoid adding identity rules to this bounded feature.
+Both baselines share filesystem safety routines, while retaining separate
+schemas and guard-specific lifecycle rules. The original Markdown admission
+and threshold evidence remain historical records.

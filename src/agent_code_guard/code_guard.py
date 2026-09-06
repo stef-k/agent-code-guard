@@ -15,7 +15,7 @@ from .config_validation import validate_configuration
 from .file_selection import ResolvedScope, resolve_invocation, resolve_scope
 from .guards import callable_size, complexity, loc, markdown_document_size, markdown_section_size, nesting
 from .human_output import format_completed_analysis
-from . import loc_baseline
+from . import baseline_files, loc_baseline, markdown_baseline
 from .result_model import GuardResult, aggregate_state, required_policies
 from .invocation import AnalysisContext, SelectedFile, load_configuration
 from .skill_distribution import export_skill, skill_path as installed_skill_path
@@ -59,7 +59,15 @@ Legacy LOC adoption:
   code-guard [PATH ...] --update-loc-baseline [counting/configuration options]
     Create or lower/prune the source-controlled LOC ratchet at
     <analysis-root>/.agent-tools/code-guard.loc-baseline.json. These explicit
-    write modes do not run normal analysis and never increase an allowance.""",
+    write modes do not run normal analysis and never increase an allowance.
+
+Reviewed Markdown documents:
+  code-guard [PATH ...] --create-markdown-baseline [--config FILE]
+  code-guard [PATH ...] --update-markdown-baseline [--config FILE]
+    Create or lower/prune .agent-tools/code-guard.markdown-baseline.json at the
+    analysis root. Accept reviewed document sizes; growth produces REVIEW.
+    Section findings remain independent. Both modes accept --scope-exclude,
+    reject LOC counting options and analysis modes, and never add on update.""",
     )
     value.add_argument(
         "paths", nargs="*", default=[],
@@ -96,6 +104,14 @@ Legacy LOC adoption:
     value.add_argument(
         "--update-loc-baseline", action="store_true",
         help="Lower or prune the canonical LOC baseline without running analysis.",
+    )
+    value.add_argument(
+        "--create-markdown-baseline", action="store_true",
+        help="Record current reviewed Markdown document sizes without running normal analysis.",
+    )
+    value.add_argument(
+        "--update-markdown-baseline", action="store_true",
+        help="Lower or prune existing Markdown document allowances; never add or increase one.",
     )
     value.add_argument(
         "--skill-path", action="store_true",
@@ -202,11 +218,18 @@ def _management_mode(args: argparse.Namespace) -> int | None:
     return 0
 
 
-def _loc_baseline_mode(args: argparse.Namespace) -> int | None:
-    if not args.create_loc_baseline and not args.update_loc_baseline:
+def _baseline_mode(args: argparse.Namespace) -> int | None:
+    modes = (args.create_loc_baseline, args.update_loc_baseline,
+             args.create_markdown_baseline, args.update_markdown_baseline)
+    if not any(modes):
         return None
+    markdown_mode = args.create_markdown_baseline or args.update_markdown_baseline
     incompatible = (
-        args.create_loc_baseline and args.update_loc_baseline
+        sum(modes) != 1
+        or (markdown_mode and (
+            args.warn is not None or args.fail is not None or args.include or args.exclude
+            or args.count_blank_lines or args.ignore_comment_lines
+        ))
         or (bool(args.paths) and args.paths[0] == "doctor")
         or args.json
         or args.json_mode is not None
@@ -219,9 +242,8 @@ def _loc_baseline_mode(args: argparse.Namespace) -> int | None:
         or args.export_skill is not None
     )
     if incompatible:
-        raise ValueError(
-            "LOC baseline write modes accept only paths and LOC counting/configuration options"
-        )
+        options = "configuration/scope options" if markdown_mode else "LOC counting/configuration options"
+        raise ValueError(f"baseline write modes accept only paths and {options}; use one write mode")
     args.paths = args.paths or ["."]
     invocation = Path.cwd()
     validate_configuration(args.config, invocation)
@@ -229,17 +251,19 @@ def _loc_baseline_mode(args: argparse.Namespace) -> int | None:
     linked_targets = loc_baseline.validate_explicit_scope(
         args.paths, invocation, scope.root, scope.files,
     )
-    config = loc.load_config(args)
-    if args.create_loc_baseline:
+    lifecycle = markdown_baseline if markdown_mode else loc_baseline
+    label = "Markdown" if markdown_mode else "LOC"
+    config = markdown_document_size.load_config(args) if markdown_mode else loc.load_config(args)
+    if args.create_loc_baseline or args.create_markdown_baseline:
         files = tuple(path for path in scope.files if path.resolve() not in linked_targets)
-        count = loc_baseline.create(scope.root, files, config)
-        print(f"Created LOC baseline: {loc_baseline.RELATIVE_PATH} ({count} entries).")
+        count = lifecycle.create(scope.root, files, config)
+        print(f"Created {label} baseline: {lifecycle.RELATIVE_PATH} ({count} entries).")
     else:
-        lowered, removed, unchanged = loc_baseline.update(
+        lowered, removed, unchanged = lifecycle.update(
             scope.root, args.paths, invocation, config, scope.excluded_files,
         )
         print(
-            f"Updated LOC baseline: {loc_baseline.RELATIVE_PATH} "
+            f"Updated {label} baseline: {lifecycle.RELATIVE_PATH} "
             f"({lowered} lowered, {removed} removed, {unchanged} unchanged)."
         )
     return 0
@@ -336,29 +360,19 @@ def run_analysis(
     context = scope if isinstance(scope, AnalysisContext) else _legacy_context(scope, args)
     loc_config = loc.load_config(args, context.configuration)
     baseline = baseline_override if baseline_loaded else loc_baseline.load_if_present(context.root)
+    document_baseline = markdown_baseline.load_if_present(context.root)
     if baseline is not None:
         loc_baseline.validate_paths(context.root, baseline)
         loc_baseline.validate_overlap(baseline, loc_config)
-        error = "baseline analysis scope is outside analysis root"
-        try:
-            current_root = context.root.resolve(strict=True)
-        except OSError as exc:
-            raise ValueError(f"{error}: {context.root}") from exc
-        for selected in context.selected_files:
-            try:
-                current_path = selected.physical_path.resolve(strict=True)
-                valid = (
-                    not selected.physical_path.is_symlink()
-                    and current_path.is_file()
-                    and current_path.is_relative_to(current_root)
-                )
-            except OSError:
-                valid = False
-            if not valid:
-                raise ValueError(f"{error}: {selected.physical_path}")
-        baseline = dict(baseline)
-        for target in linked_targets or set():
-            baseline.pop(target.relative_to(context.root).as_posix(), None)
+    if baseline is not None or document_baseline is not None:
+        baseline_files.validate_analysis_scope(
+            context.root, tuple(selected.physical_path for selected in context.selected_files),
+        )
+        baseline = dict(baseline) if baseline is not None else None
+        for allowances in (baseline, document_baseline):
+            if allowances is not None:
+                for target in linked_targets or set():
+                    allowances.pop(target.relative_to(context.root).as_posix(), None)
     callable_size_config = callable_size.load_config(args, context.configuration)
     nesting_config = nesting.load_config(args, context.configuration)
     complexity_config = complexity.load_config(args, context.configuration)
@@ -388,7 +402,7 @@ def run_analysis(
         markdown = import_module("agent_code_guard.markdown")
         markdown_facts = markdown.analyze_files(markdown_files)
         if markdown_document_config.enabled:
-            results.append(markdown_document_size.run(context.root, markdown_document_config, markdown_facts))
+            results.append(markdown_document_size.run(context.root, markdown_document_config, markdown_facts, document_baseline))
         if markdown_section_config.enabled:
             results.append(markdown_section_size.run(context.root, markdown_section_config, markdown_facts))
     else:
@@ -473,7 +487,7 @@ def main() -> int:
     try:
         if args.json_mode is not None and not args.json:
             raise ValueError("--json-mode requires --json")
-        baseline_result = _loc_baseline_mode(args)
+        baseline_result = _baseline_mode(args)
         if baseline_result is not None:
             return baseline_result
         doctor_result = _doctor_mode(args, raw_arguments)
@@ -491,7 +505,10 @@ def main() -> int:
         scope = resolve_invocation(args, invocation, configuration)
         linked_targets: set[Path] = set()
         baseline_loaded = hasattr(scope, "root")
-        if baseline_loaded and loc_baseline.baseline_path(scope.root).exists():
+        if baseline_loaded and (
+            loc_baseline.baseline_path(scope.root).exists()
+            or markdown_baseline.baseline_path(scope.root).exists()
+        ):
             linked_targets = loc_baseline.validate_explicit_scope(
                 args.paths, invocation, scope.root,
                 tuple(selected.physical_path for selected in scope.selected_files),
@@ -506,7 +523,8 @@ def main() -> int:
             print_text(data)
         return exit_code(data["overall"], args.ci)
     except Exception as exc:
-        write_mode = args.create_loc_baseline or args.update_loc_baseline
+        write_mode = any((args.create_loc_baseline, args.update_loc_baseline,
+                          args.create_markdown_baseline, args.update_markdown_baseline))
         return _print_tool_error(str(exc), args.json and not write_mode)
 
 

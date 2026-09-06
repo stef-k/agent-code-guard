@@ -17,7 +17,7 @@ code-guard doctor
 ```
 
 Ask your coding agent to locate the bundled version-matched skill with
-`code-guard --skill-path` and adopt the workflow below without creating a LOC
+`code-guard --skill-path` and adopt the workflow below without creating an adoption
 baseline. Decide whether checks remain manual or use an optional platform hook.
 Exporting a skill into a persistent directory, installing a hook, or changing
 persistent user or repository configuration requires your authorization.
@@ -25,6 +25,13 @@ persistent user or repository configuration requires your authorization.
 Require the agent to report its final result and any REVIEW findings it accepts
 with justification. Use CI as the final gate, not as a substitute for checks
 during development.
+
+An explicitly reviewed, cohesive oversized Markdown document can use the
+[document-size ratchet](usage.md#reviewed-markdown-document-ratchet) after
+acceptance is authorized. Ordinary checks never create or update a baseline.
+Unchanged or smaller accepted documents pass the document guard; growth returns
+REVIEW, and section findings remain independent. Do not use baseline updates
+to hide new growth or treat document acceptance as a section exemption.
 
 ## The shared loop
 
