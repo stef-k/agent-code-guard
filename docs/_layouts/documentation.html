@@ -1,0 +1,11 @@
+---
+layout: default
+---
+{% unless page.url == '/' %}
+<nav aria-label="Documentation navigation">
+  <a href="{{ '/' | relative_url }}">Documentation home</a> ·
+  <a href="https://github.com/stef-k/agent-code-guard">View on GitHub</a>
+</nav>
+{% endunless %}
+
+{{ content }}
