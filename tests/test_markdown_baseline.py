@@ -64,6 +64,19 @@ class MarkdownBaselineTests(CodeGuardTestCase):
             document.write_text('# Section\n' + 'body\n' * 799, encoding='utf-8')
             self.assertEqual(self.read_json(self.run_guard(root, 'architecture.md', '--json'))['guards']['markdownSectionSize']['state'], 'review')
 
+    def test_accepted_document_keeps_section_review_active(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            document = root / 'architecture.md'
+            document.write_text('# Section\n' + 'body\n' * 844, encoding='utf-8')
+            self.assertEqual(self.run_guard(root, '.', '--create-markdown-baseline').returncode, 0)
+            result = self.run_guard(root, '.', '--json')
+            data = self.read_json(result)
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(data['guards']['markdownDocumentSize']['state'], 'pass')
+            self.assertEqual(data['guards']['markdownSectionSize']['state'], 'review')
+            self.assertEqual(data['requiredPolicies'], ['markdownSectionSize'])
+
     def test_bounded_update_prunes_deletions_exclusions_and_never_adds(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

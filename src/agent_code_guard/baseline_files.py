@@ -22,7 +22,6 @@ def validate_paths(root: Path, entries: dict[str, int], label: str = "LOC") -> N
                 raise ValueError(f"{label} baseline path traverses a symlink: {relative}")
 
 
-
 def validate_explicit_scope(
     values: list[str], invocation: Path, root: Path, selected_files: tuple[Path, ...],
 ) -> set[Path]:
@@ -45,9 +44,8 @@ def validate_explicit_scope(
     return linked_targets - directly_reached
 
 
-
 def atomic_replace(target: Path, content: bytes) -> None:
-    temporary = write_temporary(target, content)
+    temporary = _write_temporary(target, content)
     try:
         os.replace(temporary, target)
     finally:
@@ -57,9 +55,8 @@ def atomic_replace(target: Path, content: bytes) -> None:
             pass
 
 
-
 def atomic_create(target: Path, content: bytes, label: str = "LOC") -> None:
-    temporary = write_temporary(target, content)
+    temporary = _write_temporary(target, content)
     try:
         os.link(temporary, target)
     except FileExistsError as exc:
@@ -71,8 +68,7 @@ def atomic_create(target: Path, content: bytes, label: str = "LOC") -> None:
             pass
 
 
-
-def write_temporary(target: Path, content: bytes) -> Path:
+def _write_temporary(target: Path, content: bytes) -> Path:
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
     temporary = Path(temporary_name)
     try:
@@ -84,7 +80,6 @@ def write_temporary(target: Path, content: bytes) -> Path:
     except Exception:
         temporary.unlink(missing_ok=True)
         raise
-
 
 
 def resolve_bounds(values: list[str], invocation: Path, root: Path) -> list[tuple[Path, bool]]:
@@ -102,7 +97,6 @@ def resolve_bounds(values: list[str], invocation: Path, root: Path) -> list[tupl
     return bounds
 
 
-
 def in_bounds(relative: str, bounds: list[tuple[Path, bool]], root: Path) -> bool:
     candidate = (root / Path(relative)).resolve(strict=False)
     return any(
@@ -111,11 +105,9 @@ def in_bounds(relative: str, bounds: list[tuple[Path, bool]], root: Path) -> boo
     )
 
 
-
 def require_regular_inside(path: Path, root: Path) -> None:
     if path.is_symlink() or not path.is_file() or not is_within(path, root):
         raise ValueError(f"baseline scope contains an unsafe or outside-root path: {path}")
-
 
 
 def canonical_path(value: str) -> bool:
@@ -125,7 +117,6 @@ def canonical_path(value: str) -> bool:
     if path.is_absolute() or path.drive or value.startswith("//"):
         return False
     return all(part not in {"", ".", ".."} for part in value.split("/"))
-
 
 
 def validate_analysis_scope(root: Path, files: tuple[Path, ...]) -> None:

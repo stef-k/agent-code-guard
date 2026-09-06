@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 from typing import Any
 
 from . import baseline_files
@@ -61,7 +61,7 @@ def load(path: Path) -> dict[str, int]:
 def _validate_relative(relative: Any) -> None:
     if (
         not isinstance(relative, str) or not baseline_files.canonical_path(relative)
-        or PureWindowsPath(relative).drive or ':' in relative or '\x00' in relative
+        or ':' in relative or '\x00' in relative
         or Path(relative).suffix.lower() != '.md'
     ):
         raise ValueError('Markdown baseline path must be a safe normalized relative .md path')

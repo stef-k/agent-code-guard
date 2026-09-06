@@ -248,7 +248,7 @@ def _baseline_mode(args: argparse.Namespace) -> int | None:
     invocation = Path.cwd()
     validate_configuration(args.config, invocation)
     scope = resolve_scope(args, invocation)
-    linked_targets = loc_baseline.validate_explicit_scope(
+    linked_targets = baseline_files.validate_explicit_scope(
         args.paths, invocation, scope.root, scope.files,
     )
     lifecycle = markdown_baseline if markdown_mode else loc_baseline
@@ -509,7 +509,7 @@ def main() -> int:
             loc_baseline.baseline_path(scope.root).exists()
             or markdown_baseline.baseline_path(scope.root).exists()
         ):
-            linked_targets = loc_baseline.validate_explicit_scope(
+            linked_targets = baseline_files.validate_explicit_scope(
                 args.paths, invocation, scope.root,
                 tuple(selected.physical_path for selected in scope.selected_files),
             )
