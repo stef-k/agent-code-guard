@@ -264,6 +264,21 @@ class PolicyGitTests(CodeGuardTestCase):
             self.assertEqual(result.returncode, 3)
             self.assertIn('symlink', self.read_json(result)['error'])
 
+    def test_config_symlink_ancestor_cannot_leave_and_reenter_repository(self):
+        with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside:
+            root = Path(temp).resolve()
+            self.base(root)
+            link = root / 'link'
+            try:
+                link.symlink_to(Path(outside).resolve(), target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f'symlinks unavailable: {exc}')
+            alias = link / '..' / root.name / CONFIG
+            self.assertEqual(alias.resolve(), root / CONFIG)
+            result = self.run_guard(root, 'src', '--staged', '--config', str(alias), '--json')
+            self.assertEqual(result.returncode, 3)
+            self.assertIn('symlink', self.read_json(result)['error'])
+
     def test_malformed_current_and_historical_config_fail_closed(self):
         for historical, text in ((False, '{'), (True, '{'),
                                  (False, '{"guards":{"loc":{"warnAt":true}}}'),

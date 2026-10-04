@@ -41,7 +41,9 @@ def _owned_configuration_path(path: Path, root: Path) -> str:
     # Preserve link identity before canonical aliases erase it. System ancestors outside
     # the repository (for example macOS /var) do not own a repository policy path.
     for candidate in (path, *path.parents):
-        if candidate.is_symlink() and candidate.resolve().is_relative_to(root):
+        if candidate.is_symlink() and (
+            candidate.parent.resolve().is_relative_to(root) or candidate.resolve().is_relative_to(root)
+        ):
             raise ValueError('active configuration must not traverse a repository policy symlink')
     current = root
     for index, part in enumerate(relative.parts):
