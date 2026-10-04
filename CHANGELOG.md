@@ -4,20 +4,29 @@ Notable changes to Agent Code Guard are recorded here.
 
 ## Unreleased
 
+## 0.5.0 - 2026-10-04
+
 ### Added
 
-- Non-configurable, Git-mode-only `policyRelaxation` REVIEW comparison of active
-  effective configuration and all three baseline families. Source and policy
-  share one resolved HEAD/merge-base authority; staged mode uses working-tree
-  policy. Typed reasons retain summary counts, 20 details, and an omitted count.
-  Invalid/unowned historical authority fails closed; bundled guidance explains
+- Accepted-REVIEW callable ratchets shared by `callableSize`, `nesting`, and
+  `cyclomaticComplexity`. Explicit human-authorized acceptance records one
+  current callable REVIEW with a substantive reason. The accepted measurement
+  is a non-increasing ceiling: unchanged/lower values pass, while later growth
+  returns the existing guard REVIEW without changing the ordinary threshold.
+- Callable-review maintenance only lowers/removes existing ceilings and
+  explicitly prunes stale identities; it never accepts new findings or grows
+  allowances. Matching uses unique physical path, embedded language, and lexical
+  identity without persisted ranges. Normal analysis stays read-only;
+  full/debug output explains accepted values.
+- Non-configurable, Git-mode-only `policyRelaxation` REVIEW comparison of
+  effective configuration plus persisted LOC, Markdown-document, and
+  callable-review allowances. Source and policy share one runner-owned resolved
+  HEAD/merge-base authority; staged mode compares historical HEAD with the
+  actual working-tree policy governing execution.
+- Typed, deterministic, bounded policy-relaxation reasons retain summary counts,
+  20 details, and an omitted count. Untrusted, malformed, or unowned historical
+  policy authority fails closed. Bundled agent policy and guidance explain
   legitimate authorized relaxation and remaining workflow trust boundaries.
-- A separate accepted-REVIEW ratchet shared by callable size, nesting, and
-  complexity. Explicit acceptance records one current REVIEW and its reason;
-  maintenance only lowers/removes existing ceilings and explicitly prunes stale
-  identities. Matching uses unique physical path, embedded language, and lexical
-  identity without persisted ranges. Normal checks stay read-only; full/debug
-  output explains accepted values, and growth returns the existing guard REVIEW.
 
 ### Fixed
 
