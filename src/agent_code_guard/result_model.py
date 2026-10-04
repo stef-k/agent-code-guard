@@ -126,10 +126,58 @@ class MarkdownSectionFinding:
 
 
 @dataclass(frozen=True)
+class PolicyReason:
+    """One recognized persistent control change, with exact typed before/after data."""
+
+    artifact: str
+    field: str
+    reason_code: str
+    before: Any
+    after: Any
+    message: str
+    path: str | None = None
+    selector: tuple[str, str, str, str] | None = None
+
+    def sort_key(self) -> tuple:
+        return self.artifact, self.field, self.path or '', self.selector or (), self.reason_code
+
+    def to_json(self) -> dict[str, Any]:
+        data = {
+            'artifact': self.artifact, 'field': self.field, 'reasonCode': self.reason_code,
+            'before': self.before, 'after': self.after, 'message': self.message,
+        }
+        if self.path is not None:
+            data['path'] = self.path
+        if self.selector is not None:
+            data['selector'] = dict(zip(('path', 'embeddedLanguage', 'callable', 'guard'), self.selector))
+        return data
+
+
+@dataclass(frozen=True)
+class PolicyRelaxationFinding:
+    """One bounded aggregate; summary counts include every omitted reason."""
+
+    total_reasons: int
+    reason_counts: dict[str, int]
+    artifact_counts: dict[str, int]
+    reasons: tuple[PolicyReason, ...]
+    omitted_reasons: int
+    state: str = 'review'
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            'state': self.state, 'totalReasons': self.total_reasons,
+            'reasonCounts': self.reason_counts, 'artifactCounts': self.artifact_counts,
+            'reasons': [reason.to_json() for reason in self.reasons],
+            'omittedReasons': self.omitted_reasons,
+        }
+
+
+@dataclass(frozen=True)
 class GuardResult:
     guard_id: str
     state: str
-    findings: list[Finding | CallableFinding | MarkdownDocumentFinding | MarkdownSectionFinding]
+    findings: list[Finding | CallableFinding | MarkdownDocumentFinding | MarkdownSectionFinding | PolicyRelaxationFinding]
 
     @property
     def required_policies(self) -> list[str]:

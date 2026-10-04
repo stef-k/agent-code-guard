@@ -16,9 +16,9 @@ from .config_validation import validate_configuration
 from .file_selection import ResolvedScope, resolve_invocation, resolve_scope
 from .guards import callable_size, complexity, loc, markdown_document_size, markdown_section_size, nesting
 from .human_output import format_completed_analysis
-from . import baseline_files, callable_review_baseline, loc_baseline, markdown_baseline
+from . import baseline_files, callable_review_baseline, loc_baseline, markdown_baseline, policy_history
 from .result_model import GuardResult, aggregate_state, required_policies
-from .invocation import AnalysisContext, SelectedFile, load_configuration
+from .invocation import AnalysisContext, SelectedFile, load_active_configuration, load_configuration
 from .skill_distribution import export_skill, skill_path as installed_skill_path
 
 if TYPE_CHECKING:
@@ -454,6 +454,7 @@ def run_analysis(
     if baseline is not None:
         loc_baseline.validate_paths(context.root, baseline)
         loc_baseline.validate_overlap(baseline, loc_config)
+    policy_result = policy_history.compare_current(context, baseline, document_baseline, callable_reviews) if context.git_authority is not None else None
     if baseline is not None or document_baseline is not None or callable_reviews is not None:
         baseline_files.validate_analysis_scope(
             context.root, tuple(selected.physical_path for selected in context.selected_files),
@@ -469,6 +470,8 @@ def run_analysis(
     markdown_document_config = markdown_document_size.load_config(args, context.configuration)
     markdown_section_config = markdown_section_size.load_config(args, context.configuration)
     results = [loc.run(context.root, loc_config, context.selected_files, baseline)]
+    if policy_result is not None:
+        results.append(policy_result)
     analyzed_files = {
         selected.reporting_path for selected in context.selected_files
         if loc_config.enabled and loc.should_include(selected, loc_config)
@@ -540,7 +543,7 @@ def run_analysis(
 
 def _legacy_context(scope: ResolvedScope, args: argparse.Namespace) -> AnalysisContext:
     """Focused-test adapter; the production runner constructs identities during selection."""
-    document = validate_configuration(args.config, Path.cwd())
+    active = load_active_configuration(args.config, Path.cwd())
     def selected(path: Path) -> SelectedFile:
         try:
             report = path.relative_to(scope.root).as_posix()
@@ -548,8 +551,9 @@ def _legacy_context(scope: ResolvedScope, args: argparse.Namespace) -> AnalysisC
             report = path.as_posix()
         return SelectedFile(report, path)
     return AnalysisContext(
-        scope.root, document, tuple(selected(path) for path in scope.files),
+        scope.root, active.document, tuple(selected(path) for path in scope.files),
         tuple(selected(path) for path in scope.excluded_files),
+        active.path, scope.git_authority,
     )
 
 
@@ -602,9 +606,8 @@ def main() -> int:
         if management_result is not None:
             return management_result
         invocation = Path.cwd()
-        configuration = load_configuration(args.config, invocation)
-        validate_configuration(args.config, invocation, configuration)
-        scope = resolve_invocation(args, invocation, configuration)
+        active = load_active_configuration(args.config, invocation)
+        scope = resolve_invocation(args, invocation, active.document, active.path)
         linked_targets: set[Path] = set()
         baseline_loaded = hasattr(scope, "root")
         if baseline_loaded and (

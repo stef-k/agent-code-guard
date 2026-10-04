@@ -92,8 +92,9 @@ class PolicyRelaxationTests(unittest.TestCase):
                     self.assertEqual(self.codes(result), expected)
                     if expected:
                         self.assertIn('declaration added', result.findings[0].reasons[0].message)
-        self.assertEqual(self.codes(comparison(config('loc', exclude=[]), {})),
-                         ['exclusionAdded'] * len(loc.DEFAULT_EXCLUDES))
+        restored = comparison(config('loc', exclude=[]), {}).findings[0]
+        self.assertEqual(restored.reason_counts, {'exclusionAdded': len(loc.DEFAULT_EXCLUDES)})
+        self.assertEqual(restored.omitted_reasons, len(loc.DEFAULT_EXCLUDES) - 20)
 
     def test_exemptions_ignore_reasons_order_and_equivalent_spelling(self):
         first = {'path': 'src/a.py', 'reason': 'reviewed'}
@@ -162,4 +163,3 @@ class PolicyRelaxationTests(unittest.TestCase):
         self.assertEqual((finding['totalReasons'], len(finding['reasons']), finding['omittedReasons']), (37, 20, 17))
         self.assertEqual(finding['reasonCounts'], {'allowanceAdded': 35, 'exclusionAdded': 2})
         self.assertEqual(finding['artifactCounts'], {CONFIG_PATH: 2, '.agent-tools/code-guard.loc-baseline.json': 35})
-

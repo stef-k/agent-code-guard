@@ -5,6 +5,8 @@ import sys
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from tests.test_cli_version import checkout_code_guard as code_guard
@@ -43,8 +45,8 @@ class JsonModeTests(unittest.TestCase):
         stderr = StringIO()
         with (
             patch.object(sys, "argv", ["code-guard", *arguments]),
-            patch.object(code_guard, "validate_configuration"),
-            patch.object(code_guard, "resolve_scope", return_value=object()),
+            patch.object(code_guard, "load_active_configuration", return_value=SimpleNamespace(document={}, path=Path('config.json'))),
+            patch.object(code_guard, "resolve_invocation", return_value=object()),
             patch.object(code_guard, "run_analysis", return_value=self.analysis),
             redirect_stdout(stdout),
             redirect_stderr(stderr),

@@ -86,10 +86,18 @@ def _validate_relative(relative: Any) -> None:
 
 
 def load(path: Path) -> dict[ReviewKey, Review]:
-    """Validate the independent schema without importing syntax providers."""
+    """Read current storage through the parser shared with historical blobs."""
     try:
-        data = json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=_unique_object)
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        return parse(path.read_text(encoding='utf-8'))
+    except (OSError, UnicodeError) as exc:
+        raise ValueError(f'invalid callable review baseline: {exc}') from exc
+
+
+def parse(text: str) -> dict[ReviewKey, Review]:
+    """Validate exact persisted selectors without filesystem or syntax providers."""
+    try:
+        data = json.loads(text, object_pairs_hook=_unique_object)
+    except json.JSONDecodeError as exc:
         raise ValueError(f'invalid callable review baseline: {exc}') from exc
     _exact_keys(data, {'version', 'callableReviews'}, 'callable review baseline')
     if type(data['version']) is not int or data['version'] != 1:
@@ -125,9 +133,9 @@ def _validate_storage(root: Path) -> None:
 
 def load_if_present(root: Path) -> dict[ReviewKey, Review] | None:
     target = baseline_path(root)
+    _validate_storage(root)
     if not target.exists() and not target.is_symlink():
         return None
-    _validate_storage(root)
     entries = load(target)
     baseline_files.validate_paths(root, {entry.path: 1 for entry in entries.values()}, 'callable review')
     return entries
