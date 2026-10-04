@@ -101,6 +101,16 @@ bounds. The process exits are exact:
 The agent inspects REVIEW and FAIL findings, applies judgment, loads only the
 named required policies, and reruns after relevant correction.
 
+Git comparisons also inspect persistent Code Guard policy independently of
+source bounds/exclusions. A `policyRelaxation` REVIEW names recognized changes
+or conservative declaration/topology changes; it does not decide authorization.
+Inspect why policy changed and retain legitimate authorized relaxation with a
+substantive justification. Do not undo an authorized change merely to clear
+REVIEW or weaken another policy surface to silence it. The guard has no config
+key or exemption and is omitted in plain explicit/audit modes. Staged analysis
+compares HEAD with the working-tree policy that actually governs the run.
+See [comparison semantics and remaining trust boundaries](usage.md#policy-relaxation-in-git-modes).
+
 Git selection requires a Git repository and fails instead of silently becoming
 a recursive audit. Outside Git, pass the exact edited files:
 

@@ -144,6 +144,13 @@ class PolicyRelaxationTests(unittest.TestCase):
                                 policy.effective_policy({}, callable_reviews={other.key: other}))
         self.assertEqual(self.codes(result), ['allowanceAdded'])
         self.assertEqual(result.findings[0].reasons[0].to_json()['selector']['guard'], 'nesting')
+        entries = {entry.key: entry, other.key: other}
+        self.assertEqual(self.codes(policy.compare(CONFIG_PATH, policy.effective_policy({}, callable_reviews=entries),
+                         policy.effective_policy({}, callable_reviews=dict(reversed(list(entries.items())))))), [])
+
+    def test_policy_guard_cannot_configure_its_own_disable_switch(self):
+        with self.assertRaisesRegex(ValueError, 'unknown configuration property: guards.policyRelaxation'):
+            policy.effective_policy(config('policyRelaxation', enabled=False))
 
     def test_mixed_changes_report_only_weakening_and_preserve_before_after(self):
         result = comparison(config('loc', warnAt=350, failAt=650), config('loc', warnAt=400, failAt=600))

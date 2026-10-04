@@ -527,3 +527,36 @@ ambiguity is a tool error. D9 authorization remains a workflow rule: no
 interactive approval or authentication mechanism is added. Explicit command
 intent and a reason provide the mechanical write boundary. Allowances record
 reviewed outcomes, not ideal code; no auto-acceptance or metric gaming is allowed.
+
+## D37 — Policy relaxation shares runner-owned Git authority
+
+Issue #136 delivers the bounded production contract admitted by #133. One
+resolved HEAD/merge-base authority in selection governs both source candidates
+and policy comparison. Three-dot source semantics consume the chosen base
+object directly, including when Git has multiple best merge bases. Policy
+comparison never independently resolves moving refs. Changed/staged modes use
+HEAD versus the actual working-tree policy; unborn HEAD uses defaults/empty
+allowances. The active invocation-relative or owned explicit configuration path
+is retained, while baselines remain at their canonical Git-root paths.
+
+`policyRelaxation` is runner-owned, Git-mode-only, REVIEW-only, and
+non-configurable. Source bounds, exclusions, and language applicability cannot
+hide the four fixed artifacts. Historical object lookup validates exact tree
+ancestors/blob modes; pure config/baseline text parsers retain existing schemas
+without checking historical target paths against today's filesystem. Current
+load boundaries retain filesystem/symlink safety. Unavailable or malformed
+authority is a tool error; plain audit/explicit modes omit the guard.
+
+Effective defaults and normalized declaration sets keep neutral maintenance and
+strengthening quiet. Added exclusions can conservatively REVIEW without
+proving a smaller matched path set. Changed ordered override topology produces
+one typed REVIEW; no glob solver is introduced. Exact persisted callable keys
+are compared without reinterpreting identity. One deterministic aggregate
+retains reason/artifact totals, 20 sorted details, and an omitted count; topology
+summaries use entry counts/fingerprints to avoid unbounded match-list output.
+
+Authorization remains outside detection. A legitimate new exemption/allowance
+still reviews and may be retained. Transient CLI policy, chosen comparison
+windows, installation/CI removal, and switching invocation/config remain
+explicit workflow trust boundaries. No policy engine, history store, network,
+source-parser dependency, automatic reversal, or #134 behavior is added.

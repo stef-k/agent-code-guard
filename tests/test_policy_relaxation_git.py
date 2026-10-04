@@ -182,6 +182,17 @@ class PolicyGitTests(CodeGuardTestCase):
             self.assertEqual(len(self.policy_reasons(result)), 5)
             self.assertEqual(self.read_json(result)['scope']['selected'], 0)
 
+    def test_loc_exclusion_cannot_hide_policy_comparison(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.base(root)
+            path = write_policy(root, 500)
+            document = json.loads(path.read_text(encoding='utf-8'))
+            document['guards']['loc']['exclude'] = ['**']
+            path.write_text(json.dumps(document), encoding='utf-8')
+            reasons = self.policy_reasons(self.run_guard(root, 'src', '--staged', '--json'))
+            self.assertEqual({reason['reasonCode'] for reason in reasons}, {'exclusionAdded', 'thresholdIncreased'})
+
     def test_deleting_config_restores_defaults_and_deleting_baselines_is_quiet(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -254,18 +265,20 @@ class PolicyGitTests(CodeGuardTestCase):
             self.assertIn('symlink', self.read_json(result)['error'])
 
     def test_malformed_current_and_historical_config_fail_closed(self):
-        for historical in (False, True):
-            with self.subTest(historical=historical), tempfile.TemporaryDirectory() as temp:
+        for historical, text in ((False, '{'), (True, '{'),
+                                 (False, '{"guards":{"loc":{"warnAt":true}}}'),
+                                 (True, '{"guards":{"loc":{"warnAt":true}}}')):
+            with self.subTest(historical=historical, text=text), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp)
                 self.base(root)
-                (root / CONFIG).write_text('{"guards":{"loc":{"warnAt":true}}}', encoding='utf-8')
+                (root / CONFIG).write_text(text, encoding='utf-8')
                 if historical:
                     git(root, 'add', '.')
                     git(root, 'commit', '-m', 'invalid policy')
                     (root / CONFIG).unlink()
                 result = self.run_guard(root, 'src', '--staged', '--json')
                 self.assertEqual(result.returncode, 3)
-                self.assertIn('guards.loc.warnAt', self.read_json(result)['error'])
+                self.assertIn('guards.loc.warnAt' if 'warnAt' in text else 'Expecting property name', self.read_json(result)['error'])
 
     def test_malformed_or_unsupported_baselines_fail_even_after_deletion(self):
         for family in ('loc', 'markdown', 'callable-review'):
@@ -286,6 +299,53 @@ class PolicyGitTests(CodeGuardTestCase):
                     result = self.run_guard(root, 'src', '--staged', '--json')
                     self.assertEqual(result.returncode, 3)
                     self.assertIn('version must be the integer 1', self.read_json(result)['error'])
+
+    def test_malformed_baseline_text_is_not_treated_as_missing(self):
+        for family in ('loc', 'markdown', 'callable-review'):
+            for historical in (False, True):
+                with self.subTest(family=family, historical=historical), tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    self.base(root)
+                    path = root / f'.agent-tools/code-guard.{family}-baseline.json'
+                    path.write_text('{', encoding='utf-8')
+                    if historical:
+                        git(root, 'add', '.')
+                        git(root, 'commit', '-m', 'malformed baseline')
+                        path.unlink()
+                    result = self.run_guard(root, 'src', '--staged', '--json')
+                    self.assertEqual(result.returncode, 3)
+                    self.assertIn('invalid ', self.read_json(result)['error'])
+
+    def test_historical_baselines_do_not_validate_targets_in_current_filesystem(self):
+        with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside:
+            root = Path(temp)
+            self.base(root)
+            baseline = root / '.agent-tools' / 'code-guard.loc-baseline.json'
+            baseline.write_text(json.dumps({'version': 1, 'loc': {'files': [
+                {'path': 'retired/a.py', 'allowedLoc': 900},
+            ]}}), encoding='utf-8')
+            git(root, 'add', '.')
+            git(root, 'commit', '-m', 'historical allowance')
+            baseline.unlink()
+            try:
+                (root / 'retired').symlink_to(Path(outside), target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f'symlinks unavailable: {exc}')
+            result = self.run_guard(root, 'src', '--staged', '--json')
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertEqual(self.read_json(result)['guards']['policyRelaxation']['state'], 'pass')
+
+    def test_current_baseline_parent_cannot_hide_missing_artifacts(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.base(root)
+            explicit = write_policy(root, 400, 'custom.json')
+            (root / CONFIG).unlink()
+            (root / '.agent-tools').rmdir()
+            (root / '.agent-tools').write_text('not a directory', encoding='utf-8')
+            result = self.run_guard(root, 'src', '--staged', '--config', str(explicit), '--json')
+            self.assertEqual(result.returncode, 3)
+            self.assertIn('baseline directory must be a real directory', self.read_json(result)['error'])
 
     def test_unsafe_historical_blob_tree_and_gitlink_shapes_fail_closed(self):
         for mode, relative in (('120000', CONFIG), ('120000', '.agent-tools'),

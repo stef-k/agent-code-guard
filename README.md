@@ -20,6 +20,8 @@ Agent Code Guard measures file size, callable size, structural nesting,
 cyclomatic complexity, Markdown document size, and Markdown section size. It
 reports deterministic **PASS**, **REVIEW**, or **FAIL** results without
 rewriting your files.
+Git comparison modes also review recognized relaxation of Code Guard's own
+effective configuration and stored allowances.
 
 It complements rather than replaces tests, compilers, linters, formatters,
 security tools, and design judgment.
@@ -163,8 +165,9 @@ measurement. A REVIEW is not proof of a defect or a mandatory refactor.
 | Cyclomatic complexity | REVIEW >15 |
 | Markdown document size | REVIEW >800 physical lines |
 | Markdown direct-section size | REVIEW >200 physical lines |
+| Policy relaxation | REVIEW for recognized relaxation or conservative topology changes in Git modes |
 
-Comparisons are strictly greater-than, so equality passes. All guards except
+Size/depth/complexity comparisons are strictly greater-than, so equality passes. All guards except
 file LOC are REVIEW-only; only file LOC can FAIL. A new guard must provide
 distinct, deterministic value rather than duplicate conventional tooling. See
 [Guard admission](https://stef-k.github.io/agent-code-guard/guard-admission.html).
@@ -200,6 +203,19 @@ code-guard .
 
 The base ref must exist in the chosen environment. Changed work is not a full
 audit; do not repeatedly scan unrelated files after every edit.
+
+### Policy relaxation
+
+`policyRelaxation` is a runner-owned, non-configurable REVIEW guard in
+`--changed-only`, `--staged`, and `--base-ref` modes. It compares HEAD (or the
+selected merge base) with the actual working-tree policy governing the run,
+including unstaged policy in staged mode. Source bounds and exclusions cannot
+hide these artifacts. Plain explicit/audit modes omit the guard.
+
+New exclusions, exemptions, and reviewed allowances can legitimately REVIEW;
+the detector reports policy changes without deciding authorization. Inspect
+and retain justified authorized changes. See the
+[comparison rules and trust boundaries](https://stef-k.github.io/agent-code-guard/usage.html#policy-relaxation-in-git-modes).
 
 ### Supported languages and formats
 
