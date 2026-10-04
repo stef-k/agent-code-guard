@@ -19,6 +19,12 @@ Notable changes to Agent Code Guard are recorded here.
   identity without persisted ranges. Normal checks stay read-only; full/debug
   output explains accepted values, and growth returns the existing guard REVIEW.
 
+### Fixed
+
+- Compare LOC configuration for policy relaxation only when LOC is enabled in
+  both policies, keeping dormant maintenance and activation quiet while retaining
+  guard-disablement, common-scope, and persisted-baseline detection.
+
 ## 0.4.0 - 2026-09-06
 
 ### Added

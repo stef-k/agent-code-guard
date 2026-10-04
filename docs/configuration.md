@@ -46,6 +46,11 @@ switch, threshold, exclusion, exemption, or baseline for this guard. It reads
 the active repository-owned config and three canonical baselines independently
 of source bounds and exclusions. See [Git policy comparison](usage.md#policy-relaxation-in-git-modes).
 
+LOC settings below `enabled` are compared only when LOC is enabled in both
+policies. Disabling LOC reports `guardDisabled`; enabling it and editing dormant
+LOC settings stay quiet. Common `scope.exclude` declarations and persisted
+baseline records remain independently compared.
+
 Set `enabled` to `false` to disable a guard. For REVIEW-only guards, `reviewAt`
 must be a positive integer when enabled. LOC supports its established options,
 including `enabled`, `warnAt`, `failAt`, `ratchetAt`, line-count settings, extension policy,

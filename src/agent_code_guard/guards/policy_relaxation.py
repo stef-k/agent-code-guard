@@ -91,6 +91,7 @@ def _reason(artifact, field, code, before, after, *, path=None, selector=None) -
 
 
 def _configuration_reasons(artifact: str, before: EffectivePolicy, after: EffectivePolicy):
+    """Compare active guard settings; common scope is independent of enablement."""
     old, new = before.loc, after.loc
     if old.enabled and not new.enabled:
         yield _reason(artifact, 'guards.loc.enabled', 'guardDisabled', True, False)
@@ -99,6 +100,9 @@ def _configuration_reasons(artifact: str, before: EffectivePolicy, after: Effect
             yield _reason(artifact, f'guards.{name}.enabled', 'guardDisabled', True, False)
         if enabled and current_enabled and current_threshold > threshold:
             yield _reason(artifact, f'guards.{name}.reviewAt', 'thresholdIncreased', threshold, current_threshold)
+    yield from _added_declarations(artifact, 'scope.exclude', before.scope_exclusions, after.scope_exclusions)
+    if not (old.enabled and new.enabled):
+        return
     for field, previous, current in (('warnAt', old.warn_at, new.warn_at), ('failAt', old.fail_at, new.fail_at)):
         if current > previous:
             yield _reason(artifact, f'guards.loc.{field}', 'thresholdIncreased', previous, current)
@@ -110,7 +114,6 @@ def _configuration_reasons(artifact: str, before: EffectivePolicy, after: Effect
             yield _reason(artifact, f'guards.loc.{field}', 'countedEvidenceReduced', True, False)
     for extension in old.include_extensions - new.include_extensions:
         yield _reason(artifact, 'guards.loc.includeExtensions', 'extensionRemoved', True, False, path=extension)
-    yield from _added_declarations(artifact, 'scope.exclude', before.scope_exclusions, after.scope_exclusions)
     yield from _added_declarations(artifact, 'guards.loc.exclude', _declarations(old.exclude), _declarations(new.exclude))
     yield from _added_declarations(artifact, 'guards.loc.allowedLargeFiles',
                                   _declarations(item.path for item in old.allowed_large_files),

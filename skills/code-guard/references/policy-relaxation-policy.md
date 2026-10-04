@@ -19,6 +19,11 @@ smaller. Changed ordered LOC override match topology requires inspection
 without a claim of proven path-specific weakening. No authorization is inferred
 from reasons, identity, commit messages, or issue prose.
 
+LOC configuration below `enabled` is compared only when LOC is enabled in both
+policies. Disabling LOC reports guard disablement without inactive-setting
+reasons; enabling LOC and dormant LOC maintenance stay quiet. Common scope
+exclusions and persisted baseline records are compared independently.
+
 One aggregate retains complete reason/artifact counts, the first 20 reasons in
 stable order, and an omitted-detail count. Inspect the artifact diff for omitted
 changes. Topology changes use entry counts and exact normalized fingerprints
