@@ -354,3 +354,17 @@ class CallableReviewLifecycleTests(CodeGuardTestCase):
             data = code_guard.payload(code_guard.run_analysis(context, args))
             finding = data['guards']['complexity']['findings'][0]
             self.assertEqual((finding['path'], finding['state'], finding['allowedMeasured']), ('display.py', 'pass', 4))
+
+    def test_acceptance_cannot_write_a_path_rejected_by_the_persisted_schema(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            configure(root)
+            path = root / 'unsafe:name.py'
+            try:
+                path.write_text(source('cyclomaticComplexity', 4), encoding='utf-8')
+            except OSError as exc:
+                self.skipTest(f'filesystem rejects colon filenames: {exc}')
+            result = self.run_guard(root, path.name, *accept_options(identity='unsafe:name.selected'))
+            self.assertEqual(result.returncode, 3)
+            self.assertIn('safe normalized relative path', result.stderr)
+            self.assertFalse((root / BASELINE).exists())

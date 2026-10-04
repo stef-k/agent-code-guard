@@ -78,6 +78,13 @@ def validate_guard(guard: str) -> None:
         raise ValueError('callable review baseline guard must be callableSize, nesting, or cyclomaticComplexity')
 
 
+def _validate_relative(relative: Any) -> None:
+    """Enforce the same portable persisted path contract for readers and writers."""
+    if (not isinstance(relative, str) or not baseline_files.canonical_path(relative)
+            or ':' in relative or '\x00' in relative):
+        raise ValueError('callable review baseline path must be a safe normalized relative path')
+
+
 def load(path: Path) -> dict[ReviewKey, Review]:
     """Validate the independent schema without importing syntax providers."""
     try:
@@ -94,9 +101,7 @@ def load(path: Path) -> dict[ReviewKey, Review]:
         _exact_keys(item, {'path', 'embeddedLanguage', 'callable', 'guard', 'allowedMeasured', 'reason'},
                     'callable review baseline entry')
         relative = item['path']
-        if (not isinstance(relative, str) or not baseline_files.canonical_path(relative)
-                or ':' in relative or '\x00' in relative):
-            raise ValueError('callable review baseline path must be a safe normalized relative path')
+        _validate_relative(relative)
         validate_guard(item['guard'])
         for field in ('embeddedLanguage', 'callable', 'reason'):
             _text(item[field], field)
@@ -228,6 +233,8 @@ def accept(
     _text(callable, 'callable')
     _text(reason, 'reason')
     selector = (path.relative_to(root).as_posix(), language, callable)
+    _validate_relative(selector[0])
+    baseline_files.require_regular_inside(path, root)
     key = (*selector, guard)
     counts, current = _current(root, facts, results)
     _require_unique(selector, counts)
