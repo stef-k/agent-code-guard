@@ -37,3 +37,17 @@ state machines, and protocol handlers merely to lower the number. Preserve
 project and language idioms.
 
 A lower complexity score is not an improvement unless the resulting behavior and structure are clearer.
+
+## Accepted callable REVIEW ratchet
+
+Explicit human authorization may record one current complexity REVIEW and its
+reason in the independent callable-review baseline. CLI/storage use
+`cyclomaticComplexity`, explicitly mapped to this `complexity` result/policy ID;
+the alternate baseline/CLI spelling is rejected. The ordinary threshold stays
+unchanged; a uniquely matched callable passes within its reviewed complexity
+ceiling, and growth reviews again. Full/debug retains accepted value/status/reason.
+Maintenance only lowers/removes entries, with explicit stale pruning; normal
+checks never write. An allowance records a reviewed outcome, not ideal code.
+Agents must not create or raise one to silence a finding, obscure control flow,
+mechanically split cohesive callables, or change thresholds/exclusions to avoid
+the ratchet. Use the targeted workflow in SKILL.md.

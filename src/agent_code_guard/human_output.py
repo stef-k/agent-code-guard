@@ -42,7 +42,7 @@ def _callable_size_lines(data: dict[str, object]) -> list[str]:
             lines.append(
                 f"REVIEW: {finding['path']}:{finding['range']['startLine']}-{finding['range']['endLine']} "
                 f"— {finding['callable']} is {finding['measured']} LOC "
-                f"(review {finding['thresholds']['reviewAt']})"
+                f"(review {finding['thresholds']['reviewAt']}{_accepted_detail(finding)})"
             )
     return lines
 
@@ -59,7 +59,7 @@ def _nesting_lines(data: dict[str, object]) -> list[str]:
             lines.append(
                 f"REVIEW: {finding['path']}:{finding['range']['startLine']}-{finding['range']['endLine']} "
                 f"— {finding['callable']} nesting depth {finding['measured']} "
-                f"(review {finding['thresholds']['reviewAt']}{explanation})"
+                f"(review {finding['thresholds']['reviewAt']}{explanation}{_accepted_detail(finding)})"
             )
     return lines
 
@@ -74,9 +74,16 @@ def _complexity_lines(data: dict[str, object]) -> list[str]:
             lines.append(
                 f"REVIEW: {finding['path']}:{finding['range']['startLine']}-{finding['range']['endLine']} "
                 f"— {finding['callable']} complexity {finding['measured']} "
-                f"(review {finding['thresholds']['reviewAt']})"
+                f"(review {finding['thresholds']['reviewAt']}{_accepted_detail(finding)})"
             )
     return lines
+
+
+def _accepted_detail(finding: dict[str, object]) -> str:
+    """Explain growth only where the existing human report already emits REVIEW."""
+    if finding.get('allowedMeasured') is None:
+        return ''
+    return f"; accepted {finding['allowedMeasured']}, {finding['ratchetStatus']}"
 
 
 def _markdown_lines(data: dict[str, object]) -> list[str]:
@@ -135,6 +142,10 @@ def format_completed_analysis(data: dict[str, object]) -> str:
     lines.extend(_nesting_lines(data))
     lines.extend(_complexity_lines(data))
     lines.extend(_markdown_lines(data))
+    for item in data.get('callableReviewBaseline', {}).get('diagnostics', []):
+        lines.append(f"STALE callable review: {item['path']} [{item['embeddedLanguage']}] "
+                     f"{item['callable']} ({item['guard']}); prune with "
+                     "--update-callable-review-baseline --prune-stale-callable-reviews.")
     policies = data["requiredPolicies"]
     if policies:
         lines.append(f"Required policies: {', '.join(policies)}")

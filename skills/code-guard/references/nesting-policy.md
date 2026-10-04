@@ -35,3 +35,15 @@ Do not change or disable the configured threshold merely to silence a finding.
 Only respect such a change when the project or user has authorized it.
 
 The preferred outcome is clearer control flow, not a smaller number at any cost.
+
+## Accepted callable REVIEW ratchet
+
+Explicit human authorization may record one current `nesting` REVIEW and its
+reason in the independent callable-review baseline. The ordinary threshold
+stays unchanged; a uniquely matched callable passes within its reviewed depth
+ceiling, and growth reviews again. Full/debug retains accepted value/status/reason.
+Maintenance only lowers/removes entries, with explicit stale pruning; normal
+checks never write. Acceptance is evidence of review, not ideal structure.
+Agents must not create or raise allowances to silence findings, obscure control
+flow to lower nesting, mechanically split cohesive callables, or change
+thresholds/exclusions to avoid the ratchet. Use the targeted workflow in SKILL.md.

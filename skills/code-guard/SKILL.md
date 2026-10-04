@@ -179,3 +179,42 @@ part of routine checks. Do not create, replace, remove, or increase allowances
 merely to silence findings. Review and commit explicit acceptance decisions.
 Human/full JSON output retains acceptance context; compact omits accepted PASS
 findings. Load the Markdown policy for actionable document or section reviews.
+
+## Reviewed callable baselines
+
+After explicit human authorization for a current callable REVIEW, target one
+physical file and exact guard/language/lexical identity with a substantive reason:
+
+```bash
+code-guard src/catalog.py \
+  --accept-callable-review cyclomaticComplexity python catalog.parse \
+  --reason "Reviewed cohesive format catalog; re-review on growth."
+```
+
+Canonical baseline/CLI IDs are `callableSize`, `nesting`, and
+`cyclomaticComplexity`; the latter maps to the existing `complexity`
+result/policy ID, and `complexity` is rejected as a baseline/CLI alias.
+The separate `.agent-tools/code-guard.callable-review-baseline.json` records the
+exact current measurement and reason. Acceptance requires one current REVIEW
+and cannot replace/increase an existing ceiling. There is no bulk acceptance.
+Do not self-authorize, create, or raise allowances merely to silence findings.
+
+Normal analysis reads without writing: the ordinary threshold remains policy
+for unreviewed code, the accepted value is one callable's reviewed ceiling, and
+growth above it returns REVIEW. At/below the ordinary threshold, the allowance
+is `notNeeded`. Matching requires a unique physical path + embedded language +
+lexical identity. Rename/move/disappearance and movement of coordinate-qualified
+callbacks can become stale; ambiguous identities fail closed. Do not rescue
+them with fuzzy matching or source edits designed to game measurements.
+
+`code-guard src --update-callable-review-baseline` only lowers/removes existing
+ceilings. Add `--prune-stale-callable-reviews` to explicitly prune stale entries
+within those bounds. Disabled/excluded/unavailable evidence cannot authorize
+new acceptance or lowering. Write modes require explicit positional scope and
+reject Git selectors, CI/JSON modes, and other baseline writes; unavailable
+analysis blocks writes. Review and commit the acceptance decision. Full/debug
+retains accepted measurement/status/reason; compact omits accepted PASS noise;
+human growth output shows current and accepted values. Independent findings and
+INCOMPLETE evidence remain visible. An allowance is evidence of a human-reviewed
+outcome, not ideal structure: preserve cohesive callables and clear control
+flow, and do not change thresholds/exclusions to avoid the ratchet.

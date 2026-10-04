@@ -54,6 +54,9 @@ class CallableFinding:
     thresholds: dict[str, int] | None = None
     details: dict[str, Any] | None = None
     embedded_language: str | None = None
+    allowed_measured: int | None = None
+    ratchet_status: str | None = None
+    reason: str | None = None
 
     def to_json(self) -> dict[str, Any]:
         value = {
@@ -68,6 +71,10 @@ class CallableFinding:
             value["details"] = self.details
         if self.embedded_language is not None:
             value["embeddedLanguage"] = self.embedded_language
+        if self.allowed_measured is not None:
+            value["allowedMeasured"] = self.allowed_measured
+            value["ratchetStatus"] = self.ratchet_status
+            value["reason"] = self.reason
         return value
 
 

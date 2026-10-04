@@ -33,6 +33,17 @@ Unchanged or smaller accepted documents pass the document guard; growth returns
 REVIEW, and section findings remain independent. Do not use baseline updates
 to hide new growth or treat document acceptance as a section exemption.
 
+Human-reviewed callable size, nesting, and complexity can use the separate
+[callable-review ratchet](usage.md#accepted-callable-review-ratchet). Authorize
+one current REVIEW with a substantive reason, then invoke targeted acceptance.
+The ordinary threshold governs unreviewed code; the accepted measurement is
+one callable's reviewed ceiling; growth above that ceiling returns REVIEW.
+Maintenance can only lower/remove existing ceilings and explicitly prune stale
+identities. Normal checks never write them. Agents cannot self-authorize or
+raise allowances to hide findings, and an allowance is not proof of ideal
+structure. Preserve clear control flow and cohesive callables rather than
+mechanically splitting or changing thresholds/exclusions to avoid the ratchet.
+
 ## The shared loop
 
 ```text

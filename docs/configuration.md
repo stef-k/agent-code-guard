@@ -192,6 +192,61 @@ threshold changes, or replacement allowances.
 
 See the [workflow and output contract](usage.md#reviewed-markdown-document-ratchet).
 
+## Source-controlled callable-review ratchet
+
+Human-reviewed callable ceilings live independently of LOC and Markdown in
+`<analysis-root>/.agent-tools/code-guard.callable-review-baseline.json`:
+
+```json
+{
+  "version": 1,
+  "callableReviews": [
+    {
+      "path": "offenders_patterns.py",
+      "embeddedLanguage": "python",
+      "callable": "offenders_patterns._auth",
+      "guard": "cyclomaticComplexity",
+      "allowedMeasured": 17,
+      "reason": "Reviewed cohesive authentication-format catalog; re-review on growth."
+    }
+  ]
+}
+```
+
+The schema has closed keys, integer version `1`, and an array of entries. Each
+entry requires a safe normalized root-relative physical path with `/`
+separators, non-empty embedded language and lexical callable identity, a guard
+ID, a positive integer guard-native measurement, and a non-blank human reason.
+No range, source hash, ordinal, or alternate measurement field is supported.
+Callable size counts physical lines, nesting counts structural depth, and
+complexity counts baseline 1 plus normalized decisions, exactly as before.
+
+Canonical persisted/CLI guard IDs are `callableSize`, `nesting`, and
+`cyclomaticComplexity`. The last maps explicitly to the existing `complexity`
+result/policy ID. `complexity` is rejected in this baseline and acceptance CLI;
+it cannot become a separate allowance. Unknown keys/guards, duplicate JSON
+properties or exact entries, invalid values/types/reasons, unsafe paths, and
+symlink traversal fail closed with exit `3`. Writers sort by path, embedded
+language, callable, and guard and use UTF-8, two-space indentation, LF, and a
+final newline. Creation and replacement reuse the baseline atomic-write helpers.
+
+The path + embedded language + lexical identity must identify exactly one
+callable in the runner's current `AnalysisFacts`. Duplicate lexical identities
+are tool errors when an active allowance would match; no duplicate is chosen
+by source order or range. Rename, move, disappearance, and movement of a
+coordinate-qualified callback can leave a stale entry. Stale entries are
+harmless and require explicit pruning; unavailable, excluded, and unselected
+files provide no evidence for applying or pruning an existing callable.
+
+There are no new threshold/configuration keys. With ordinary threshold `T`,
+accepted value `A`, and current measurement `M`, test `M <= T` first: PASS with
+`notNeeded`. Otherwise `M <= A` passes with `withinAllowance`, and `M > A`
+reviews with `grown`. Unmatched callables retain ordinary behavior. Threshold
+changes never rewrite stored values; disabled guards do not activate because
+an allowance exists. LOC and Markdown schemas and lifecycles stay independent.
+
+See the [acceptance and maintenance commands](usage.md#accepted-callable-review-ratchet).
+
 ## Fail-closed validation
 
 Malformed JSON, invalid types or thresholds, unknown top-level properties,

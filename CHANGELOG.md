@@ -4,6 +4,15 @@ Notable changes to Agent Code Guard are recorded here.
 
 ## Unreleased
 
+### Added
+
+- A separate accepted-REVIEW ratchet shared by callable size, nesting, and
+  complexity. Explicit acceptance records one current REVIEW and its reason;
+  maintenance only lowers/removes existing ceilings and explicitly prunes stale
+  identities. Matching uses unique physical path, embedded language, and lexical
+  identity without persisted ranges. Normal checks stay read-only; full/debug
+  output explains accepted values, and growth returns the existing guard REVIEW.
+
 ## 0.4.0 - 2026-09-06
 
 ### Added

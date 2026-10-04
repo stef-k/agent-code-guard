@@ -241,7 +241,16 @@ Reviewed oversized Markdown documents have a separate, explicit
 `--create-markdown-baseline` records accepted physical-line counts;
 `--update-markdown-baseline` only lowers or prunes them. Documents within their
 allowance pass the document-size guard; growth produces REVIEW. Section
-findings remain active, and ordinary analysis never writes either baseline.
+findings remain active, and ordinary analysis never writes a baseline.
+
+Human-reviewed callable size, nesting, and complexity can use a separate
+[callable-review ratchet](https://stef-k.github.io/agent-code-guard/usage.html#accepted-callable-review-ratchet).
+`--accept-callable-review GUARD LANGUAGE CALLABLE --reason TEXT` records one
+current REVIEW in an explicit file. The general threshold stays unchanged;
+the accepted callable passes within its reviewed ceiling, and growth reviews
+again. Maintenance only lowers/removes allowances, with explicit stale pruning.
+Baseline/CLI complexity uses `cyclomaticComplexity`; results and policies keep
+`complexity`. Acceptance requires human authorization and a substantive reason.
 
 ## Trust, CI, and platform support
 

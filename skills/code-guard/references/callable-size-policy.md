@@ -37,3 +37,15 @@ Do not alter the threshold or disable the guard merely to silence a finding.
 Only respect such a change when the project or user has authorized it.
 
 A lower callable LOC number is useful only when the resulting code is at least as readable and maintainable as before.
+
+## Accepted callable REVIEW ratchet
+
+Explicit human authorization may record one current `callableSize` REVIEW and
+its reason in the independent callable-review baseline. The ordinary threshold
+stays unchanged; a uniquely matched callable passes within its reviewed LOC
+ceiling, and growth above it reviews again. Full/debug output retains the
+accepted value and reason. Maintenance only lowers/removes entries, with
+explicit stale pruning; normal checks never write. An allowance records a
+reviewed outcome, not ideal code. Agents must not create or raise one to hide a
+finding, mechanically split a coherent callable to remove it, or change
+thresholds/exclusions to avoid the ratchet. Use the targeted workflow in SKILL.md.

@@ -485,3 +485,45 @@ ratchets are deferred to avoid adding identity rules to this bounded feature.
 Both baselines share filesystem safety routines, while retaining separate
 schemas and guard-specific lifecycle rules. The original Markdown admission
 and threshold evidence remain historical records.
+
+## D36 — Callable REVIEW acceptance uses unique lexical identities and reviewed ceilings
+
+Callable size, nesting, and complexity share one independent source-controlled
+baseline in `.agent-tools/code-guard.callable-review-baseline.json`. The durable
+key is normalized root-relative physical path + embedded language + lexical
+callable identity + canonical guard ID. `SourceRange` remains an in-memory
+ownership fact and is never persisted as review identity. Boundary kind adds
+no discriminator: the lexical tuple must resolve uniquely in current
+runner-owned `AnalysisFacts`, or an active allowance fails closed. No parser,
+repository discovery, signature reconstruction, hash, ordinal, or fuzzy
+matching layer is added. Named identities survive unrelated line insertion;
+rename/move/disappearance and coordinate-qualified callback movement can leave
+stale, harmless entries requiring explicit pruning/re-review.
+
+The shared application step preserves measurement, threshold, selection,
+parser semantics, and guard-native details. For threshold `T`, accepted ceiling
+`A`, and current measurement `M`, `M <= T` passes with `notNeeded`; otherwise
+`M <= A` passes with `withinAllowance`, and `M > A` reviews with `grown`.
+Unmatched callables use the ordinary threshold. Disabled guards stay disabled;
+accepted findings cannot hide provider/syntax INCOMPLETE evidence. Global
+threshold changes do not rewrite ceilings. Configuration/CLI/storage use
+`cyclomaticComplexity`, explicitly mapped to the existing `complexity`
+result/policy ID; the alternate baseline/CLI spelling is rejected.
+
+Acceptance targets one current REVIEW in one explicit physical file, requires
+a human reason, and records the exact measured value. It can create the
+baseline or add one entry, but cannot replace or increase an existing ceiling.
+Separate maintenance only lowers/removes entries, with stale pruning explicitly
+requested. Both use explicit positional/current-filesystem bounds and reject
+Git selectors, CI/JSON analysis, and other lifecycle modes. They reuse
+`baseline_files` safety and atomic-write primitives. Normal analysis remains
+read-only; unavailable/excluded/unselected files supply no pruning evidence.
+LOC and Markdown retain independent schemas and lifecycles.
+
+Matched full/debug findings add accepted value, ratchet status, and reason;
+compact omits accepted PASS noise, while human REVIEW shows growth versus the
+accepted ceiling. Stale diagnostics are scoped to completed evidence, and
+ambiguity is a tool error. D9 authorization remains a workflow rule: no
+interactive approval or authentication mechanism is added. Explicit command
+intent and a reason provide the mechanical write boundary. Allowances record
+reviewed outcomes, not ideal code; no auto-acceptance or metric gaming is allowed.
