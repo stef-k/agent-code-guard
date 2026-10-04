@@ -18,6 +18,9 @@ def compare_current(
     if context.git_authority is None or context.configuration_path is None:
         raise ValueError('policy comparison requires runner-owned Git and active configuration authority')
     artifact = _owned_configuration_path(context.configuration_path, context.root)
+    # All three current baselines share this directory, even when artifacts are
+    # absent. This extra ownership check applies only to Git policy comparison.
+    loc_baseline.validate_storage_path(context.root)
     base = context.git_authority.base_object
     text = read_artifact(context.root, base, artifact)
     document = parse_configuration(text) if text is not None else {}

@@ -73,9 +73,9 @@ def parse(text: str) -> dict[str, int]:
 
 def load_if_present(root: Path) -> dict[str, int] | None:
     path = baseline_path(root)
-    validate_storage_path(root)
     if not path.exists() and not path.is_symlink():
         return None
+    validate_storage_path(root)
     return load(path)
 
 

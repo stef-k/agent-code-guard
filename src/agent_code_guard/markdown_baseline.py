@@ -87,9 +87,9 @@ def _validate_storage(root: Path) -> None:
 
 def load_if_present(root: Path) -> dict[str, int] | None:
     target = baseline_path(root)
-    _validate_storage(root)
     if not target.exists() and not target.is_symlink():
         return None
+    _validate_storage(root)
     entries = load(target)
     baseline_files.validate_paths(root, entries, 'Markdown')
     return entries

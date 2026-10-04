@@ -361,6 +361,9 @@ class PolicyGitTests(CodeGuardTestCase):
             result = self.run_guard(root, 'src', '--staged', '--config', str(explicit), '--json')
             self.assertEqual(result.returncode, 3)
             self.assertIn('baseline directory must be a real directory', self.read_json(result)['error'])
+            plain = self.run_guard(root, 'src', '--config', str(explicit), '--json')
+            self.assertEqual(plain.returncode, 0, plain.stdout)
+            self.assertNotIn('policyRelaxation', self.read_json(plain)['guards'])
 
     def test_unsafe_historical_blob_tree_and_gitlink_shapes_fail_closed(self):
         for mode, relative in (('120000', CONFIG), ('120000', '.agent-tools'),
