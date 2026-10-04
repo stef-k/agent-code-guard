@@ -105,7 +105,8 @@ worktree, then intersects them with positional file or directory bounds.
 code-guard . --staged
 ```
 
-This selects only index changes. Unstaged and untracked files are excluded.
+This selects only index changes as source candidates. Analysis still uses
+working-tree configuration and baselines, including unstaged policy edits.
 
 ### Base comparison
 
@@ -120,6 +121,72 @@ fetch the intended base before running in shallow or isolated CI checkouts.
 Only one of `--changed-only`, `--staged`, and `--base-ref` may be used at a
 time. Positional paths bound the Git-selected candidates; they do not add files
 outside that selection.
+
+### Policy relaxation in Git modes
+
+Every Git comparison also runs the non-configurable `policyRelaxation` guard.
+It compares persistent effective policy after production defaults and
+normalization, using the same retained Git authority as source selection:
+
+| Mode | Trusted policy | Current policy |
+| --- | --- | --- |
+| `--changed-only` | Resolved HEAD | Actual working tree |
+| `--staged` | Resolved HEAD | Actual working tree, including unstaged policy |
+| `--base-ref REF` | Runner-selected merge-base object | Actual working tree |
+
+Changed/staged repositories with no HEAD use built-in defaults and empty
+baselines as the trusted state. Base-ref still requires valid commit authority.
+Missing owned artifacts mean defaults/empty allowances. Invalid authority,
+malformed current/historical policy, unsupported baseline versions, and unsafe
+historical symlink/object/ancestor shapes are tool errors, never policy PASS.
+
+The four compared artifacts are the actual active configuration and:
+
+- `.agent-tools/code-guard.loc-baseline.json`;
+- `.agent-tools/code-guard.markdown-baseline.json`;
+- `.agent-tools/code-guard.callable-review-baseline.json`.
+
+Automatic config discovery stays relative to the invocation directory;
+baselines stay at the Git root. Repository-owned explicit config aliases map
+to their canonical repository path. External configs and repository policy
+symlink traversal cannot establish trusted history and fail closed in Git
+modes. Plain explicit/audit analysis omits this inapplicable guard.
+
+The guard reviews disabling any configured guard, increasing active REVIEW or
+LOC thresholds, changing LOC `ratchetAt` from `review` to `fail`, reducing
+counted blank/comment evidence, removing normalized LOC extensions, adding
+normalized exclusion/exemption declarations, and adding/increasing any of the
+three baseline allowances. Lowering/removing allowances, reason-only edits,
+and neutral default serialization/reordering stay quiet. Transient CLI choices
+are excluded from persistent policy comparison.
+
+Exclusions use declaration sets, without symbolic glob reasoning: even a
+redundant added declaration may REVIEW. Ordered LOC override match sets retain
+last-match-wins semantics. Unchanged normalized topology permits threshold
+comparison; a changed topology produces one conservative
+`overrideTopologyChanged` reason. These findings describe what changed and do
+not claim that arbitrary effective path coverage was proven weaker.
+
+REVIEW is one aggregate with `totalReasons`, sorted `reasonCounts` and
+`artifactCounts`, at most 20 `reasons`, and `omittedReasons`. Reasons sort by
+artifact, logical field, path/selector, and code. Each retains `artifact`,
+`field`, `reasonCode`, `before`, `after`, and explanatory `message`, with a
+`path` or exact callable `selector` where appropriate. Topology before/after
+summaries retain entry counts and SHA-256 fingerprints instead of unbounded
+match lists. Human, full/debug JSON, and compact JSON share this cap. REVIEW
+requires `policyRelaxation` guidance; PASS has no required policy. `--ci`
+retains visible REVIEW and exits `0`; independent FAIL/INCOMPLETE dominates.
+
+Policy comparison does not alter source counts. An empty selected-source scope
+can REVIEW a policy change, even when positional bounds, `scope.exclude`, or
+LOC exclusions hide every source or policy file from ordinary analysis.
+Legitimate authorized policy relaxation can be retained; do not reverse it
+solely to clear REVIEW or weaken another control to silence the finding.
+
+Residual trust boundaries remain: transient CLI thresholds/counting/exclusions;
+choosing a base that omits prior weakening; changing/removing Code Guard or its
+CI invocation; and switching invocation/config outside the active compared
+artifact. This guard does not enforce CI integrity or infer authorization.
 
 ### Explicit files and no VCS
 
@@ -381,7 +448,7 @@ analysis starts with the aggregate state and exact scope counts:
 PASS: 3 selected; 2 analyzed; 1 inapplicable; 0 excluded.
 ```
 
-The labels do not pluralize. An empty valid selection is
+The labels do not pluralize. An empty valid selection with no policy relaxation is
 `PASS: 0 selected; 0 analyzed; 0 inapplicable; 0 excluded.` and exits `0`.
 Existing finding and required-policy lines follow this summary unchanged.
 

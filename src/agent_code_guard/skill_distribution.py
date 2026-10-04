@@ -19,6 +19,7 @@ PAYLOAD_FILES = (
     "references/loc-policy.md",
     "references/markdown-size-policy.md",
     "references/nesting-policy.md",
+    "references/policy-relaxation-policy.md",
 )
 
 

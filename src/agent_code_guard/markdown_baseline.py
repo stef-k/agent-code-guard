@@ -32,9 +32,18 @@ def _exact_keys(value: Any, keys: set[str], location: str) -> None:
 
 
 def load(path: Path) -> dict[str, int]:
+    """Read current storage through the same parser used for historical blobs."""
     try:
-        data = json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=_unique_object)
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        return parse(path.read_text(encoding='utf-8'))
+    except (OSError, UnicodeError) as exc:
+        raise ValueError(f'invalid Markdown baseline: {exc}') from exc
+
+
+def parse(text: str) -> dict[str, int]:
+    """Validate persisted schema and paths without current target-file I/O."""
+    try:
+        data = json.loads(text, object_pairs_hook=_unique_object)
+    except json.JSONDecodeError as exc:
         raise ValueError(f'invalid Markdown baseline: {exc}') from exc
     _exact_keys(data, {'version', 'markdownDocumentSize'}, 'Markdown baseline')
     if type(data['version']) is not int or data['version'] != 1:

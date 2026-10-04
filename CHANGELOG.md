@@ -6,12 +6,24 @@ Notable changes to Agent Code Guard are recorded here.
 
 ### Added
 
+- Non-configurable, Git-mode-only `policyRelaxation` REVIEW comparison of active
+  effective configuration and all three baseline families. Source and policy
+  share one resolved HEAD/merge-base authority; staged mode uses working-tree
+  policy. Typed reasons retain summary counts, 20 details, and an omitted count.
+  Invalid/unowned historical authority fails closed; bundled guidance explains
+  legitimate authorized relaxation and remaining workflow trust boundaries.
 - A separate accepted-REVIEW ratchet shared by callable size, nesting, and
   complexity. Explicit acceptance records one current REVIEW and its reason;
   maintenance only lowers/removes existing ceilings and explicitly prunes stale
   identities. Matching uses unique physical path, embedded language, and lexical
   identity without persisted ranges. Normal checks stay read-only; full/debug
   output explains accepted values, and growth returns the existing guard REVIEW.
+
+### Fixed
+
+- Compare LOC configuration for policy relaxation only when LOC is enabled in
+  both policies, keeping dormant maintenance and activation quiet while retaining
+  guard-disablement, common-scope, and persisted-baseline detection.
 
 ## 0.4.0 - 2026-09-06
 

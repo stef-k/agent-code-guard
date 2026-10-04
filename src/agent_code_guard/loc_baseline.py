@@ -29,9 +29,18 @@ def baseline_path(root: Path) -> Path:
 
 
 def load(path: Path) -> dict[str, int]:
+    """Read current storage; pure parsing also serves historical Git blobs."""
     try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        return parse(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError) as exc:
+        raise ValueError(f"invalid LOC baseline: {exc}") from exc
+
+
+def parse(text: str) -> dict[str, int]:
+    """Validate version-1 text structurally, independently of today's filesystem."""
+    try:
+        document = json.loads(text)
+    except json.JSONDecodeError as exc:
         raise ValueError(f"invalid LOC baseline: {exc}") from exc
     _exact_keys(document, {"version", "loc"}, "baseline")
     version = document.get("version")

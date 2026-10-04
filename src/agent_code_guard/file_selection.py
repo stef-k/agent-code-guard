@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from .invocation import AnalysisContext, JsonObject, SelectedFile
+from .invocation import AnalysisContext, GitAuthority, JsonObject, SelectedFile, configuration_path
 from .path_matching import matches_path_glob, relative_or_absolute_path
 
 BUILTIN_PRUNED_DIRECTORIES = {".git", "node_modules", "bin", "obj"}
@@ -26,13 +26,17 @@ class SelectionArgs(Protocol):
 
 @dataclass(frozen=True)
 class ResolvedScope:
+    """Selected files and the single historical authority for this invocation."""
+
     root: Path
     files: tuple[Path, ...]
     excluded_files: tuple[Path, ...] = ()
+    git_authority: GitAuthority | None = None
 
 
 def resolve_invocation(
     args: SelectionArgs, start: Path, configuration: JsonObject,
+    active_configuration_path: Path | None = None,
 ) -> AnalysisContext:
     """Resolve every physical/reporting identity once for one invocation."""
     scope = _resolve_scope(args, start, configuration)
@@ -41,6 +45,8 @@ def resolve_invocation(
         configuration,
         tuple(SelectedFile(_reporting_path(path, scope.root), path) for path in scope.files),
         tuple(SelectedFile(_reporting_path(path, scope.root), path) for path in scope.excluded_files),
+        active_configuration_path or configuration_path(args.config, start),
+        scope.git_authority,
     )
 
 
@@ -67,13 +73,14 @@ def _resolve_scope(args: SelectionArgs, start: Path, configuration: JsonObject) 
     git_root = find_repo_root(working_root)
     root = git_root or working_root
     validate_selection_args(args, git_root)
+    authority = resolve_git_authority(args, git_root)
     paths = resolve_explicit_paths(args.paths, working_root)
 
     if args.base_ref is not None:
-        candidates = git_base_files(git_root, args.base_ref)
+        candidates = git_base_files(git_root, authority)
         files = bound_git_candidates(existing_files(candidates), paths)
     elif args.changed_only or args.staged:
-        candidates = git_files(git_root, staged=args.staged)
+        candidates = git_files(git_root, staged=args.staged, authority=authority)
         files = bound_git_candidates(existing_files(candidates), paths)
     else:
         files = existing_files(expand_paths(paths, git_root))
@@ -86,7 +93,7 @@ def _resolve_scope(args: SelectionArgs, start: Path, configuration: JsonObject) 
         if any(matches_path_glob(reporting_path, pattern) for pattern in exclusions)
     )
     excluded_set = set(excluded)
-    return ResolvedScope(root, tuple(path for path in normalized if path not in excluded_set), excluded)
+    return ResolvedScope(root, tuple(path for path in normalized if path not in excluded_set), excluded, authority)
 
 
 def _reporting_path(canonical_path: Path, canonical_root: Path) -> str:
@@ -149,28 +156,59 @@ def validate_selection_args(args: SelectionArgs, git_root: Path | None) -> None:
         raise ValueError("--base-ref must not be empty")
     if (args.changed_only or args.staged or has_base_ref) and git_root is None:
         raise RuntimeError("Git file-selection mode requires a Git repository")
-    if has_base_ref:
-        validate_base_ref(git_root, args.base_ref)
 
 
-def validate_base_ref(root: Path, base_ref: str) -> None:
+def resolve_git_authority(args: SelectionArgs, root: Path | None) -> GitAuthority | None:
+    """Resolve required commits once; later work consumes objects, never moving refs."""
+    if not (args.changed_only or args.staged or args.base_ref is not None):
+        return None
+    assert root is not None
+    head = _head_object(root)
+    if args.base_ref is None:
+        return GitAuthority(head, head)
     try:
-        subprocess.run(
-            ["git", "merge-base", base_ref, "HEAD"], cwd=root, check=True,
-            capture_output=True,
-        )
+        reference = subprocess.run(
+            ['git', 'rev-parse', '--verify', '--end-of-options', f'{args.base_ref}^{{commit}}'],
+            cwd=root, check=True, capture_output=True,
+        ).stdout.strip().decode('ascii')
+        if head is None:
+            raise RuntimeError(f"unable to compare base ref {args.base_ref!r} with HEAD: no HEAD")
+        base = subprocess.run(
+            ["git", "merge-base", reference, head], cwd=root, check=True, capture_output=True,
+        ).stdout.strip().decode('ascii')
+        return GitAuthority(head, base)
     except subprocess.CalledProcessError as exc:
         detail = os.fsdecode(exc.stderr).strip()
-        message = f"unable to compare base ref {base_ref!r} with HEAD"
+        message = f"unable to compare base ref {args.base_ref!r} with HEAD"
         raise RuntimeError(f"{message}: {detail}" if detail else message) from exc
 
 
-def git_files(root: Path, staged: bool) -> list[Path]:
-    has_head = subprocess.run(
-        ["git", "rev-parse", "--verify", "--quiet", "HEAD"], cwd=root,
-        check=False, capture_output=True,
-    ).returncode == 0
-    diff_target = ["--cached"] if staged or not has_head else ["HEAD"]
+def _head_object(root: Path) -> str | None:
+    """Distinguish an unborn branch from unavailable or invalid HEAD authority."""
+    result = subprocess.run(
+        ['git', 'rev-parse', '--verify', '--quiet', 'HEAD^{commit}'],
+        cwd=root, check=False, capture_output=True,
+    )
+    if result.returncode == 0:
+        return result.stdout.strip().decode('ascii')
+    symbolic = subprocess.run(
+        ['git', 'symbolic-ref', '--quiet', 'HEAD'], cwd=root, check=False, capture_output=True,
+    )
+    if result.returncode == 1 and symbolic.returncode == 0:
+        reference = subprocess.run(
+            ['git', 'show-ref', '--verify', '--quiet', os.fsdecode(symbolic.stdout).strip()],
+            cwd=root, check=False, capture_output=True,
+        )
+        if reference.returncode == 1:
+            return None
+    raise RuntimeError('unable to resolve HEAD policy comparison authority')
+
+
+def git_files(root: Path, staged: bool, authority: GitAuthority) -> list[Path]:
+    """Select working/index changes against the already resolved HEAD object."""
+    diff_target = ['--cached'] if staged or authority.head_object is None else []
+    if authority.head_object is not None:
+        diff_target.append(authority.head_object)
     result = subprocess.run(
         ["git", "diff", *diff_target, "--name-only", "--diff-filter=ACMR", "-z"],
         cwd=root, check=True, capture_output=True,
@@ -185,16 +223,13 @@ def git_files(root: Path, staged: bool) -> list[Path]:
     return files
 
 
-def git_base_files(root: Path, base_ref: str) -> list[Path]:
-    try:
-        result = subprocess.run(
-            ["git", "diff", "--name-only", "--diff-filter=ACMR", "-z", f"{base_ref}...HEAD", "--"],
-            cwd=root, check=True, capture_output=True,
-        )
-    except subprocess.CalledProcessError as exc:
-        detail = os.fsdecode(exc.stderr).strip()
-        message = f"unable to compare base ref {base_ref!r} with HEAD"
-        raise RuntimeError(f"{message}: {detail}" if detail else message) from exc
+def git_base_files(root: Path, authority: GitAuthority) -> list[Path]:
+    """Preserve three-dot source semantics using the authority's chosen merge base."""
+    result = subprocess.run(
+        ["git", "diff", "--name-only", "--diff-filter=ACMR", "-z",
+         authority.base_object, authority.head_object, "--"],
+        cwd=root, check=True, capture_output=True,
+    )
     return [root / os.fsdecode(path) for path in result.stdout.split(b"\0") if path]
 
 

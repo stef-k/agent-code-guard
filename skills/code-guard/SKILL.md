@@ -90,6 +90,7 @@ Policy references:
 - nesting depth: `references/nesting-policy.md`
 - cyclomatic complexity: `references/complexity-policy.md`
 - Markdown document/section size: `references/markdown-size-policy.md`
+- Git policy relaxation: `references/policy-relaxation-policy.md`
 
 Do not load unrelated guard policies merely because they exist.
 
@@ -124,6 +125,7 @@ Guards:
 - cyclomatic complexity (implemented and enabled by default; REVIEW greater than 15).
 - Markdown document physical size (implemented for `.md` and enabled by default; REVIEW greater than 800);
 - Markdown direct-section physical size (implemented for `.md` and enabled by default; REVIEW greater than 200).
+- persistent policy relaxation (runner-owned, non-configurable, REVIEW-only in Git comparison modes).
 
 Callable LOC needs no invented configuration to activate it. Omission or
 `enabled: true` uses 80; an authorized positive-integer `reviewAt` overrides it,
@@ -154,6 +156,25 @@ Markdown document baseline passes the document-size guard. Load `references/mark
 `markdownDocumentSize` or `markdownSectionSize` appears in `requiredPolicies`.
 Review navigation and responsibility without mechanically splitting coherent
 specifications or gaming headings/formatting.
+
+`policyRelaxation` compares HEAD (or the runner-selected merge base) with the
+actual active working-tree configuration and three canonical baselines. Staged
+mode includes unstaged policy because that policy governs execution. No-HEAD
+changed/staged modes use defaults/empty allowances. Source bounds and exclusions
+cannot hide these artifacts; plain explicit/audit modes omit the guard. There
+is no `guards.policyRelaxation`, disable switch, threshold, exemption, or
+baseline. External/unowned config and invalid current/historical policy fail
+closed. Output retains total counts and at most 20 sorted reason details with
+an omitted count. Load `references/policy-relaxation-policy.md` only when
+`policyRelaxation` appears in `requiredPolicies`.
+
+Inspect why policy was relaxed and retain legitimate authorized changes with
+justification. Do not undo an authorized change merely to clear REVIEW or weaken
+another control to silence it. Added exclusion declarations and changed ordered
+override topology are conservative reviews, without proof that arbitrary path
+coverage became weaker. Transient CLI choices, choosing a base that omits prior
+weakening, installation/CI removal, and switching invocation/config outside the
+active artifact remain workflow trust boundaries.
 
 Do not invent configuration, disable a guard, or raise its threshold
 merely to silence a finding. Respect built-ins and only project/user-authorized overrides.

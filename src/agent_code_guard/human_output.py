@@ -115,6 +115,24 @@ def _markdown_lines(data: dict[str, object]) -> list[str]:
     return lines
 
 
+def _policy_relaxation_lines(data: dict[str, object]) -> list[str]:
+    """Render the same capped aggregate serialized by the result model."""
+    result = data['guards'].get('policyRelaxation')
+    if result is None or result['state'] != 'review':
+        return []
+    finding = result['findings'][0]
+    lines = [f"REVIEW: policyRelaxation — {finding['totalReasons']} policy reasons.",
+             f"  Reason counts: {json.dumps(finding['reasonCounts'], sort_keys=True)}",
+             f"  Artifact counts: {json.dumps(finding['artifactCounts'], sort_keys=True)}"]
+    for reason in finding['reasons']:
+        target = reason.get('path') or reason.get('selector')
+        detail = f" {json.dumps(target, ensure_ascii=False)}" if target is not None else ''
+        lines.append(f"  {reason['artifact']} {reason['field']}{detail} [{reason['reasonCode']}]: "
+                     f"{json.dumps(reason['before'])} -> {json.dumps(reason['after'])}. {reason['message']}")
+    lines.append(f"  Omitted reason details: {finding['omittedReasons']}.")
+    return lines
+
+
 def format_completed_analysis(data: dict[str, object]) -> str:
     """Return the complete human report for an existing completed payload."""
     scope = data["scope"]
@@ -142,6 +160,7 @@ def format_completed_analysis(data: dict[str, object]) -> str:
     lines.extend(_nesting_lines(data))
     lines.extend(_complexity_lines(data))
     lines.extend(_markdown_lines(data))
+    lines.extend(_policy_relaxation_lines(data))
     for item in data.get('callableReviewBaseline', {}).get('diagnostics', []):
         lines.append(f"STALE callable review: {item['path']} [{item['embeddedLanguage']}] "
                      f"{item['callable']} ({item['guard']}); prune with "

@@ -40,6 +40,17 @@ The six guard keys and their production defaults are:
 Every threshold comparison is strict `>`; a value equal to its threshold
 passes. The five `reviewAt` guards are REVIEW-only. Only `loc` can FAIL.
 
+The runner also owns `policyRelaxation` in Git comparison modes. It has **no
+configuration key**: `guards.policyRelaxation` is rejected. There is no disable
+switch, threshold, exclusion, exemption, or baseline for this guard. It reads
+the active repository-owned config and three canonical baselines independently
+of source bounds and exclusions. See [Git policy comparison](usage.md#policy-relaxation-in-git-modes).
+
+LOC settings below `enabled` are compared only when LOC is enabled in both
+policies. Disabling LOC reports `guardDisabled`; enabling it and editing dormant
+LOC settings stay quiet. Common `scope.exclude` declarations and persisted
+baseline records remain independently compared.
+
 Set `enabled` to `false` to disable a guard. For REVIEW-only guards, `reviewAt`
 must be a positive integer when enabled. LOC supports its established options,
 including `enabled`, `warnAt`, `failAt`, `ratchetAt`, line-count settings, extension policy,
@@ -60,7 +71,7 @@ Example with one deliberate threshold change:
 
 ## Common scope exclusions
 
-`scope.exclude` removes matching paths before any guard runs:
+`scope.exclude` removes matching source paths before source guards run:
 
 ```json
 {
@@ -76,6 +87,7 @@ Example with one deliberate threshold change:
 Repeated `--scope-exclude <glob>` values add caller-supplied all-guard
 exclusions and compose with project configuration. Only files removed by these
 two all-guard forms contribute to the completed result's `excluded` count.
+Neither form hides policy artifacts from `policyRelaxation`.
 
 ## LOC-specific exclusions
 
