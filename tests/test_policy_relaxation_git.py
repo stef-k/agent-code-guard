@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -264,16 +265,19 @@ class PolicyGitTests(CodeGuardTestCase):
             self.assertEqual(result.returncode, 3)
             self.assertIn('symlink', self.read_json(result)['error'])
 
-    def test_config_symlink_ancestor_cannot_leave_and_reenter_repository(self):
+    def test_config_symlink_ancestor_cannot_supply_owned_policy_authority(self):
         with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as outside:
             root = Path(temp).resolve()
             self.base(root)
             link = root / 'link'
+            # Windows normalizes '..' before following directory links. Use a
+            # direct owned target there; POSIX exercises escape and re-entry.
+            target = root / '.agent-tools' if os.name == 'nt' else Path(outside).resolve()
             try:
-                link.symlink_to(Path(outside).resolve(), target_is_directory=True)
+                link.symlink_to(target, target_is_directory=True)
             except OSError as exc:
                 self.skipTest(f'symlinks unavailable: {exc}')
-            alias = link / '..' / root.name / CONFIG
+            alias = link / 'code-guard.config.json' if os.name == 'nt' else link / '..' / root.name / CONFIG
             self.assertEqual(alias.resolve(), root / CONFIG)
             result = self.run_guard(root, 'src', '--staged', '--config', str(alias), '--json')
             self.assertEqual(result.returncode, 3)
