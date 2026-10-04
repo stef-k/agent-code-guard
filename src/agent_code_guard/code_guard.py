@@ -10,15 +10,19 @@ from importlib.metadata import PackageNotFoundError, version as distribution_ver
 import json
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .config_validation import validate_configuration
 from .file_selection import ResolvedScope, resolve_invocation, resolve_scope
 from .guards import callable_size, complexity, loc, markdown_document_size, markdown_section_size, nesting
 from .human_output import format_completed_analysis
-from . import baseline_files, loc_baseline, markdown_baseline
+from . import baseline_files, callable_review_baseline, loc_baseline, markdown_baseline
 from .result_model import GuardResult, aggregate_state, required_policies
 from .invocation import AnalysisContext, SelectedFile, load_configuration
 from .skill_distribution import export_skill, skill_path as installed_skill_path
+
+if TYPE_CHECKING:
+    from .analysis.facts import AnalysisFacts
 
 DISTRIBUTION_NAME = "agent-code-guard"
 METADATA_UNAVAILABLE = f"installed distribution metadata is unavailable for {DISTRIBUTION_NAME}"
@@ -67,7 +71,17 @@ Reviewed Markdown documents:
     Create or lower/prune .agent-tools/code-guard.markdown-baseline.json at the
     analysis root. Accept reviewed document sizes; growth produces REVIEW.
     Section findings remain independent. Both modes accept --scope-exclude,
-    reject LOC counting options and analysis modes, and never add on update.""",
+    reject LOC counting options and analysis modes, and never add on update.
+
+Reviewed callables (explicit human-authorized acceptance):
+  code-guard FILE --accept-callable-review GUARD LANGUAGE CALLABLE --reason TEXT
+  code-guard PATH [PATH ...] --update-callable-review-baseline
+    [--prune-stale-callable-reviews]
+    Record one current REVIEW in .agent-tools/code-guard.callable-review-baseline.json.
+    GUARD is callableSize, nesting, or cyclomaticComplexity (result ID: complexity).
+    Acceptance cannot replace/increase an existing allowance. Maintenance only
+    lowers/removes existing entries; stale pruning must be explicitly requested.
+    Both require positional/current-filesystem scope and reject analysis modes.""",
     )
     value.add_argument(
         "paths", nargs="*", default=[],
@@ -112,6 +126,19 @@ Reviewed Markdown documents:
     value.add_argument(
         "--update-markdown-baseline", action="store_true",
         help="Lower or prune existing Markdown document allowances; never add or increase one.",
+    )
+    value.add_argument(
+        "--accept-callable-review", nargs=3, metavar=("GUARD", "LANGUAGE", "CALLABLE"),
+        help="Accept one current callable REVIEW in one explicit file; requires --reason.",
+    )
+    value.add_argument("--reason", help="Non-empty human review reason for --accept-callable-review.")
+    value.add_argument(
+        "--update-callable-review-baseline", action="store_true",
+        help="Lower/remove existing callable allowances; never add or increase one.",
+    )
+    value.add_argument(
+        "--prune-stale-callable-reviews", action="store_true",
+        help="With callable baseline maintenance, prune disappeared/renamed callable entries within bounds.",
     )
     value.add_argument(
         "--skill-path", action="store_true",
@@ -219,14 +246,20 @@ def _management_mode(args: argparse.Namespace) -> int | None:
 
 
 def _baseline_mode(args: argparse.Namespace) -> int | None:
+    if args.reason is not None and not args.accept_callable_review:
+        raise ValueError("--reason requires --accept-callable-review")
+    if args.prune_stale_callable_reviews and not args.update_callable_review_baseline:
+        raise ValueError("--prune-stale-callable-reviews requires --update-callable-review-baseline")
     modes = (args.create_loc_baseline, args.update_loc_baseline,
-             args.create_markdown_baseline, args.update_markdown_baseline)
+             args.create_markdown_baseline, args.update_markdown_baseline,
+             bool(args.accept_callable_review), args.update_callable_review_baseline)
     if not any(modes):
         return None
     markdown_mode = args.create_markdown_baseline or args.update_markdown_baseline
+    callable_mode = bool(args.accept_callable_review) or args.update_callable_review_baseline
     incompatible = (
         sum(modes) != 1
-        or (markdown_mode and (
+        or ((markdown_mode or callable_mode) and (
             args.warn is not None or args.fail is not None or args.include or args.exclude
             or args.count_blank_lines or args.ignore_comment_lines
         ))
@@ -242,8 +275,10 @@ def _baseline_mode(args: argparse.Namespace) -> int | None:
         or args.export_skill is not None
     )
     if incompatible:
-        options = "configuration/scope options" if markdown_mode else "LOC counting/configuration options"
+        options = "configuration/scope options" if markdown_mode or callable_mode else "LOC counting/configuration options"
         raise ValueError(f"baseline write modes accept only paths and {options}; use one write mode")
+    if callable_mode:
+        return _callable_baseline_mode(args)
     args.paths = args.paths or ["."]
     invocation = Path.cwd()
     validate_configuration(args.config, invocation)
@@ -266,6 +301,51 @@ def _baseline_mode(args: argparse.Namespace) -> int | None:
             f"Updated {label} baseline: {lifecycle.RELATIVE_PATH} "
             f"({lowered} lowered, {removed} removed, {unchanged} unchanged)."
         )
+    return 0
+
+
+def _callable_baseline_mode(args: argparse.Namespace) -> int:
+    """Run current evidence once, then perform one explicitly bounded baseline mutation."""
+    if not args.paths:
+        raise ValueError("callable baseline writes require explicit positional scope")
+    if args.accept_callable_review:
+        callable_review_baseline.validate_guard(args.accept_callable_review[0])
+        if args.reason is None or not args.reason.strip():
+            raise ValueError("callable REVIEW acceptance requires a non-empty --reason")
+    invocation = Path.cwd()
+    configuration = load_configuration(args.config, invocation)
+    validate_configuration(args.config, invocation, configuration)
+    context = resolve_invocation(args, invocation, configuration)
+    files = tuple(selected.physical_path for selected in context.selected_files)
+    linked_targets = baseline_files.validate_explicit_scope(args.paths, invocation, context.root, files)
+    bounds = baseline_files.resolve_bounds(args.paths, invocation, context.root)
+    if linked_targets:
+        raise ValueError("callable baseline write scope may not use explicit file symlinks")
+    if args.accept_callable_review and (len(bounds) != 1 or bounds[0][1]):
+        raise ValueError("callable REVIEW acceptance requires exactly one explicit file")
+    analysis = run_analysis(context, args, linked_targets=linked_targets)
+    if analysis.unavailable:
+        raise ValueError("callable baseline writes require complete analysis; unavailable: "
+                         + ", ".join(item.path for item in analysis.unavailable))
+    if analysis.facts is None:
+        raise ValueError("callable baseline writes require enabled callable guards")
+    if args.accept_callable_review:
+        guard, language, callable = args.accept_callable_review
+        callable_review_baseline.accept(
+            context.root, analysis.callable_reviews, analysis.facts, analysis.results,
+            bounds[0][0], guard, language, callable, args.reason,
+        )
+        print(f"Accepted callable REVIEW: {bounds[0][0].relative_to(context.root).as_posix()} "
+              f"[{language}] {callable} ({guard}); {callable_review_baseline.RELATIVE_PATH}.")
+    else:
+        lowered, removed, unchanged, stale = callable_review_baseline.update(
+            context.root, analysis.callable_reviews, analysis.facts, analysis.results, bounds,
+            args.prune_stale_callable_reviews,
+        )
+        print(f"Updated callable review baseline: {callable_review_baseline.RELATIVE_PATH} "
+              f"({lowered} lowered, {removed} removed, {unchanged} unchanged, {stale} stale).")
+        if stale and not args.prune_stale_callable_reviews:
+            print("Use --prune-stale-callable-reviews with maintenance to prune stale entries.")
     return 0
 
 
@@ -309,6 +389,10 @@ class CompletedAnalysis:
     scope: ScopeSummary
     unavailable: tuple[UnavailableEntry, ...] = ()
     incomplete_guard_ids: tuple[str, ...] = ()
+    # Lifecycle commands consume the same evidence and loaded baseline as normal analysis.
+    facts: AnalysisFacts | None = None
+    callable_reviews: dict[callable_review_baseline.ReviewKey, callable_review_baseline.Review] | None = None
+    callable_review_diagnostics: tuple[dict[str, str], ...] = ()
 
 
 def payload(
@@ -345,6 +429,11 @@ def payload(
             guard["findings"] = [
                 finding for finding in guard["findings"] if finding["state"] in {"review", "fail"}
             ]
+    if analysis.callable_review_diagnostics:
+        data["callableReviewBaseline"] = {
+            "path": callable_review_baseline.RELATIVE_PATH,
+            "diagnostics": list(analysis.callable_review_diagnostics),
+        }
     return data
 
 
@@ -361,10 +450,11 @@ def run_analysis(
     loc_config = loc.load_config(args, context.configuration)
     baseline = baseline_override if baseline_loaded else loc_baseline.load_if_present(context.root)
     document_baseline = markdown_baseline.load_if_present(context.root)
+    callable_reviews = callable_review_baseline.load_if_present(context.root)
     if baseline is not None:
         loc_baseline.validate_paths(context.root, baseline)
         loc_baseline.validate_overlap(baseline, loc_config)
-    if baseline is not None or document_baseline is not None:
+    if baseline is not None or document_baseline is not None or callable_reviews is not None:
         baseline_files.validate_analysis_scope(
             context.root, tuple(selected.physical_path for selected in context.selected_files),
         )
@@ -384,6 +474,7 @@ def run_analysis(
         if loc_config.enabled and loc.should_include(selected, loc_config)
     }
     needs_analysis = callable_size_config.enabled or nesting_config.enabled or complexity_config.enabled
+    callable_review_diagnostics = ()
     if needs_analysis:
         analysis = import_module("agent_code_guard.analysis.pipeline")
         analyzed_files.update(selected.reporting_path for selected in context.selected_files if analysis.is_applicable(selected.physical_path))
@@ -395,6 +486,14 @@ def run_analysis(
             results.append(nesting.run(context.root, nesting_config, facts))
         if complexity_config.enabled:
             results.append(complexity.run(context.root, complexity_config, facts))
+        if callable_reviews is not None:
+            applicable_reviews = {
+                key: entry for key, entry in callable_reviews.items()
+                if context.root / entry.path not in (linked_targets or set())
+            }
+            results, callable_review_diagnostics = callable_review_baseline.apply(
+                context.root, applicable_reviews, facts, results,
+            )
     needs_markdown = markdown_document_config.enabled or markdown_section_config.enabled
     markdown_files = tuple(selected for selected in context.selected_files if selected.physical_path.suffix.lower() == ".md") if needs_markdown else ()
     analyzed_files.update(selected.reporting_path for selected in markdown_files)
@@ -433,6 +532,9 @@ def run_analysis(
         ),
         unavailable,
         incomplete_guard_ids,
+        facts if needs_analysis else None,
+        callable_reviews,
+        callable_review_diagnostics,
     )
 
 
@@ -508,6 +610,7 @@ def main() -> int:
         if baseline_loaded and (
             loc_baseline.baseline_path(scope.root).exists()
             or markdown_baseline.baseline_path(scope.root).exists()
+            or callable_review_baseline.baseline_path(scope.root).exists()
         ):
             linked_targets = baseline_files.validate_explicit_scope(
                 args.paths, invocation, scope.root,
@@ -524,7 +627,8 @@ def main() -> int:
         return exit_code(data["overall"], args.ci)
     except Exception as exc:
         write_mode = any((args.create_loc_baseline, args.update_loc_baseline,
-                          args.create_markdown_baseline, args.update_markdown_baseline))
+                          args.create_markdown_baseline, args.update_markdown_baseline,
+                          args.accept_callable_review, args.update_callable_review_baseline))
         return _print_tool_error(str(exc), args.json and not write_mode)
 
 
