@@ -278,5 +278,6 @@ def update(
             lowered += 1
         else:
             unchanged += 1
-    _write(root, proposed, creating=False)
+    if proposed != entries:
+        _write(root, proposed, creating=False)
     return lowered, removed, unchanged, stale

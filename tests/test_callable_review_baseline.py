@@ -178,3 +178,63 @@ class CallableReviewBaselineTests(CodeGuardTestCase):
             compact = self.read_json(self.run_guard(root, 'sample.py', '--json', '--json-mode', 'compact'))
             self.assertEqual(compact['guards']['complexity']['findings'][0]['ratchetStatus'], 'grown')
             self.assertEqual(self.run_guard(root, 'sample.py', '--ci').returncode, 0)
+
+    def test_anonymous_callback_movement_requires_review_again(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            configure(root)
+            path = root / 'sample.js'
+            text = 'values.map(value => { if (value) return 1; if (value === 0) return 2; return 3; });\n'
+            path.write_text(text, encoding='utf-8')
+            ordinary = self.read_json(self.run_guard(root, 'sample.js', '--json'))
+            finding = ordinary['guards']['complexity']['findings'][0]
+            self.assertIn('<callback@', finding['callable'])
+            baseline = store(root, [review(measured=3, path='sample.js', embeddedLanguage='javascript',
+                                          callable=finding['callable'])])
+            self.assertEqual(self.run_guard(root, 'sample.js', '--json').returncode, 0)
+            path.write_text('// Unrelated movement\n' + text, encoding='utf-8')
+            moved = self.read_json(self.run_guard(root, 'sample.js', '--json'))
+            self.assertEqual(moved['guards']['complexity']['state'], 'review')
+            self.assertEqual(moved['callableReviewBaseline']['diagnostics'][0]['status'], 'stale')
+            self.assertNotIn('range', json.loads(baseline.read_text(encoding='utf-8'))['callableReviews'][0])
+
+    def test_vue_embedded_languages_are_distinct_and_same_language_duplicates_are_ambiguous(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            configure(root)
+            path = root / 'sample.vue'
+            function = 'function selected(value) { if (value) value++; if (value === 0) value++; return value; }\n'
+            javascript = '<script>\n' + function + '</script>\n'
+            path.write_text(javascript + '<script lang="ts">\n' + function + '</script>\n', encoding='utf-8')
+            store(root, [review(measured=3, path='sample.vue', embeddedLanguage='javascript')])
+            data = self.read_json(self.run_guard(root, 'sample.vue', '--json'))
+            findings = data['guards']['complexity']['findings']
+            self.assertEqual([(item['embeddedLanguage'], item['state']) for item in findings],
+                             [('javascript', 'pass'), ('typescript', 'review')])
+            path.write_text(javascript * 2, encoding='utf-8')
+            ambiguous = self.run_guard(root, 'sample.vue', '--json')
+            self.assertEqual(ambiguous.returncode, 3)
+            self.assertIn('ambiguous callable review', self.read_json(ambiguous)['error'])
+
+    def test_missing_baseline_matches_empty_baseline_and_independent_failure_remains(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            configure(root)
+            (root / 'sample.py').write_text(source('cyclomaticComplexity', 4), encoding='utf-8')
+            modes = ((), ('--json',), ('--json', '--json-mode', 'debug'), ('--json', '--json-mode', 'compact'))
+            without = [self.run_guard(root, 'sample.py', *mode) for mode in modes]
+            store(root, [])
+            for mode, before in zip(modes, without):
+                after = self.run_guard(root, 'sample.py', *mode)
+                self.assertEqual((after.returncode, after.stdout, after.stderr),
+                                 (before.returncode, before.stdout, before.stderr))
+            store(root, [review()])
+            config = root / '.agent-tools/code-guard.config.json'
+            document = json.loads(config.read_text(encoding='utf-8'))
+            document['guards']['loc'] = {'warnAt': 2, 'failAt': 3}
+            config.write_text(json.dumps(document), encoding='utf-8')
+            result = self.run_guard(root, 'sample.py', '--ci', '--json')
+            data = self.read_json(result)
+            self.assertEqual((result.returncode, data['overall']), (2, 'fail'))
+            self.assertEqual(data['guards']['complexity']['state'], 'pass')
+            self.assertEqual(data['requiredPolicies'], ['loc'])

@@ -272,6 +272,93 @@ independent section findings still require their own policy.
 
 See the [persisted schema](configuration.md#source-controlled-markdown-document-ratchet).
 
+## Accepted callable REVIEW ratchet
+
+After a human authorizes accepting a current callable REVIEW, record exactly
+one finding in exactly one explicit physical file:
+
+```bash
+code-guard offenders_patterns.py \
+  --accept-callable-review cyclomaticComplexity python offenders_patterns._auth \
+  --reason "Reviewed cohesive authentication-format catalog; re-review on growth."
+git add .agent-tools/code-guard.callable-review-baseline.json
+git diff --cached
+```
+
+The selector is guard + embedded language + exact lexical identity, as shown
+in full JSON. Canonical guards are `callableSize`, `nesting`, and
+`cyclomaticComplexity`; the existing complexity result/policy ID is still
+`complexity`, which is rejected as a baseline/CLI alias. Each invocation targets
+one current REVIEW, requires a non-empty reason, and records its exact current
+measurement. Directories, multiple files, PASS/nonexistent targets, duplicate
+lexical identities, and existing allowances are rejected. A second explicitly
+reviewed callable can be added with another invocation; there is no bulk mode.
+Acceptance cannot replace or raise an existing ceiling, including after growth.
+
+Normal analysis automatically reads the baseline without writing it. The
+threshold remains the general policy for unreviewed code; the accepted value
+is the reviewed ceiling for one callable/guard. For complexity threshold 15
+and accepted value 17:
+
+| Current complexity | Result |
+| --- | --- |
+| 17 or 16 | PASS, `withinAllowance` |
+| 18 | REVIEW, `grown` |
+| 15 or less | PASS, `notNeeded`; removable by maintenance |
+| Unaccepted callable at 16 | REVIEW under the unchanged threshold |
+
+Only a unique current physical path + language + lexical identity receives
+the allowance. Inserting unrelated lines above a named callable preserves the
+match. Renames/moves become unaccepted identities. Anonymous callbacks whose
+existing lexical names contain coordinates can become stale when moved and
+require re-review. Different embedded languages in Vue remain separate; two
+identical names in the same language fail closed. Remove an ambiguous entry
+through an explicitly reviewed source-control edit before accepting a unique
+current identity. No fuzzy matching or new parser behavior rescues old entries.
+
+Explicit maintenance operates within positional file/directory bounds:
+
+```bash
+code-guard src --update-callable-review-baseline
+code-guard src --update-callable-review-baseline --prune-stale-callable-reviews
+```
+
+Maintenance requires an existing baseline. It lowers a ceiling to the current
+measurement while still above the ordinary threshold, removes allowances no
+longer needed, and never adds/increases one. Growth aborts the entire proposal
+without partial writes. Stale entries remain until pruning is explicitly
+requested; directory bounds allow pruning entries for deleted files. Disabled
+guards and existing excluded/unselected/inapplicable files are preserved.
+Unchanged maintenance preserves file bytes and timestamps. Reasons survive
+lowering. Normal analysis reports stale identities only in completed analyzed
+files; maintenance additionally reports missing paths within its bounds.
+
+Both commands require explicit positional scope and current filesystem state.
+They accept `--config` and repeated `--scope-exclude`, reject other write modes,
+LOC counting/threshold options, `--changed-only`, `--staged`, `--base-ref`,
+`--ci`, JSON modes, diagnostics, version reporting, and skill management.
+Known unavailable syntax/provider evidence blocks writes. Success exits `0`;
+invalid/unsafe/ambiguous targets exit `3` on stderr without a completed report.
+Baseline storage and entries may not traverse symlinks or escape the analysis
+root. Write bounds reject symlinks; ordinary explicit-file symlink analysis
+cannot gain an allowance unless the physical file is also reached directly.
+
+Full/debug matched findings add `allowedMeasured`, `ratchetStatus`
+(`withinAllowance`, `grown`, `notNeeded`), and `reason`, retaining ordinary
+`thresholds.reviewAt`, measurement, range, language, and guard-native details.
+Compact JSON omits accepted PASS findings. Human output stays quiet for those
+passes and shows current versus accepted measurement on growth. Stale entries
+add concise human diagnostics and `callableReviewBaseline.diagnostics` in all
+JSON modes. Growth routes the existing guard policy; accepted passes do not.
+Independent REVIEW/FAIL and INCOMPLETE evidence and exit codes remain intact.
+
+An allowance records a human-reviewed outcome, not proof of ideal structure.
+Agents must not create or raise one merely to silence a finding. Do not split
+coherent callables mechanically, obscure control flow to reduce measured
+complexity/nesting, or change thresholds/exclusions to avoid re-review. Genuine
+reductions remain visible without automatic baseline mutation. Review and commit
+acceptance decisions. See the [schema](configuration.md#source-controlled-callable-review-ratchet).
+
 ## Results and exit codes
 
 - `PASS` means no special action and exits `0`.
