@@ -68,6 +68,63 @@ class PolicyRelaxationTests(unittest.TestCase):
             with self.subTest(before=before, after=after):
                 self.assertEqual(self.codes(comparison(config('loc', **before), config('loc', **after))), expected)
 
+    def test_loc_configuration_requires_enablement_in_both_states(self):
+        """Dormant LOC settings are neutral; disabling reports only enablement."""
+        override = {'match': ['src/**'], 'warnAt': 400, 'failAt': 600}
+        exemption = {'path': 'src/a.py', 'reason': 'accepted'}
+        cases = [
+            ({'warnAt': 400}, {'warnAt': 500}, [('warnAt', 'thresholdIncreased')]),
+            ({'failAt': 600}, {'failAt': 700}, [('failAt', 'thresholdIncreased')]),
+            ({'ratchetAt': 'review'}, {'ratchetAt': 'fail'}, [('ratchetAt', 'ratchetModeWeakened')]),
+            ({'countBlankLines': True}, {'countBlankLines': False}, [('countBlankLines', 'countedEvidenceReduced')]),
+            ({'countCommentLines': True}, {'countCommentLines': False}, [('countCommentLines', 'countedEvidenceReduced')]),
+            ({'includeExtensions': ['.py', '.ts']}, {'includeExtensions': ['.py']},
+             [('includeExtensions', 'extensionRemoved')]),
+            ({'exclude': ['src/**']}, {'exclude': ['src/**', 'src/generated/**']}, [('exclude', 'exclusionAdded')]),
+            ({'allowedLargeFiles': []}, {'allowedLargeFiles': [exemption]}, [('allowedLargeFiles', 'exemptionAdded')]),
+            ({'overrides': [override]}, {'overrides': [{**override, 'warnAt': 500, 'failAt': 700}]},
+             [('overrides[0].warnAt', 'thresholdIncreased'), ('overrides[0].failAt', 'thresholdIncreased')]),
+            ({'overrides': []}, {'overrides': [override]}, [('overrides', 'overrideTopologyChanged')]),
+            ({'overrides': [override]}, {'overrides': []}, [('overrides', 'overrideTopologyChanged')]),
+            ({'warnAt': 400, 'failAt': 600, 'countCommentLines': True, 'overrides': [override]},
+             {'warnAt': 500, 'failAt': 700, 'countCommentLines': False, 'overrides': []},
+             [('warnAt', 'thresholdIncreased'), ('failAt', 'thresholdIncreased'),
+              ('countCommentLines', 'countedEvidenceReduced'), ('overrides', 'overrideTopologyChanged')]),
+        ]
+        for old_enabled, new_enabled in ((False, False), (True, False), (False, True), (True, True)):
+            for before, after, active_reasons in cases:
+                with self.subTest(old_enabled=old_enabled, new_enabled=new_enabled, before=before, after=after):
+                    result = comparison(config('loc', **before, enabled=old_enabled),
+                                        config('loc', **after, enabled=new_enabled))
+                    if old_enabled and new_enabled:
+                        expected = active_reasons
+                    elif old_enabled:
+                        expected = [('enabled', 'guardDisabled')]
+                    else:
+                        expected = []
+                    reasons = [(reason.field, reason.reason_code) for finding in result.findings
+                               for reason in finding.reasons]
+                    self.assertEqual(reasons, sorted((f'guards.loc.{field}', code) for field, code in expected))
+                    self.assertEqual(result.state, 'review' if expected else 'pass')
+                    self.assertEqual(required_policies([result]), ['policyRelaxation'] if expected else [])
+
+    def test_common_exclusions_are_independent_of_loc_enablement(self):
+        """Common exclusion additions remain conservative even with LOC off."""
+        for old_enabled, new_enabled in ((False, False), (True, False), (False, True), (True, True)):
+            for before, after, added in ((['src/**'], ['src/**', 'src/generated/**'], True),
+                                         (['src/**'], ['./src/**', 'src\\**'], False),
+                                         (['src/**'], [], False)):
+                with self.subTest(old_enabled=old_enabled, new_enabled=new_enabled, before=before, after=after):
+                    previous = {**config('loc', enabled=old_enabled), 'scope': {'exclude': before}}
+                    current = {**config('loc', enabled=new_enabled), 'scope': {'exclude': after}}
+                    result = comparison(previous, current)
+                    expected = [('guards.loc.enabled', 'guardDisabled')] if old_enabled and not new_enabled else []
+                    if added:
+                        expected.append(('scope.exclude', 'exclusionAdded'))
+                    self.assertEqual([(reason.field, reason.reason_code) for finding in result.findings
+                                      for reason in finding.reasons], expected)
+                    self.assertEqual(result.state, 'review' if expected else 'pass')
+
     def test_extension_coverage_uses_product_normalization_and_case(self):
         cases = [(['py', '.ts'], ['.py', '.ts', 'py'], []),
                  (['.py', '.ts'], ['.py'], ['extensionRemoved']),
