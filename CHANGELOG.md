@@ -4,6 +4,17 @@ Notable changes to Agent Code Guard are recorded here.
 
 ## Unreleased
 
+## 0.5.1 - 2026-10-23
+
+### Fixed
+
+- Bootstrap CI, release builds, and fresh wheel/sdist smoke environments with
+  the Python advisory's SHA-256-pinned pip 26.2.2 wheel before dependency
+  downloads, without relying on the runner's seeded pip or CA bundle.
+- Document patched-installer prerequisites and the pinned bootstrap in the
+  packaged README and installation guides, including pipx's separate shared
+  environment and uv >=0.13.4. Analyzer behavior and parser pins are unchanged.
+
 ## 0.5.0 - 2026-10-04
 
 ### Added

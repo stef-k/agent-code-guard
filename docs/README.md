@@ -14,8 +14,9 @@ complex control flow, and documents that are becoming difficult to navigate.
 
 ## Get started
 
-Install the command in an isolated environment with
-[pipx](https://pipx.pypa.io/):
+Follow the [secure installation guide](usage.md#installation) first: downloads
+require pip >=26.2.2 (including pipx's shared pip) or uv >=0.13.4. With a patched
+installer, install the command in an isolated environment with [pipx](https://pipx.pypa.io/):
 
 ```bash
 pipx install agent-code-guard

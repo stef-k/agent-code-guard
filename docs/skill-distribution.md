@@ -4,7 +4,9 @@ The `agent-code-guard` Python distribution is the single versioned release
 unit. It contains the `code-guard` CLI, runtime, and an inert,
 version-matched skill payload. Keep their lifecycle steps distinct:
 
-1. Install the Python distribution with pipx, pip, or uv.
+1. Follow the [secure installation guide](usage.md#installation), then install
+   the Python distribution with pipx, pip, or uv. Downloads require pip
+   >=26.2.2 in the actual installer environment or uv >=0.13.4.
 2. Invoke the installed `code-guard` CLI.
 3. Locate the bundled skill:
 

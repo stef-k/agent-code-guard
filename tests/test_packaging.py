@@ -131,6 +131,17 @@ class InstalledPackageTests(unittest.TestCase):
         )
         self.assertNotIn("](docs/", metadata.get_payload())
 
+    def test_distribution_readme_includes_integrity_pinned_installer_bootstrap(self) -> None:
+        """PyPI readers receive the patched-installer contract with the release."""
+        readme = importlib.metadata.metadata("agent-code-guard").get_payload()
+        self.assertIn("pip >=26.2.2", readme)
+        self.assertIn("uv >=0.13.4", readme)
+        self.assertIn(
+            "pip-26.2.2-py3-none-any.whl#sha256="
+            "fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70",
+            readme,
+        )
+
     def test_distribution_declares_canonical_runtime_dependencies(self) -> None:
         requirements = importlib.metadata.requires("agent-code-guard") or []
         self.assertEqual(

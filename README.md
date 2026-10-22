@@ -60,6 +60,20 @@ it makes no claim about measured token savings.
 
 [pipx](https://pipx.pypa.io/) isolates the command from project environments:
 
+Before installing, use **pip >=26.2.2** in the environment that performs
+downloads, or **uv >=0.13.4**. For pipx's pip backend, this includes its shared
+pip environment; upgrading an unrelated system pip is insufficient. Follow the
+[secure installation guide](https://stef-k.github.io/agent-code-guard/usage.html#installation)
+for pipx prerequisites and virtual-environment setup. In an activated Python
+3.10+ virtual environment, bootstrap pip from the Python advisory's pinned wheel
+before downloading any other package:
+
+```bash
+python -m pip --isolated --disable-pip-version-check install --no-index --no-deps --no-cache-dir --require-hashes "pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70"
+```
+
+With a patched installer, install and check the command:
+
 ```bash
 pipx install agent-code-guard
 code-guard --version
@@ -77,7 +91,7 @@ Copy this prompt to a coding agent:
 > Adopt Agent Code Guard for this repository using the official project and
 > documentation at https://github.com/stef-k/agent-code-guard. This prompt
 > authorizes installing the published distribution in an isolated supported
-> way, preferably with `pipx install agent-code-guard`, and persistently
+> way after following the secure installation guide above, and persistently
 > activating or exporting its installed, version-matched skill for the current
 > agent environment. Verify `code-guard --version` and run `code-guard doctor`,
 > then locate the skill with `code-guard --skill-path`. Follow the

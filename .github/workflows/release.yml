@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/release.yml
       - pyproject.toml
+      - .github/pip-bootstrap.txt
       - MANIFEST.in
       - README.md
       - skills/code-guard/**
@@ -54,6 +55,10 @@ jobs:
             exit 1
           }
           echo "Release tag commit $tag_commit is contained in origin/main"
+      - name: Bootstrap integrity-pinned pip before dependency downloads
+        run: python -m pip --isolated --disable-pip-version-check install --no-index --no-deps --no-cache-dir --require-hashes -r .github/pip-bootstrap.txt
+      - name: Report installer versions and certificate configuration
+        run: python -m pip debug
       - name: Install build tools
         run: python -m pip install build twine
       - name: Build distributions once
@@ -76,6 +81,8 @@ jobs:
           smoke_dir="$(mktemp -d)"
           python -m venv "$smoke_dir/venv"
           cd "$smoke_dir"
+          "$smoke_dir/venv/bin/python" -m pip --isolated --disable-pip-version-check install --no-index --no-deps --no-cache-dir --require-hashes -r "$GITHUB_WORKSPACE/.github/pip-bootstrap.txt"
+          "$smoke_dir/venv/bin/python" -m pip debug
           "$smoke_dir/venv/bin/python" -m pip install "$artifact_dir"/*.whl
           "$smoke_dir/venv/bin/code-guard" --help
           "$smoke_dir/venv/bin/code-guard" --skill-path
@@ -92,6 +99,8 @@ jobs:
           smoke_dir="$(mktemp -d)"
           python -m venv "$smoke_dir/venv"
           cd "$smoke_dir"
+          "$smoke_dir/venv/bin/python" -m pip --isolated --disable-pip-version-check install --no-index --no-deps --no-cache-dir --require-hashes -r "$GITHUB_WORKSPACE/.github/pip-bootstrap.txt"
+          "$smoke_dir/venv/bin/python" -m pip debug
           "$smoke_dir/venv/bin/python" -m pip install "$artifact_dir"/*.tar.gz
           "$smoke_dir/venv/bin/code-guard" --help
           "$smoke_dir/venv/bin/code-guard" --skill-path
