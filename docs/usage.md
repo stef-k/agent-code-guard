@@ -2,26 +2,76 @@
 
 ## Installation
 
-Install Agent Code Guard as an isolated CLI tool with pipx:
+Use Python 3.10+ and an installer with patched certificate trust: pip >=26.2.2
+or uv >=0.13.4. Keep the operating system's CA store updated as well. The
+[Python security advisory](https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576)
+explains why updating only system certificates does not repair upstream pip's
+vendored certifi bundle.
+
+### Virtual environment
+
+Create and activate a virtual environment. On Linux/macOS:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+On Windows PowerShell:
+
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+Each new environment can seed an older pip through `ensurepip`. Before any
+dependency downloads, run this command with the activated environment's Python:
+
+```bash
+python -m pip --isolated --disable-pip-version-check install --no-index --no-deps --no-cache-dir --require-hashes "pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70"
+python -m pip --version
+python -m pip install agent-code-guard
+```
+
+The advisory supplies this exact wheel and SHA-256. Even when the seed pip's TLS
+roots are stale, the locally specified hash authenticates the bootstrap bytes
+before installation. The command disables index lookup, dependency resolution,
+cache reuse, and pip's update check. Do not replace it with an unpinned
+`pip install --upgrade pip` or disable TLS verification. Subsequent dependency
+downloads use the patched pip. For Python.org macOS installations, also update
+the separate certifi package used by that installation, as the advisory directs.
+
+### pipx and uv
+
+Install Agent Code Guard as an isolated CLI tool with pipx only after repairing
+the installer pipx actually uses:
 
 ```bash
 pipx install agent-code-guard
 ```
 
-Inside an activated Python virtual environment, use:
+For pipx's pip backend, locate its shared environment using `pipx environment`
+and run the pinned bootstrap above with that environment's Python before
+`pipx install`, `pipx upgrade-shared`, or any other download. On Linux/macOS its
+interpreter is normally `<PIPX_SHARED_LIBS>/bin/python`; on Windows it is
+`<PIPX_SHARED_LIBS>\Scripts\python.exe`. If the shared environment does not yet
+exist, use the virtual-environment route above rather than bootstrapping pipx
+through an older downloader. Updating a project's or system's pip does not
+update pipx's shared pip. See [how pipx works](https://pipx.pypa.io/stable/explanation/how-pipx-works.html).
 
-```bash
-python -m pip install agent-code-guard
-```
-
-An isolated uv tool installation is also available:
+For pipx's uv backend or a direct uv tool install, first verify `uv --version`
+reports >=0.13.4. Obtain a patched uv through an updated OS package manager or
+the pinned-pip environment above; an older uv's bundled roots must not be used
+to fetch its own replacement. Then:
 
 ```bash
 uv tool install agent-code-guard
 ```
 
-For source or repository development installs, run one of the following from a
-checkout:
+### Source installs
+
+For source or repository development installs, bootstrap pip in the active
+virtual environment as above, then run one of the following from a checkout:
 
 ```bash
 python -m pip install .

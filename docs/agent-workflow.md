@@ -7,8 +7,10 @@ activation.
 
 ## Human setup and decisions
 
-Install the published command in an isolated environment and verify the active
-installation:
+Follow the [secure installation guide](usage.md#installation) before downloading
+packages: use pip >=26.2.2 in the actual installer environment (including pipx's
+shared pip), or uv >=0.13.4. Then install the published command in an isolated
+environment and verify the active installation:
 
 ```bash
 pipx install agent-code-guard

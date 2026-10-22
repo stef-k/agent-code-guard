@@ -22,6 +22,10 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: pyproject.toml
+      - name: Bootstrap integrity-pinned pip before dependency downloads
+        run: python -m pip --isolated --disable-pip-version-check install --no-index --no-deps --no-cache-dir --require-hashes -r .github/pip-bootstrap.txt
+      - name: Report installer versions and certificate configuration
+        run: python -m pip debug
       - run: python -m pip install .
       - run: 'python -c "from pathlib import Path; import sys; p = Path(''.agent-tools/code-guard.loc-baseline.json''); present = p.exists() or p.is_symlink(); print(''Forbidden LOC baseline present: .agent-tools/code-guard.loc-baseline.json'', file=sys.stderr) if present else None; raise SystemExit(1 if present else 0)"'
       - run: code-guard . --ci
@@ -47,6 +51,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: pyproject.toml
+      - name: Bootstrap integrity-pinned pip before dependency downloads
+        run: python -m pip --isolated --disable-pip-version-check install --no-index --no-deps --no-cache-dir --require-hashes -r .github/pip-bootstrap.txt
+      - name: Report installer versions and certificate configuration
+        run: python -m pip debug
       - run: python -m pip install .
       - run: code-guard --help
       - run: code-guard --skill-path
